@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+
+# Explicitly defining members to match the Six-Tier Taxonomy
+members = [
+   "system-core",
+   "system-substrate",
+   "system-security",
+   "system-interface",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["PointSav Digital Systems AG"]
+license = "Proprietary"
+
+[profile.release]
+opt-level = "z"     # Optimize for size (critical for seL4/no_std)
+lto = true          # Link Time Optimization
+panic = "abort"     # No unwinding in no_std

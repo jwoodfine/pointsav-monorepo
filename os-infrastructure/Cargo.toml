@@ -1,0 +1,10 @@
+[package]
+name = "os-infrastructure"
+version = "0.1.0"
+edition = "2021"
+authors = ["P. Woodfine <pwoodfine@woodfinegroup.com>"]
+description = "Tier 4: Stateless Hypervisor Node (The Rails) for seL4."
+
+[dependencies]
+system-core = { path = "../system-core" }
+system-substrate = { path = "../system-substrate" }
