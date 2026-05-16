@@ -5,7 +5,7 @@
 # PointSav Digital Systems
 ### *Infraestructura de Registros Verificables para Instituciones que Poseen sus Activos*
 
-[![Licencia: Apache 2.0](https://img.shields.io/badge/Licencia-Apache_2.0-blue.svg?style=flat-square)](https://opensource.org/licenses/Apache-2.0)
+[![Licencia: Incubación](https://img.shields.io/badge/Licencia-Fase_de_Incubaci%C3%B3n-e36209.svg?style=flat-square)](LICENSE)
 [![Cumplimiento: WORM](https://img.shields.io/badge/Cumplimiento-WORM_Listo-22863a.svg?style=flat-square)](#)
 [![Fundación: seL4 Verificado](https://img.shields.io/badge/Fundaci%C3%B3n-seL4_Verificado-6f42c1.svg?style=flat-square)](#la-fundación-de-sistemas-verificables)
 
@@ -76,7 +76,7 @@ El modelo de activación por niveles:
 
 ## El Modelo Comercial
 
-El uso de archivo único — una instancia de ToteboxOS, una terminal ConsoleOS — es completamente gratuito y de código abierto bajo Apache 2.0.
+PointSav se encuentra actualmente en una fase activa de incubación — todos los componentes tienen todos los derechos reservados durante este período, conforme a los términos establecidos en `LICENSE`. El uso de archivo único — una instancia de ToteboxOS, una terminal ConsoleOS — es el nivel de uso gratuito previsto al concluir la fase de incubación.
 
 En el momento en que necesite agregar información de múltiples archivos — por ejemplo, conectar los registros de propiedad de un inmueble con los registros de personal del equipo de gestión — necesitará OrchestrationOS, que es software propietario. PointSav no cobra por el almacenamiento privado de datos. Cobra por la capa de inteligencia que conecta los archivos entre sí.
 
