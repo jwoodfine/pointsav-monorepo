@@ -1,6 +1,6 @@
 # NEXT.md — service-input
 
-> Last updated: 2026-04-26
+> Last updated: 2026-05-20
 > Read at session start. Update before session end so the next
 > session knows where to pick up.
 
@@ -8,18 +8,15 @@
 
 ## Right now
 
-- **service-people pre-framework subdirectory inventory.** Five
-  subdirectories exist inside `service-people/` that pre-date the
-  project framework: `sovereign-acs-engine/`, `spatial-crm/`,
-  `spatial-ledger/`, `substrate/`, `tools/`. Inventory each —
-  determine whether it is keep-as-is, rename, retire, or relocate —
-  and record the decision in `service-people/NEXT.md` (and the
-  registry if relocation changes project count).
+- **`maildir.rs` removal decision.** `src/maildir.rs` (`MaildirVault`)
+  is no longer referenced — the daemon loop in `service-email/src/main.rs`
+  now uses `FsClient` (swap landed 2026-05-20). File retained on disk
+  pending operator confirmation that it is unneeded. Remove once
+  operator confirms.
 
 ## Queue
-- Round-trip test fixture — small known-good document of each
-  format, parse, write through a stub `service-fs`, read back, hash
-  the payload. Confirms determinism end-to-end.
+- Additional format parsers beyond the initial four — add only when
+  a customer use case surfaces it (demand-driven, not completeness-driven).
 
 ## Deferred
 
@@ -31,6 +28,17 @@
   waits for a real workload that exceeds memory.
 
 ## Recently done
+
+- 2026-05-20: **End-to-end round-trip integration test** added. New
+  `tests/parse_to_fs_round_trip.rs` spins up a real service-fs daemon
+  (PosixTileLedger on ephemeral port) and drives a service-input router
+  via `tower::ServiceExt::oneshot`. POST `document.ingest` (Markdown
+  bytes base64-encoded) → FsClient submits to service-fs → GET
+  `/v1/entries?since=0` → asserts source_id, format "Markdown", parsed
+  text round-trip, parser metadata present. Multi-threaded tokio runtime
+  (`worker_threads = 4`) required (ureq blocking inside async handler).
+  Model: `service-people/tests/end_to_end_fs_round_trip.rs`. **33 tests
+  pass clean** (32 unit + 1 integration).
 
 - 2026-04-26: **service-input happy-path PDF test fixture** added.
   Generated `tests/fixtures/minimal.pdf` — a hand-crafted 614-byte
