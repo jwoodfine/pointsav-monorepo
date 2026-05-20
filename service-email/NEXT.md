@@ -8,32 +8,26 @@
 
 ## Right now
 
-- **`sovereign-splinter/` rename.** Cargo.toml `name` field is
+- **`sovereign-splinter/` rename (C4a).** Cargo.toml `name` field is
   `sovereign-splinter` — "sovereign" prefix is Do-Not-Use per
-  workspace conventions. Rename to `email-splitter` (or fold into
-  `service-email/src/` as the `.eml` parsing module). The
+  workspace conventions. Rename to `email-splitter`. The
   `scripts/spool-daemon.sh` binary path reference updates with it.
+- **SOAP fixture tests (C3).** Add fixture XML for FindItem / GetItem /
+  UpdateItem responses; ≥6 tests validating EWS wire format without
+  a live mailbox.
 
 ## Queue
 
-- **`ingress-harvester/` + `master-harvester-rs/` retirement.**
-  Both use the deprecated in-process OAuth pattern. EWS rebase is
-  now live in `service-email/src/`; retire these once the new path
-  is confirmed end-to-end. The micro-batching concept from
-  `master-harvester-rs/` (BATCH_SIZE=3) is worth preserving in the
-  daemon loop (currently polls at 60s with one message per tick).
-- Decide consumption mode for the EWS code: workspace path-dep on
-  the relevant `service-email-egress-ews/` sub-crate, or lift the
-  pattern into `service-email/src/`. The lift approach has been
-  taken in this rebase (pattern copied from egress-roster/ews_payload.xml
-  reference); path-dep can revisit if the egress crates' Cargo
-  name-vs-directory mismatches are resolved.
-- Replace `maildir::MaildirVault` writes with `service-fs` MCP
-  append calls. The `MaildirVault` is a transition-period sink;
-  the long-term shape persists message bodies through the WORM
-  ledger.
-- MCP server interface — expose ingest as a tool, surface read
-  views as resources. One moduleId per process.
+- **`ingress-harvester/` + `master-harvester-rs/` retirement (C4b/C4c).**
+  Micro-batching concept from `master-harvester-rs/` (BATCH_SIZE=3)
+  worth porting to daemon loop before retiring.
+- **`maildir.rs` removal.** MaildirVault is no longer used in
+  `src/main.rs` (replaced by FsClient 2026-05-20). File retained
+  on disk pending operator decision; remove once confirmed unneeded.
+- **service-input round-trip integration test (C5).** Model on
+  service-people `tests/end_to_end_fs_round_trip.rs`.
+- Add `service-email` as a workspace member in the monorepo root
+  `Cargo.toml` (Layer 1 audit finding 2026-04-18).
 - Add `service-email` as a workspace member in the monorepo root
   `Cargo.toml` once the EWS rebase compiles cleanly (Layer 1
   audit finding in `.claude/rules/cleanup-log.md` 2026-04-18).

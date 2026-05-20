@@ -36,6 +36,27 @@ they are protocol-specific implementations, not duplicates).
 
 ## Current state
 
+**MCP server + service-fs wiring complete (2026-05-20).**
+
+- `src/fs_client.rs` — `FsClient::append_email(message_id, raw_eml)`
+  POSTs `EmailRecord { message_id, raw_eml_b64, ingested_at }` to
+  service-fs `/v1/append` via ureq 3.x blocking. Derives `Clone`.
+- `src/mcp.rs` — MCP JSON-RPC 2.0 handler. Tool: `email.ingest`
+  (source_id, raw_eml_bytes_b64). X-Foundry-Module-ID enforcement.
+  7 unit tests covering initialize, tools/list, ingest-transport-error,
+  wrong module_id, missing source_id, invalid base64, unknown tool.
+- `src/http.rs` — axum router. `AppState { module_id, fs_client }`.
+  Routes: GET /healthz, GET /readyz, POST /mcp.
+- `src/main.rs` — two concurrent workloads: MCP HTTP server
+  (tokio::spawn) + EWS polling daemon loop. Daemon now writes to
+  service-fs via FsClient; MaildirVault no longer used.
+- `Cargo.toml` — added axum 0.7, serde, serde_json, ureq 3.3,
+  tracing, tracing-subscriber; tower in dev-dependencies.
+- **16 tests pass** (`cargo test --manifest-path service-email/Cargo.toml`).
+
+Env vars added: `EMAIL_MODULE_ID` (required), `EMAIL_FS_URL`
+(required), `EMAIL_BIND_ADDR` (optional, default 127.0.0.1:9200).
+
 **EWS auth rebase complete (2026-04-26).** The former inline OAuth
 `client_credentials` + Graph REST path has been replaced:
 
@@ -47,16 +68,7 @@ they are protocol-specific implementations, not duplicates).
   implementing FindItem / GetItem (IncludeMimeContent) / UpdateItem
   via EWS SOAP over HTTPS with bearer auth. String-based XML parsing
   (no extra dep); base64 decode of MimeContent.
-- `src/main.rs` — polling daemon loop using `EwsCredentials` +
-  `EwsClient` + `MaildirVault`.
-- `Cargo.toml` — reqwest with `rustls-tls` (no openssl-sys); base64
-  dep added; serde/serde_json removed; `[workspace]` added for
-  standalone crate isolation.
-- Six unit tests pass clean (`cargo test --manifest-path
-  service-email/Cargo.toml`).
-
-Next: `sovereign-splinter/` rename (Do-Not-Use "sovereign" prefix) +
-`ingress-harvester/` / `master-harvester-rs/` retirement.
+- Six unit tests in ews_client.rs cover XML parsing + base64 round-trip.
 
 Pre-framework sub-directory inventory (2026-04-26; decisions in NEXT.md):
 
@@ -100,10 +112,13 @@ service-email/
 ├── README.md, README.es.md
 ├── CLAUDE.md, NEXT.md
 ├── src/
-│   ├── main.rs         — Tokio async daemon loop
+│   ├── main.rs         — two workloads: MCP HTTP server + EWS polling daemon
 │   ├── auth.rs         — EwsCredentials::from_env() (AZURE_ACCESS_TOKEN)
 │   ├── ews_client.rs   — EwsClient: FindItem / GetItem / UpdateItem SOAP
-│   └── maildir.rs      — MaildirVault writer (transition sink -> service-fs)
+│   ├── fs_client.rs    — FsClient::append_email → service-fs /v1/append
+│   ├── http.rs         — AppState + axum router (/healthz /readyz /mcp)
+│   ├── mcp.rs          — MCP handler: email.ingest tool; 7 tests
+│   └── maildir.rs      — MaildirVault (no longer used; retained pending removal)
 ├── docs/
 │   └── TEMPLATE_INDEX_MSFT_ENTRA_ID.md  — Entra ID auth index template
 ├── ingress-harvester/  — pre-framework; retire-pending (inline OAuth pattern)
