@@ -31,3 +31,7 @@ service-people/substrate/*.jsonl
 
 # Multi-agent session locks (ephemeral — not committed)
 .agent/engines/*/session.lock
+
+# discovery-queue — runtime TX identity data (operator decision 2026-05-16)
+# Future disposition: move to service-fs/data/ — tracked as open item
+discovery-queue/
