@@ -1,6 +1,6 @@
 # NEXT.md — service-email
 
-> Last updated: 2026-04-25
+> Last updated: 2026-05-21
 > Read at session start. Update before session end so the next
 > session knows where to pick up.
 
@@ -8,43 +8,37 @@
 
 ## Right now
 
-- **`sovereign-splinter/` rename (C4a).** Cargo.toml `name` field is
-  `sovereign-splinter` — "sovereign" prefix is Do-Not-Use per
-  workspace conventions. Rename to `email-splitter`. The
-  `scripts/spool-daemon.sh` binary path reference updates with it.
-- **SOAP fixture tests (C3).** Add fixture XML for FindItem / GetItem /
-  UpdateItem responses; ≥6 tests validating EWS wire format without
-  a live mailbox.
+- **Enable Exchange polling.** `local-email.service` is running (port 9204,
+  MCP server only). To activate the EWS daemon, create an override file:
+  ```
+  sudo mkdir -p /etc/systemd/system/local-email.service.d/
+  sudo tee /etc/systemd/system/local-email.service.d/exchange.conf <<'EOF'
+  [Service]
+  Environment="AZURE_ACCESS_TOKEN=<az account get-access-token --resource https://outlook.office365.com | jq -r .accessToken>"
+  Environment="EXCHANGE_TARGET_USER=<mailbox@domain.com>"
+  EOF
+  sudo systemctl daemon-reload && sudo systemctl restart local-email
+  ```
+  Token expires; update + restart to rotate. Logs: `journalctl -u local-email -f`.
+
+- **`maildir.rs` removal.** `MaildirVault` is no longer used (replaced by
+  FsClient 2026-05-20). File retained pending operator go-ahead. One unit
+  test exists that constructs it; removal is a two-line clean — confirm safe.
 
 ## Queue
 
-- **`ingress-harvester/` + `master-harvester-rs/` retirement (C4b/C4c).**
-  Micro-batching concept from `master-harvester-rs/` (BATCH_SIZE=3)
-  worth porting to daemon loop before retiring.
-- **`maildir.rs` removal.** MaildirVault is no longer used in
-  `src/main.rs` (replaced by FsClient 2026-05-20). File retained
-  on disk pending operator decision; remove once confirmed unneeded.
-- **service-input round-trip integration test (C5).** Model on
-  service-people `tests/end_to_end_fs_round_trip.rs`.
-- Add `service-email` as a workspace member in the monorepo root
-  `Cargo.toml` (Layer 1 audit finding 2026-04-18).
-- Add `service-email` as a workspace member in the monorepo root
-  `Cargo.toml` once the EWS rebase compiles cleanly (Layer 1
-  audit finding in `.claude/rules/cleanup-log.md` 2026-04-18).
-- Fixture-based test for SOAP payload serialisation — known-good
-  XML round-trips through the EWS request constructor. Avoids
-  needing a live mailbox for unit-level coverage.
+- Add `service-email` to `conventions/software-units.yaml` (workspace scope)
+  so `bin/deploy-binary.sh` can manage future binary updates. Binary currently
+  deployed manually; ledger entry at `data/binary-ledger/service-email.jsonl`.
+- Add `service-email` as a workspace member in the monorepo root `Cargo.toml`
+  (Layer 1 audit finding 2026-04-18; blocked on openssl-sys cleanup).
+- Update `service-email/CLAUDE.md` — current state section is stale (pre-deployment).
+  Needs: port 9204, local-email.service running, Exchange override pattern.
 
 ## Blocked
 
-- End-to-end ingestion testing — Blocked on: needs a real
-  Exchange mailbox + valid `AZURE_ACCESS_TOKEN`. No automated
-  harness today; the fixture-based payload test above is the
-  closer alternative.
-- Workspace `Cargo.toml` membership — Blocked on: monorepo
-  workspace under-declaration is a separate cleanup
-  (`.claude/rules/cleanup-log.md` 2026-04-18). The EWS rebase can
-  land standalone first; member declaration follows.
+- Live Exchange end-to-end test — Blocked on: needs `AZURE_ACCESS_TOKEN` +
+  `EXCHANGE_TARGET_USER`. MCP path is testable now; EWS daemon path needs creds.
 
 ## Deferred
 
