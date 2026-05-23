@@ -1,0 +1,3 @@
+[workspace]
+members = ["app-orchestration-bim", "tool-keyplan"]
+resolver = "2"
