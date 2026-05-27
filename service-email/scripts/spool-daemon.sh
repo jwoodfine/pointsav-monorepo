@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [ "$#" -ne 2 ]; then
-    echo "[ERROR] Usage: ./spool-daemon.sh <TOTEBOX_ROOT> <PATH_TO_SOVEREIGN_SPLINTER_BIN>"
+    echo "[ERROR] Usage: ./spool-daemon.sh <TOTEBOX_ROOT> <PATH_TO_EMAIL_SPLITTER_BIN>"
     exit 1
 fi
 
@@ -16,7 +16,7 @@ CUR_DIR="$TOTEBOX_ROOT/service-email/maildir/cur"
 # Ensure physical WORM boundaries exist
 mkdir -p "$NEW_DIR" "$CUR_DIR"
 
-echo "[SYSTEM] Sovereign Spool Daemon armed. Watching: $NEW_DIR"
+echo "[SYSTEM] Email spool daemon armed. Watching: $NEW_DIR"
 echo "--------------------------------------------------------"
 
 # Lightweight continuous polling loop
@@ -27,7 +27,7 @@ while true; do
             FILENAME=$(basename "$EML_FILE")
             echo "[DETECTED] Inbound asset: $FILENAME"
             
-            # 1. Fire the Rust Sovereign Splinter
+            # 1. Fire the email-splitter binary
             "$ENGINE_BIN" "$EML_FILE" "$TOTEBOX_ROOT"
             
             # 2. Vault the asset (Relocate to cur/)

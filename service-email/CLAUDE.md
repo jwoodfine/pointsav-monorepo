@@ -1,6 +1,6 @@
 # CLAUDE.md — service-email
 
-> **State:** Active  —  **Last updated:** 2026-04-25
+> **State:** Active  —  **Last updated:** 2026-05-27
 > **Version:** 0.0.1  (per `~/Foundry/CLAUDE.md` §7 and DOCTRINE.md §VIII)
 > **Registry row:** `pointsav-monorepo/.claude/rules/project-registry.md`
 >
@@ -48,14 +48,15 @@ they are protocol-specific implementations, not duplicates).
 - `src/http.rs` — axum router. `AppState { module_id, fs_client }`.
   Routes: GET /healthz, GET /readyz, POST /mcp.
 - `src/main.rs` — two concurrent workloads: MCP HTTP server
-  (tokio::spawn) + EWS polling daemon loop. Daemon now writes to
-  service-fs via FsClient; MaildirVault no longer used.
-- `Cargo.toml` — added axum 0.7, serde, serde_json, ureq 3.3,
+  (tokio::spawn) + EWS polling daemon loop. Daemon writes to
+  service-fs via FsClient.
+- `Cargo.toml` — axum 0.7, serde, serde_json, ureq 3.3,
   tracing, tracing-subscriber; tower in dev-dependencies.
-- **16 tests pass** (`cargo test --manifest-path service-email/Cargo.toml`).
+- **23 tests pass** (`cargo test --manifest-path service-email/Cargo.toml`).
 
-Env vars added: `EMAIL_MODULE_ID` (required), `EMAIL_FS_URL`
+Env vars: `EMAIL_MODULE_ID` (required), `EMAIL_FS_URL`
 (required), `EMAIL_BIND_ADDR` (optional, default 127.0.0.1:9200).
+**Deployed port:** `local-email.service` runs on 9204 (nginx-intranet owns 9200).
 
 **EWS auth rebase complete (2026-04-26).** The former inline OAuth
 `client_credentials` + Graph REST path has been replaced:
@@ -118,12 +119,11 @@ service-email/
 │   ├── fs_client.rs    — FsClient::append_email → service-fs /v1/append
 │   ├── http.rs         — AppState + axum router (/healthz /readyz /mcp)
 │   ├── mcp.rs          — MCP handler: email.ingest tool; 7 tests
-│   └── maildir.rs      — MaildirVault (no longer used; retained pending removal)
 ├── docs/
 │   └── TEMPLATE_INDEX_MSFT_ENTRA_ID.md  — Entra ID auth index template
 ├── ingress-harvester/  — pre-framework; retire-pending (inline OAuth pattern)
 ├── master-harvester-rs/ — pre-framework; retire-pending (Graph API deprecated)
-├── sovereign-splinter/ — pre-framework; keep parsing core; Do-Not-Use prefix
+├── email-splitter/     — pre-framework .eml parser (renamed from sovereign-splinter 2026-05-27)
 └── scripts/
     └── spool-daemon.sh — maildir watcher; calls sovereign-splinter
 ```

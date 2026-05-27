@@ -1,6 +1,6 @@
 # NEXT.md — service-email
 
-> Last updated: 2026-05-21
+> Last updated: 2026-05-27 (session 5)
 > Read at session start. Update before session end so the next
 > session knows where to pick up.
 
@@ -21,19 +21,14 @@
   ```
   Token expires; update + restart to rotate. Logs: `journalctl -u local-email -f`.
 
-- **`maildir.rs` removal.** `MaildirVault` is no longer used (replaced by
-  FsClient 2026-05-20). File retained pending operator go-ahead. One unit
-  test exists that constructs it; removal is a two-line clean — confirm safe.
-
 ## Queue
 
 - Add `service-email` to `conventions/software-units.yaml` (workspace scope)
   so `bin/deploy-binary.sh` can manage future binary updates. Binary currently
   deployed manually; ledger entry at `data/binary-ledger/service-email.jsonl`.
+  **Command Session task.**
 - Add `service-email` as a workspace member in the monorepo root `Cargo.toml`
   (Layer 1 audit finding 2026-04-18; blocked on openssl-sys cleanup).
-- Update `service-email/CLAUDE.md` — current state section is stale (pre-deployment).
-  Needs: port 9204, local-email.service running, Exchange override pattern.
 
 ## Blocked
 
@@ -52,6 +47,24 @@
   concern downstream of the ledger.
 
 ## Recently done
+
+- 2026-05-27 (session 5): **`sovereign-splinter/` renamed to `email-splitter/`.**
+  "sovereign" is a Do-Not-Use prefix per nomenclature-taxonomy.md. Directory renamed;
+  `scripts/spool-daemon.sh` comments updated to remove the Do-Not-Use term.
+  `CLAUDE.md` file layout updated.
+
+- 2026-05-21 (session 4): **`maildir.rs` removed.** `MaildirVault` was replaced by
+  `FsClient` (2026-05-20); dead code removed. `mod maildir;` line removed from `main.rs`.
+  23/23 tests pass.
+
+- 2026-05-21 (session 3): **`local-email.service` deployed** on `127.0.0.1:9204`.
+  MCP server confirmed healthy (`/healthz`, `initialize`, `tools/list`). EWS daemon
+  disabled on startup (no Exchange credentials yet). Binary sha256 recorded in
+  `data/binary-ledger/service-email.jsonl`.
+
+- 2026-05-20 (session 2): **MCP server + service-fs wiring complete.**
+  `src/fs_client.rs`, `src/mcp.rs`, `src/http.rs` added. `email.ingest` MCP tool.
+  `X-Foundry-Module-ID` enforcement. 23 tests total.
 
 - 2026-04-26: **EWS auth rebase complete.**
   `src/auth.rs` — replaced inline OAuth2 `client_credentials` flow
