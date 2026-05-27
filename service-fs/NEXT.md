@@ -1,6 +1,6 @@
 # NEXT.md — service-fs
 
-> Last updated: 2026-04-27
+> Last updated: 2026-05-27 (session 5)
 > Read at session start. Update before session end so the next
 > session knows where to pick up.
 
@@ -8,29 +8,14 @@
 
 ## Right now
 
-- **systemd unit file** — `infrastructure/local-fs/` (workspace-tier;
-  coordinate via Master outbox so the unit matches the daemon's
-  env-var contract: `FS_BIND_ADDR`, `FS_MODULE_ID`, `FS_LEDGER_ROOT`,
-  `FS_SIGNING_KEY`). Master owns this per the action matrix; Task role
-  here is to confirm the env-var surface before Master authors the unit.
-  The surface is stable as of 2026-04-26.
+Nothing pending in Totebox scope. Master owns the systemd timer
+for `anchor-emitter/` (monthly Rekor anchoring, Doctrine Invention #7).
 
 ## Queue
-- systemd unit file (`infrastructure/service-fs/service-fs.service`
-  shape, modelled on
-  `infrastructure/local-slm/local-slm.service` v0.0.11):
-  workspace-tier work, but coordinate via Master outbox so the
-  unit file matches the daemon's env-var contract
-  (`FS_BIND_ADDR`, `FS_MODULE_ID`, `FS_LEDGER_ROOT`).
-- Round-trip test fixture: hit `/v1/append`, then `/v1/entries`,
-  assert payload identity. Belongs as an integration test in
-  `tests/` (not unit — exercises the full HTTP + ledger stack).
-- `discovery-queue/` cleanup — registry has it as Not-a-project,
-  noted as "gitignore + move to `service-fs/data/`" since the
-  pre-framework era. With service-fs now a real hosted service,
-  decide whether the runtime-data destination still makes sense
-  (probably yes once the segment-file storage lands; deferred
-  until then).
+
+- `discovery-queue/` cleanup — registry has it as Not-a-project;
+  move to `service-fs/data/` deferred until segment-file storage lands.
+  Operator decision pending.
 
 ## Deferred
 
@@ -43,6 +28,10 @@
   Real workload threshold has not been hit.
 
 ## Recently done
+
+- 2026-05-19 (Master): **`local-fs.service` deployed** on `127.0.0.1:9100`.
+  `FS_MODULE_ID=foundry-workspace`, `FS_LEDGER_ROOT` configured. Confirmed
+  healthy in session 3. Systemd unit at `infrastructure/local-fs/local-fs.service`.
 
 - 2026-04-27: **`anchor-emitter/` Rust binary** (Doctrine Invention #7).
   New standalone crate at `service-fs/anchor-emitter/` (own `[workspace]`
