@@ -1,6 +1,6 @@
 # CLAUDE.md — service-people
 
-> **State:** Active  —  **Last updated:** 2026-04-25
+> **State:** Active  —  **Last updated:** 2026-05-27
 > **Version:** 0.0.1  (per `~/Foundry/CLAUDE.md` §7 and DOCTRINE.md §VIII)
 > **Registry row:** `pointsav-monorepo/.claude/rules/project-registry.md`
 >
@@ -25,56 +25,54 @@ services as MCP clients.
 
 ## Current state
 
-Inventoried 2026-04-26. Pre-framework subdirectories assessed;
-per-item decisions in `NEXT.md` Recently done section.
+**ACS engine absorbed, legacy code retired (2026-05-27 session 4). 31 tests pass.**
 
-- `Cargo.toml` — minimal stub, no dependencies
-- `src/lib.rs` — 3-line `system_status()` placeholder
-- `service-people.py` — pre-framework Python; retire-pending
-- `ledger_personnel.json` — placeholder seed contacts; retire-pending
-- `people-acs-engine/` — Rust binary: email regex + UUIDv5
-  Anchor/Claim JSONL; informs Identity Ledger schema; keep
-- `spatial-ledger/` — Rust binary: batch ledger-writer from
-  `discovery-queue/` → `substrate/ledger_personnel.jsonl`; keep
-  until MCP + service-fs pipeline replaces it
-- `spatial-crm/` — Rust binary: cross-ring entity extractor
-  (writes to `service-slm/transient-queues`); retire-pending
-- `substrate/` — runtime data directory; `*.jsonl` gitignored 2026-04-26
-- `scripts/` — `extract-people-ledger.sh` (moved from `tools/`)
+Three MCP tools over `POST /mcp` (JSON-RPC 2.0):
 
-Next step (NEXT.md Right-now): define Identity Ledger schema,
-building on the Anchor/Claim pattern in `people-acs-engine/`.
+- `identity.append` — name + primary_email + optional aliases + organisation
+  → `Person` (UUIDv5 from email) → `FsClient` → service-fs `/v1/append` + local
+  `PeopleStore` cache
+- `identity.lookup` — email or UUID → `Person` (from `PeopleStore` in-process index)
+- `identity.scan_text` — raw text + source_id → email regex scan → Anchor+Claim
+  pairs → service-fs `/v1/append` × 2 per match (one anchor, one claim)
 
-No drift flags at activation time: the existing scaffold is
-near-empty Rust + adjacent prior-work artefacts, not bare-metal
-unikernel framing (contrast `service-fs`'s drift). The runtime
-model can move forward as a hosted MCP server per the ratified
-architecture without a doctrine-level conflict.
+**31 tests:** 30 unit tests across `acs`, `fs_client`, `mcp`, `people_store`,
+`person` modules + 1 integration test (`tests/end_to_end_fs_round_trip.rs`).
+
+Env vars: `PEOPLE_MODULE_ID` (required), `PEOPLE_FS_URL` (required, e.g.
+`http://127.0.0.1:9100`), `PEOPLE_BIND_ADDR` (optional, default 127.0.0.1:9300).
+
+systemd unit not yet deployed — next session.
 
 ## Build and test
 
-`Cargo.toml` has no dependencies; `cargo check` inside this
-directory will build the trivial `lib.rs` stub but exercises
-nothing. Defer running until the schema and MCP surface are
-defined.
+```
+cargo test --manifest-path service-people/Cargo.toml
+```
+
+Expected: 31 tests pass (30 unit + 1 integration). Run from the monorepo root.
+The integration test spins up a real service-fs PosixTileLedger on an ephemeral port
+using `tower::ServiceExt::oneshot` — no external services required.
 
 ## File layout
 
 ```
 service-people/
-├── Cargo.toml              — minimal stub (no dependencies yet)
+├── Cargo.toml              — axum, tokio, serde, ureq 3.x, uuid, chrono, regex
 ├── README.md, README.es.md — bilingual overview
 ├── CLAUDE.md, NEXT.md
-├── src/lib.rs              — 3-line system_status() placeholder
-├── service-people.py       — pre-framework Python; retire-pending
-├── ledger_personnel.json   — placeholder seed contacts; retire-pending
-├── people-acs-engine/      — Rust binary; email-regex + UUIDv5
-│                             Anchor/Claim; keep
-├── spatial-ledger/         — Rust binary; discovery-queue → substrate JSONL
-├── spatial-crm/            — Rust binary; retire-pending (cross-ring)
-├── substrate/              — runtime data (*.jsonl gitignored)
-└── scripts/
-    └── extract-people-ledger.sh  — SSH+rsync substrate export
+├── src/
+│   ├── lib.rs              — module re-exports (acs, fs_client, http, mcp, people_store, person)
+│   ├── main.rs             — Tokio entrypoint; reads PEOPLE_MODULE_ID, PEOPLE_FS_URL,
+│   │                         PEOPLE_BIND_ADDR; spins axum HTTP server
+│   ├── acs.rs              — Anchor + Claim structs; scan_text() email regex → UUIDv5
+│   ├── fs_client.rs        — FsClient: append_record<T>, append, append_anchor, append_claim
+│   ├── http.rs             — AppState { module_id, fs_client, people_store }; axum router
+│   ├── mcp.rs              — MCP JSON-RPC 2.0; identity.append + identity.lookup + identity.scan_text
+│   ├── people_store.rs     — PeopleStore: RwLock HashMap by email + UUID; conflict detection
+│   └── person.rs           — Person struct; UUIDv5 from primary_email; builder pattern
+└── tests/
+    └── end_to_end_fs_round_trip.rs  — integration: identity.append → service-fs → verify
 ```
 
 ## Hard constraints — do not violate
@@ -105,14 +103,12 @@ service-people/
 
 ## What not to do
 
-- Do not begin schema work without first inventorying the existing
-  sub-directories. They predate the framework; some may be
-  abandoned, some may carry the right schema thinking. Decide
-  per-subdirectory before reusing or replacing.
 - Do not import AI/ML inference dependencies. ADR-07 applies.
 - Do not duplicate Identity Ledger persistence inside this crate
   when the WORM ledger is `service-fs`. One persistence boundary,
   one append-only invariant.
+- Do not silently merge conflicting identity records. `PeopleStore`
+  returns a conflict error — surface it to the caller (ADR-10 / F12).
 
 ---
 
