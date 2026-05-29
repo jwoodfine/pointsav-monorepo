@@ -1,6 +1,6 @@
 # NEXT.md — service-input
 
-> Last updated: 2026-05-20
+> Last updated: 2026-05-29 (session 7)
 > Read at session start. Update before session end so the next
 > session knows where to pick up.
 
@@ -8,11 +8,9 @@
 
 ## Right now
 
-- **`maildir.rs` removal decision.** `src/maildir.rs` (`MaildirVault`)
-  is no longer referenced — the daemon loop in `service-email/src/main.rs`
-  now uses `FsClient` (swap landed 2026-05-20). File retained on disk
-  pending operator confirmation that it is unneeded. Remove once
-  operator confirms.
+Nothing pending in Totebox scope. Not yet deployed as a systemd unit — needs
+Command Session to build binary + draft `infrastructure/local-input/local-input.service`.
+Pattern follows `local-email.service`.
 
 ## Queue
 - Additional format parsers beyond the initial four — add only when

@@ -1,6 +1,6 @@
 # CLAUDE.md — service-input
 
-> **State:** Active  —  **Last updated:** 2026-04-25
+> **State:** Active  —  **Last updated:** 2026-05-29
 > **Version:** 0.0.1  (per `~/Foundry/CLAUDE.md` §7 and DOCTRINE.md §VIII)
 > **Registry row:** `pointsav-monorepo/.claude/rules/project-registry.md`
 >
@@ -25,33 +25,42 @@ Ledger. Sibling to `service-people` (identity ingest) and
 
 ## Current state
 
-Newly created 2026-04-25; previously did not exist in the cluster
-or the project registry. Activation transitions it directly from
-Reserved-folder to Active because the parser dispatcher is the
-entire next workstream and we want per-project `CLAUDE.md` /
-`NEXT.md` discipline in place before any code lands.
+**Parser suite complete. 33 tests pass. Workspace member.**
 
-No code yet. The directory contains only `README.md` and
-`README.es.md` (bilingual per `~/Foundry/CLAUDE.md` §6). The next
-session in this cluster lands the initial Cargo crate skeleton and
-the parser-dispatcher trait. Cargo workspace membership is a
-separate decision tracked in NEXT.md.
+Full Ring 1 ingest pipeline operational as of 2026-05-20:
+
+- **4 parsers:** PDF (oxidize-pdf 2.x, temp-file shim), Markdown
+  (pulldown-cmark 0.12, pure-text), DOCX (docx-rust 0.1.x,
+  Cursor reader), XLSX (calamine 0.34, Cursor reader). All
+  implement the `Parser` trait; magic-byte + extension detection
+  in `detect_format`.
+- **FsClient** (`src/fs_client.rs`) — `submit(doc)` POSTs to
+  `service-fs /v1/append` via ureq 3.3 blocking; `X-Foundry-Module-ID`
+  header enforcement.
+- **MCP server** (`src/mcp.rs` + `src/http.rs`) — `document.ingest`
+  tool (filename, source_id, bytes_base64); `X-Foundry-Module-ID`
+  enforcement; axum on `INPUT_BIND_ADDR` (default 0.0.0.0:9200).
+- **33 tests:** 32 unit + 1 end-to-end integration test
+  (`tests/parse_to_fs_round_trip.rs` — spins up real service-fs
+  PosixTileLedger on ephemeral port, drives document.ingest, asserts
+  WORM round-trip).
+- **Workspace member** — added to root `Cargo.toml` `[members]`
+  after openssl-sys Layer 1 audit issue was resolved.
+
+Not yet deployed as a systemd unit. Binary build + `local-input.service`
+is a Command Session task (pattern: `local-email.service`).
 
 ## Build and test
 
 ```
-cargo check    # standalone (service-input is workspace-excluded
-               # alongside service-fs while the openssl-sys Layer 1
-               # audit issue lives in a sibling member)
 cargo test --manifest-path service-input/Cargo.toml
-               # runs the 29 tests: format detection + dispatcher (12),
-               # multi-parser integration (1), PdfParser (2),
-               # MarkdownParser (5), DocxParser (2), XlsxParser (2),
-               # FsClient integration (1), MCP handler (5).
-               # NOTE: run from the monorepo root with --manifest-path,
-               # not bare cargo check/test (workspace-level openssl-sys
-               # blocker in sibling members, Layer 1 audit 2026-04-18).
+# 33 tests: format detection + dispatcher (12), multi-parser integration (1),
+# PdfParser (2), MarkdownParser (5), DocxParser (2), XlsxParser (2),
+# FsClient integration (1), MCP handler (5), parse_to_fs_round_trip (1 integration).
 ```
+
+Also covered by workspace-level `cargo check --workspace` (service-input is a
+declared workspace member as of 2026-05-29).
 
 ## File layout
 

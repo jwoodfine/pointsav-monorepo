@@ -80,13 +80,14 @@ Pre-framework sub-directory inventory (2026-04-26; decisions in NEXT.md):
   dynamic folder discovery + BATCH_SIZE=3 micro-batching; retire-pending
   (Graph API approach deprecated by EWS rebase; folder-discovery +
   micro-batching patterns worth porting)
-- `sovereign-splinter/` — Rust binary; mailparse-based `.eml` parser
+- `email-splitter/` — Rust binary; mailparse-based `.eml` parser
   that routes to `service-people/discovery-queue` (identity signals) +
   `service-slm/transient-queues` (body text) + `assets/inert-media`
-  (attachments); "sovereign" prefix is Do-Not-Use; core parsing logic
-  kept — superseded routing will be replaced by MCP append calls
+  (attachments); core parsing logic kept — superseded routing will be
+  replaced by MCP append calls. Renamed from `sovereign-splinter/`
+  2026-05-27 (Do-Not-Use prefix removed).
 - `scripts/` — correctly placed per repo-layout.md; contains
-  `spool-daemon.sh` (watches maildir/new/, calls sovereign-splinter)
+  `spool-daemon.sh` (watches maildir/new/, calls email-splitter)
 - `docs/TEMPLATE_INDEX_MSFT_ENTRA_ID.md` — Entra ID auth index
   template; moved from root to docs/ (repo-layout.md compliance)
 
@@ -125,7 +126,7 @@ service-email/
 ├── master-harvester-rs/ — pre-framework; retire-pending (Graph API deprecated)
 ├── email-splitter/     — pre-framework .eml parser (renamed from sovereign-splinter 2026-05-27)
 └── scripts/
-    └── spool-daemon.sh — maildir watcher; calls sovereign-splinter
+    └── spool-daemon.sh — maildir watcher; calls email-splitter
 ```
 
 ## Hard constraints — do not violate
@@ -134,11 +135,10 @@ service-email/
   embedding-based message classification, no AI-driven sender
   resolution. Identity resolution is delegated to `service-people`
   (also Ring 1, also deterministic).
-- **WORM via `service-fs`.** Once the rebase lands, persisted
-  message bodies go through `service-fs`'s MCP append surface, not
-  to local disk. The current `maildir::MaildirVault` writes to a
-  configured `TOTEBOX_ARCHIVE_PATH` — that's a transition surface,
-  not the long-term shape.
+- **WORM via `service-fs`.** Message bodies are persisted through
+  `service-fs`'s MCP append surface via `FsClient`. `MaildirVault`
+  (`maildir.rs`) was removed session 4 (2026-05-21). The EWS daemon
+  in `main.rs` writes directly to service-fs.
 - **Per-tenant boundary.** One process per `moduleId`. No
   cross-tenant mailbox ingestion.
 - **Auth runs out-of-process.** Per the operator-confirmed EWS
@@ -171,10 +171,11 @@ service-email/
   `service-email-egress-*` sub-crates wholesale. Pick the minimum
   surface needed for the EWS auth rebase; consume more only when
   a concrete need surfaces.
-- Do not delete or rewrite the pre-framework sub-directories
-  (`ingress-harvester/`, `master-harvester-rs/`,
-  `sovereign-splinter/`) until they are inventoried. Some may
-  carry the right thinking for the rebase.
+- Do not delete `ingress-harvester/` or `master-harvester-rs/` without
+  operator sign-off. Both are retire-pending (inventory done 2026-04-26)
+  but retirement requires explicit operator confirmation per AGENT.md
+  interrogation protocol. `email-splitter/` (formerly `sovereign-splinter/`)
+  is keep-core — do not delete it.
 
 ---
 
