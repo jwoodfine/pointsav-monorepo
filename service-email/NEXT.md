@@ -1,6 +1,6 @@
 # NEXT.md — service-email
 
-> Last updated: 2026-05-27 (session 5)
+> Last updated: 2026-05-29 (session 7)
 > Read at session start. Update before session end so the next
 > session knows where to pick up.
 
@@ -27,8 +27,10 @@
   so `bin/deploy-binary.sh` can manage future binary updates. Binary currently
   deployed manually; ledger entry at `data/binary-ledger/service-email.jsonl`.
   **Command Session task.**
-- Add `service-email` as a workspace member in the monorepo root `Cargo.toml`
-  (Layer 1 audit finding 2026-04-18; blocked on openssl-sys cleanup).
+- ~~Add `service-email` as a workspace member in the monorepo root `Cargo.toml`~~
+  **Done 2026-05-29 (session 7)** — `[workspace]` table removed from
+  `service-email/Cargo.toml`; `Cargo.lock` absorbed into root; `service-email`
+  added to root `[members]`; workspace check passes clean.
 
 ## Blocked
 

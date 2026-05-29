@@ -1,6 +1,6 @@
 # NEXT.md — service-people
 
-> Last updated: 2026-05-27 (session 5)
+> Last updated: 2026-05-29 (session 7)
 > Read at session start. Update before session end so the next
 > session knows where to pick up.
 
@@ -8,10 +8,11 @@
 
 ## Right now
 
-- **Deploy as systemd unit** — `infrastructure/local-people/local-people.service`
-  (workspace-tier; coordinate via Master outbox). Env-var surface:
-  `PEOPLE_BIND_ADDR=127.0.0.1:9300`, `PEOPLE_MODULE_ID`, `PEOPLE_FS_URL=http://127.0.0.1:9100`.
-  Pattern follows `infrastructure/local-email/local-email.service`.
+- **Deploy as systemd unit** — unit file staged at
+  `infrastructure/local-people/local-people.service` (session 7).
+  Outbox message to Command Session has full step-by-step instructions
+  (build binary, create system user, binary-ledger entry, install).
+  Port 9300 confirmed free 2026-05-29.
 
 ## Queue
 

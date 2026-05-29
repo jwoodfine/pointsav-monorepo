@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "service-people",
     "service-content",
+    "service-email",
     "service-fs",
     "service-input",
     "app-console-content",
