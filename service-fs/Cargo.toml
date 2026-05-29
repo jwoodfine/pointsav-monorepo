@@ -21,6 +21,11 @@ path = "src/main.rs"
 
 [dev-dependencies]
 tower = { version = "0.4", features = ["util"] }
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "ledger_bench"
+harness = false
 
 [dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal"] }

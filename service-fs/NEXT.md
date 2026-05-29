@@ -16,13 +16,16 @@ for `anchor-emitter/` (monthly Rekor anchoring, Doctrine Invention #7).
 - `discovery-queue/` cleanup — registry has it as Not-a-project;
   move to `service-fs/data/` deferred until segment-file storage lands.
   Operator decision pending.
-- **criterion benchmarks** — measure append throughput (entries/sec,
-  bytes/sec under sustained load), checkpoint latency (time to sign a
-  checkpoint over N entries), and Rekor round-trip time (anchor-emitter
-  invocation to tlog writeback confirmed). Route results to
-  project-editorial as a JOURNAL-NOTES-j2 addendum once available.
-  Required for J2 submission data section (J2 ASPLOS submission;
-  J5 on HOLD pending J2).
+- **Run criterion benchmarks + stage J2 data** — `benches/ledger_bench.rs`
+  is now present (session 7). Run `cargo bench --manifest-path service-fs/Cargo.toml`
+  and stage results to `.agent/drafts-outbound/JOURNAL-NOTES-j2-benchmarks.md`
+  as a J2 §4 addendum. Append throughput (O(N) baseline), checkpoint
+  latency (O(1)), full-scan read throughput. Rekor round-trip requires
+  network — defer or mock.
+- **Segment-file upgrade** — append is currently O(N) per D4 full-rewrite.
+  256-entry sealed segments (C2SP tlog-tiles target) are the next
+  performance tier. Hold until J2 bench data establishes the O(N)
+  baseline so the improvement is quantifiable.
 
 ## Deferred
 
