@@ -16,12 +16,12 @@ for `anchor-emitter/` (monthly Rekor anchoring, Doctrine Invention #7).
 - `discovery-queue/` cleanup — registry has it as Not-a-project;
   move to `service-fs/data/` deferred until segment-file storage lands.
   Operator decision pending.
-- **Bench re-run with trimmed parameters** — full 100-sample run at
-  prior_entries=[0,10,50,100] estimated >3 hours on GCE pd-standard.
-  Re-run with `--sample-size 10` and/or remove the 50/100 data points
-  to collect checkpoint + read_since groups in a practical session window.
-  J2 data draft already staged (`JOURNAL-NOTES-j2-benchmarks.md`);
-  this re-run adds the missing checkpoint latency + read_since numbers.
+- **Bench re-run on cold storage (nice-to-have)** — the 2026-05-29 run measured
+  all three groups at 100 samples each; results are in `JOURNAL-NOTES-j2-benchmarks.md`.
+  Append results were OS-page-cache-warm (masked O(N) at N≤100). A cold-storage run
+  (fresh VM boot, no prior writes) would confirm the warm-up-phase O(N) scaling
+  seen during the session. Not blocking for J2 — the current draft notes the
+  cache effect explicitly.
 - **Segment-file upgrade** — append is currently O(N) per D4 full-rewrite.
   256-entry sealed segments (C2SP tlog-tiles target) are the next
   performance tier. Hold until J2 bench data establishes the O(N)
