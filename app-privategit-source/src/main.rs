@@ -333,7 +333,9 @@ async fn binary(
                         (header::CONTENT_TYPE, "application/octet-stream"),
                         (
                             header::CONTENT_DISPOSITION,
-                            Box::leak(format!("attachment; filename=\"{filename}\"").into_boxed_str()),
+                            Box::leak(
+                                format!("attachment; filename=\"{filename}\"").into_boxed_str(),
+                            ),
                         ),
                     ],
                     body,
@@ -455,7 +457,12 @@ async fn verify_key_endpoint(
     };
     let key_fp = hex::encode(&vk.as_bytes()[..4]);
 
-    match verify_license_key(vk, &req.license_key_b64, &req.product_id, &state.revoked_tokens) {
+    match verify_license_key(
+        vk,
+        &req.license_key_b64,
+        &req.product_id,
+        &state.revoked_tokens,
+    ) {
         Err(ref e @ LicenseVerifyErr::ChannelExpired(ref expired)) => {
             tracing::info!(product_id = %req.product_id, key_fp = %key_fp, result = "forbidden", reason = "channel-expired", expired = %expired, "verify-key");
             (
@@ -613,11 +620,18 @@ async fn main() -> Result<()> {
         .route("/git/*path", get(git_stub).post(git_stub))
         .route("/verify-key", post(verify_key_endpoint))
         .route("/verify-key.pub", get(verify_key_pub))
-        .route("/admin/reload-revocation-list", post(reload_revocation_list))
+        .route(
+            "/admin/reload-revocation-list",
+            post(reload_revocation_list),
+        )
         .with_state(state);
 
     tracing::info!("app-privategit-source listening on {bind_addr}");
     let listener = tokio::net::TcpListener::bind(&bind_addr).await?;
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<SocketAddr>(),
+    )
+    .await?;
     Ok(())
 }
