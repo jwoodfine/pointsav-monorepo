@@ -20,6 +20,7 @@ pub extern "C" fn _start() -> ! {
 
 /// Bare-metal panic handler.
 /// In a production environment, this triggers a fault IPC to the system-security Watchdog.
+#[cfg(not(test))]
 #[panic_handler]
 fn panic(_info: &PanicInfo) -> ! {
     loop {}
