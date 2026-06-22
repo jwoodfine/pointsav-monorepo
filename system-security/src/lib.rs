@@ -1,5 +1,5 @@
-#![no_std]
-#![no_main]
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 
 extern "C" {
     fn microkit_dbg_puts(s: *const u8);
@@ -45,3 +45,4 @@ pub extern "C" fn notified(ch: u64) {
 fn panic(_info: &core::panic::PanicInfo) -> ! {
     loop {}
 }
+
