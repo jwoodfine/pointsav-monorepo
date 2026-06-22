@@ -119,11 +119,11 @@ async fn post_archetypes(
     state
         .graph
         .delete_by_classification("__taxonomy__", "archetype")
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     let count = state
         .graph
         .upsert_entities("__taxonomy__", &entities)
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     Ok(Json(
         serde_json::json!({"loaded": count, "classification": "archetype"}),
     ))
@@ -138,11 +138,11 @@ async fn post_coa(
     state
         .graph
         .delete_by_classification("__taxonomy__", "coa-profile")
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     let count = state
         .graph
         .upsert_entities("__taxonomy__", &entities)
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     Ok(Json(
         serde_json::json!({"loaded": count, "classification": "coa-profile"}),
     ))
@@ -157,11 +157,11 @@ async fn post_domains(
     state
         .graph
         .delete_by_classification("__taxonomy__", "domain")
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     let count = state
         .graph
         .upsert_entities("__taxonomy__", &entities)
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     Ok(Json(
         serde_json::json!({"loaded": count, "classification": "domain"}),
     ))
@@ -185,11 +185,11 @@ async fn post_glossary(
     state
         .graph
         .delete_by_classification("__taxonomy__", &classification)
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     let count = state
         .graph
         .upsert_entities("__taxonomy__", &entities)
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     Ok(Json(
         serde_json::json!({"loaded": count, "classification": classification}),
     ))
@@ -204,11 +204,11 @@ async fn post_themes(
     state
         .graph
         .delete_by_classification("__taxonomy__", "theme")
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     let count = state
         .graph
         .upsert_entities("__taxonomy__", &entities)
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     Ok(Json(
         serde_json::json!({"loaded": count, "classification": "theme"}),
     ))
@@ -231,11 +231,11 @@ async fn post_topics(
     state
         .graph
         .delete_by_classification_and_location("__taxonomy__", "topic", &domain)
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     let count = state
         .graph
         .upsert_entities("__taxonomy__", &entities)
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     Ok(Json(
         serde_json::json!({"loaded": count, "classification": "topic", "domain": domain}),
     ))
@@ -258,11 +258,11 @@ async fn post_guides(
     state
         .graph
         .delete_by_classification("__taxonomy__", "guide")
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     let count = state
         .graph
         .upsert_entities("__taxonomy__", &entities)
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     Ok(Json(
         serde_json::json!({"loaded": count, "classification": "guide"}),
     ))
@@ -282,11 +282,11 @@ async fn reload_guides(
     state
         .graph
         .delete_by_classification("__taxonomy__", "guide")
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     let count = state
         .graph
         .upsert_entities("__taxonomy__", &entities)
-        .map_err(|e| err500(e))?;
+        .map_err(err500)?;
     Ok(Json(
         serde_json::json!({"reloaded": count, "classification": "guide", "source": path}),
     ))

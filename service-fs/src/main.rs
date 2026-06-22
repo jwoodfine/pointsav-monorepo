@@ -1,11 +1,13 @@
-#![no_std]
-#![no_main]
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(not(test), no_main)]
 
+#[cfg(not(test))]
 use core::panic::PanicInfo;
 
 /// Entry point for the seL4 Unikernel.
 /// The `system-security` Capability-Based Manager (CBM) routes execution here
 /// after provisioning the isolated memory space.
+#[cfg(not(test))]
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
     // 1. Initialize bare-metal state
@@ -25,3 +27,4 @@ pub extern "C" fn _start() -> ! {
 fn panic(_info: &PanicInfo) -> ! {
     loop {}
 }
+
