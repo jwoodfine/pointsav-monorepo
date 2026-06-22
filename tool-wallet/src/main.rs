@@ -721,8 +721,8 @@ fn assign_order_index(index_path: &str, order_id: &str) -> Result<u32> {
             Err(e) => {
                 tracing::warn!("order index at {index_path} corrupt ({e}); trying .bak");
                 let bak = format!("{index_path}.bak");
-                let bak_content = fs::read_to_string(&bak)
-                    .with_context(|| format!("reading .bak: {bak}"))?;
+                let bak_content =
+                    fs::read_to_string(&bak).with_context(|| format!("reading .bak: {bak}"))?;
                 serde_json::from_str(&bak_content)
                     .with_context(|| format!("parsing .bak: {bak}"))?
             }
