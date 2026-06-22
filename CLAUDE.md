@@ -95,3 +95,12 @@ CODE  = runs our systems; no customer license; internal deploy only (published O
 Split rule: declaratives → TOPIC, imperatives → GUIDE; same slug, different prefix, no shared sentences.
 Cash register test: licensable + marketplace-listed → SOFT; everything else → CODE.
 Storefront (app-privategit-marketplace) is CODE; the merchandise it sells is SOFT.
+
+## Cluster branch + promote
+
+This archive runs on `cluster/project-orchestration`. `.agent/` commits stay here permanently.
+Code commits promote to canonical via `~/Foundry/bin/promote.sh` (filters .agent/ automatically).
+
+Session start: `git branch --show-current` → must return `cluster/project-orchestration`.
+Commits: `~/Foundry/bin/commit-as-next.sh "<message>"` from archive root (no change).
+Stage 6: Command Session runs `~/Foundry/bin/promote.sh` (code-only path).
