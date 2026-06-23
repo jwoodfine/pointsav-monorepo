@@ -506,6 +506,20 @@ header .tag {
 .tree-git[data-s="staged"]    { color: #89d185; }
 .tree-git[data-s="deleted"]   { color: #f85149; }
 
+/* ── Editor panel collapse ────────────────────────────────────────── */
+#ed-collapse-btn { font-size: 14px; line-height: 1; padding: 2px 6px; flex-shrink: 0; }
+#editor-panel.ed-collapsed { width: 28px !important; min-width: 28px; }
+#editor-panel.ed-collapsed .editor-bar {
+  flex-direction: column; justify-content: flex-start;
+  height: auto; border-bottom: none; padding: 6px 0; gap: 0;
+}
+#editor-panel.ed-collapsed .editor-bar > *:not(#ed-collapse-btn) { display: none; }
+#editor-panel.ed-collapsed #editor-wrap,
+#editor-panel.ed-collapsed #goto-bar,
+#editor-panel.ed-collapsed #find-bar,
+#editor-panel.ed-collapsed #recovery-bar,
+#editor-panel.ed-collapsed #outline-panel { display: none !important; }
+
 /* ── Print ────────────────────────────────────────────────────────── */
 @media print {
   header, .sidebar, .resizer, .viewer-bar, #editor-panel, .editor-bar { display: none !important; }
@@ -693,6 +707,7 @@ header .tag {
 
     <div id="editor-panel">
       <div class="editor-bar">
+        <button class="bar-btn" id="ed-collapse-btn" onclick="toggleEditorCollapse()" title="Collapse editor">◀</button>
         <span class="editor-title">Editor</span>
         <span id="editor-cursor"></span>
         <span id="editor-dirty" style="display:none" title="Unsaved changes">●</span>
@@ -852,6 +867,32 @@ function toggleSidebar() {
   if (sb.classList.contains('sb-collapsed')) expandSidebar(); else collapseSidebar();
 }
 
+// ── Editor panel collapse ─────────────────────────────────────────────────────
+var editorPinnedWidth = 440;
+function collapseEditorPanel() {
+  const ep = document.getElementById('editor-panel');
+  const w = ep.offsetWidth;
+  if (w > 36) { editorPinnedWidth = w; sessionStorage.setItem('wb-editor-w', w); }
+  ep.classList.add('ed-collapsed');
+  document.getElementById('resizer2').style.display = 'none';
+  var btn = document.getElementById('ed-collapse-btn');
+  if (btn) btn.textContent = '▶';
+}
+function expandEditorPanel() {
+  const ep = document.getElementById('editor-panel');
+  const saved = sessionStorage.getItem('wb-editor-w');
+  if (saved) editorPinnedWidth = parseInt(saved, 10);
+  ep.style.width = editorPinnedWidth + 'px';
+  ep.classList.remove('ed-collapsed');
+  document.getElementById('resizer2').style.display = 'block';
+  var btn = document.getElementById('ed-collapse-btn');
+  if (btn) btn.textContent = '◀';
+}
+function toggleEditorCollapse() {
+  const ep = document.getElementById('editor-panel');
+  if (ep.classList.contains('ed-collapsed')) expandEditorPanel(); else collapseEditorPanel();
+}
+
 // ── Hidden-files toggle ───────────────────────────────────────────────────────
 function toggleHiddenFiles() {
   showHidden = !showHidden;
@@ -1008,6 +1049,7 @@ function showEditorPanel(content) {
   const panel = document.getElementById('editor-panel');
   const r2    = document.getElementById('resizer2');
   const ta    = document.getElementById('editor-textarea');
+  if (panel.classList.contains('ed-collapsed')) expandEditorPanel();
   panel.classList.add('visible');
   r2.style.display = 'block';
   ta.value = content;
