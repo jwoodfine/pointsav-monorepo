@@ -37,6 +37,7 @@ fn inner_main() -> anyhow::Result<()> {
     use app_console_input::InputCartridge;
     use app_console_keys::{pairing, AppConsoleKeys, ConsoleConfig};
     use app_console_people::PeopleCartridge;
+    use app_console_search::cartridge::SearchCartridge;
     use app_console_slm::SlmCartridge;
     use app_console_system::SystemCartridge;
 
@@ -231,6 +232,7 @@ fn inner_main() -> anyhow::Result<()> {
         &p.tenant,
         &p.ingest_endpoint,
     )));
+    chassis.register(Box::new(SearchCartridge::new_for(&p.content_endpoint)));
     chassis.register(Box::new(SlmCartridge::new(&p.slm_endpoint, p.plain_mode)));
     chassis.register(Box::new(SystemCartridge::new(&p.pair_endpoint)));
     metrics::spawn_metrics_server(p.metrics_port);
