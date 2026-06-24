@@ -1,6 +1,6 @@
 @~/Foundry/AGENT.md
 
-# pointsav-monorepo — Sub-clone Guide
+# project-software — Archive Guide
 
 > This CLAUDE.md covers the `pointsav-monorepo/` sub-clone common to all
 > Totebox Archives that use the monorepo as their vendor leg.
@@ -41,6 +41,13 @@ pointsav-monorepo/
 └── scripts/                xtask, dtcg-to-css.py, stage6-gate.sh
 ```
 
+## Commit + promote
+
+Commits via `~/Foundry/bin/commit-as-next.sh "<message>"` from archive root.
+**Stage 6 self-service (this archive):** `~/Foundry/bin/self-service-promote.sh`
+— pushes code commits to staging mirrors + appends to `promote-queue.jsonl`.
+Command Session processes canonical merge. Do NOT run `promote.sh` directly.
+
 ## Commit rules
 
 - `git add <specific files>` — never `git add .`
@@ -52,3 +59,15 @@ pointsav-monorepo/
 
 Surface via archive outbox (`../.agent/outbox.md`) — not here.
 Do not write to another archive's state files.
+
+## MCP tools — `foundry` server (use at startup)
+
+`get_session_brief(role="totebox", archive="project-software")` replaces manually reading
+inbox.md, outbox.md, NOTAM.md, session-context.md. Call it first.
+
+| Tool | When to use |
+|---|---|
+| `get_session_brief` | **First call at startup** — inbox, outbox, NOTAM, session-context |
+| `send_mailbox_message` | Send any mailbox message (M-2/M-10 audit compliant) |
+| `query_datagraph` | Entity lookup before answering about people/projects |
+| `ask_local` | OLMo 7B local inference — free, SYS-ADR-07-safe |
