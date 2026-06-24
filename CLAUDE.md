@@ -71,20 +71,13 @@ commit from this cluster using `bin/commit-as-next.sh`.
 
 `get_session_brief(role="totebox", archive="project-orchestration")` replaces manually reading
 inbox.md, outbox.md, NOTAM.md, session-context.md. Call it first.
-`send_mailbox_message()` replaces hand-editing YAML frontmatter.
 
 | Tool | When to use |
 |---|---|
 | `get_session_brief` | **First call at startup** — inbox, outbox, NOTAM, session-context |
 | `send_mailbox_message` | Send any mailbox message (M-2/M-10 audit compliant) |
-| `query_mailbox` | Sweep archives — scope="all" in one call |
-| `get_doorman_status` | Tier A/B/C + circuit state |
-| `get_service_status` | Apprenticeship queue + audit-ledger counts |
 | `query_datagraph` | Entity lookup before answering about people/projects |
-| `ask_local` | OLMo 7B local inference — free, SYS-ADR-07-safe; graph context auto-injected |
-| `cast_apprenticeship_verdict` | Sign + submit verdict on a shadow-captured attempt |
-| `mutate_datagraph` | Create/update graph entities (requires explicit operator intent) |
-| `submit_extraction` | Queue prose for entity extraction pipeline |
+| `ask_local` | OLMo 7B local inference — free, SYS-ADR-07-safe |
 
 ## Artifact types — bright-line rules
 
@@ -96,11 +89,9 @@ Split rule: declaratives → TOPIC, imperatives → GUIDE; same slug, different 
 Cash register test: licensable + marketplace-listed → SOFT; everything else → CODE.
 Storefront (app-privategit-marketplace) is CODE; the merchandise it sells is SOFT.
 
-## Cluster branch + promote
+## Commit + promote
 
-This archive runs on `cluster/project-orchestration`. `.agent/` commits stay here permanently.
-Code commits promote to canonical via `~/Foundry/bin/promote.sh` (filters .agent/ automatically).
-
-Session start: `git branch --show-current` → must return `cluster/project-orchestration`.
-Commits: `~/Foundry/bin/commit-as-next.sh "<message>"` from archive root (no change).
-Stage 6: Command Session runs `~/Foundry/bin/promote.sh` (code-only path).
+Commits via `~/Foundry/bin/commit-as-next.sh "<message>"` from archive root.
+**Stage 6 self-service (this archive):** `~/Foundry/bin/self-service-promote.sh`
+— pushes code commits to staging mirrors + appends to `promote-queue.jsonl`.
+Command Session processes canonical merge. Do NOT run `promote.sh` directly.
