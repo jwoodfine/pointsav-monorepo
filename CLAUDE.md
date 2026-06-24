@@ -1,6 +1,6 @@
 @~/Foundry/AGENT.md
 
-# project-proforma — Archive Guide
+# project-workplace — Archive Guide
 
 > **State:** active | **Last updated:** 2026-06-19
 > **Cluster manifest:** `.agent/manifest.md`
@@ -50,8 +50,9 @@ Per `~/Foundry/AGENT.md` § Session roles:
 Commits to media-knowledge-* go directly to canonical (DOCTRINE §IV.e).
 Commits to woodfine-fleet-deployment use admin-tier: `~/Foundry/bin/commit-as-next.sh --admin woodfine "<msg>"`.
 Commits to pointsav-monorepo use: `~/Foundry/bin/commit-as-next.sh "<msg>"`.
-Stage 6 promotion via `~/Foundry/bin/promote.sh` from Command Session.
-**Stage 6 pending:** commits through `fc4d0978` (Phase 10) need promote; git divergence on main is a Command-side blocker.
+**Stage 6:** Build + deploy to staging is self-service (`self_service: build-deploy`).
+Canonical promote is not self-service — write `"Stage 6 pending — project-workplace — <crate>"`
+to outbox at shutdown. Command Session processes canonical merge.
 
 ## Conflicts
 
@@ -60,7 +61,7 @@ the conflict via outbox to command session** — do not silently override.
 
 ## MCP tools — `foundry` server (use at startup)
 
-`get_session_brief(role="totebox", archive="project-proforma")` replaces manually reading
+`get_session_brief(role="totebox", archive="project-workplace")` replaces manually reading
 inbox.md, outbox.md, NOTAM.md, session-context.md. Call it first.
 
 | Tool | When to use |
