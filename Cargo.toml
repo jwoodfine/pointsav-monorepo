@@ -50,6 +50,8 @@ members = [
     # Marketing platform: shared chrome chassis + the marketing app
     "app-mediakit-shell",
     "app-mediakit-marketing",
+    # Food-service platform engine (foodservice.woodfinegroup.com)
+    "app-mediakit-foodservice",
     # Design system browser (port 9094)
     "app-privategit-design",
     # Sovereign replacement stubs (wired into app-privategit-design)
@@ -77,6 +79,11 @@ strip = "symbols"
 # app-mediakit-marketing is a runtime HTTP server — speed-optimised, like the
 # knowledge engine, not the bare-metal size-optimised workspace default.
 [profile.release.package.app-mediakit-marketing]
+opt-level = 3
+strip = "symbols"
+
+# app-mediakit-foodservice is a runtime HTTP server — same speed-optimised profile.
+[profile.release.package.app-mediakit-foodservice]
 opt-level = 3
 strip = "symbols"
 
