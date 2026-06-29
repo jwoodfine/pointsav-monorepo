@@ -62,11 +62,15 @@ Shell script at `~/Foundry/bin/list-archives.sh`:
 4. Source: PROJECT-CLONES.md or manifest files directly
 ```
 
-### P3.3 — app-orchestration-command v0.0.1 (Rust) `[in-progress 2026-06-29 totebox@claude-code]`
+### P3.3 — app-orchestration-command v0.0.1 (Rust) `[done 2026-06-29 totebox@claude-code]`
 
-**Expanded scope:** workspace (server + lib + core); invite token pairing UX;
-pairings.yaml API surface; process supervisor for app-orchestration-slm child;
-app-orchestration-graph stub. See BRIEF-os-orchestration.md for locked decisions.
+3-crate workspace: orchestration-command-core (wire types), orchestration-command
+(library: fleet, personnel, invite, pairing, routing, child, license), and
+orchestration-command-server (Axum 0.8, port 8020, current_thread Tokio).
+app-orchestration-graph stub also added. 7 tests passing. Binary 1.7 MB stripped.
+Committed to cluster/project-orchestration. Stage 6 pending — staging mirror rejected
+(18 commits ahead on remote main); needs Command Session rebase + canonical merge.
+project-registry.md update needed on monorepo main branch (routed via outbox).
 
 ### P3.3b — Cross-archive invite token protocol coordination `[done 2026-06-29]`
 
