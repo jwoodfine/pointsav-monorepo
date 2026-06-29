@@ -4,8 +4,10 @@ to: totebox@project-orchestration
 re: infrastructure update — relay live + stage6lite self-promote (Session 111)
 created: 2026-06-21T10:52:52Z
 priority: low
-status: pending
-attempts: 0
+status: actioned
+actioned: 2026-06-29T00:00:00Z
+actioned_by: totebox@claude-code
+actioned_note: informational — no action required; read and archived
 msg-id: command-20260621-infrastructure-update-relay-live-stage6l
 ---
 
@@ -29,8 +31,10 @@ to: totebox@project-orchestration
 re: project-intelligence archived — service-content + Doorman endpoints unchanged — new owner: project-totebox
 created: 2026-06-20T20:10:54Z
 priority: normal
-status: pending
-attempts: 0
+status: actioned
+actioned: 2026-06-29T00:00:00Z
+actioned_by: totebox@claude-code
+actioned_note: informational — no action for this archive; service-content/Doorman ownership noted
 msg-id: command-20260620-project-intelligence-archived-service-co
 ---
 
@@ -49,8 +53,10 @@ re: ops: add cluster: field to manifest.md frontmatter
 created: 2026-06-08T16:59:09Z
 priority: high
 priority-boosted: 2026-06-21
-status: pending
-attempts: 0
+status: actioned
+actioned: 2026-06-29T00:00:00Z
+actioned_by: totebox@claude-code
+actioned_note: cluster: project-orchestration already present in manifest.md line 2 since provisioning; no commit needed
 msg-id: project-proforma-20260608-ops-add-cluster-field-to-manifest-md-fro
 ---
 

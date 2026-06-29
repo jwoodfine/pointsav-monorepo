@@ -7,6 +7,7 @@
 
 | File | brief-id | Title | Status | Updated |
 |------|----------|-------|--------|---------|
+| [BRIEF-os-orchestration.md](BRIEF-os-orchestration.md) | project-orchestration-os-orchestration | os-orchestration build-out — app-orchestration-command v0.0.1 | active | 2026-06-29 |
 
 ## Artifact routing
 When a BRIEF graduates to a deliverable, it routes here:

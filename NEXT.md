@@ -62,7 +62,23 @@ Shell script at `~/Foundry/bin/list-archives.sh`:
 4. Source: PROJECT-CLONES.md or manifest files directly
 ```
 
-### P3.3 — app-orchestration-command v0.0.1 (Rust)
+### P3.3 — app-orchestration-command v0.0.1 (Rust) `[in-progress 2026-06-29 totebox@claude-code]`
+
+**Expanded scope:** workspace (server + lib + core); invite token pairing UX;
+pairings.yaml API surface; process supervisor for app-orchestration-slm child;
+app-orchestration-graph stub. See BRIEF-os-orchestration.md for locked decisions.
+
+### P3.3b — Cross-archive invite token protocol coordination `[done 2026-06-29]`
+
+Outbox messages sent to project-console, project-totebox, project-infrastructure
+with invite token wire spec. Awaiting ACKs before cutting implementation.
+
+### P3.6 — Update topic-os-orchestration.draft.md `[done 2026-06-29]`
+
+Added project-scoped deployment model, invite token UX, and full CommandCentre
+endpoint table. Staged at ~/Foundry/.agent/drafts-outbound/; route to project-editorial.
+
+### P3.3 original spec (reference — superseded by expanded scope above)
 
 Scaffold in `pointsav-monorepo/app-orchestration-command/`:
 
