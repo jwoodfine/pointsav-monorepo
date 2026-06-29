@@ -6,7 +6,7 @@ title: "os-orchestration build-out — app-orchestration-command v0.0.1"
 status: active
 owner: project-orchestration
 created: 2026-06-29
-updated: 2026-06-29
+updated: 2026-06-29T18:30Z
 ---
 
 ## Context
@@ -90,7 +90,12 @@ marketplace. [[BRIEF-OS-FAMILY]] [[BRIEF-sovereign-os-family-master-plan]]
 
 ## Work log
 
-- 2026-06-29 — BRIEF created; research complete; plan approved; Step 1 in progress
+- 2026-06-29 — BRIEF created; research complete; plan approved; Step 1 complete
+- 2026-06-29 — Implementation complete: 3-crate workspace, 7 tests pass, 1.7 MB binary
+  Axum route fix (`:param` → `{param}`). Committed to cluster/project-orchestration.
+  Stage 6 pending — staging mirror rejected (remote main 18+ commits ahead);
+  needs Command Session rebase + canonical merge via promote.sh.
+  project-registry.md needs update on monorepo main branch via Command outbox.
 
 ---
 
