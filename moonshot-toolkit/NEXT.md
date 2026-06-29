@@ -1,39 +1,42 @@
 # NEXT.md — moonshot-toolkit
 
-> Last updated: 2026-04-27
+> Last updated: 2026-06-29
 > Read at session start. Update before session end.
 
 ---
 
 ## Right now
 
-- Framework §9 activation landed (this commit). Next commits in
-  this AUTO session: src/spec.rs (#35) + src/plan.rs (#36) +
-  src/main.rs CLI rewrite (#37).
+- Task #14 decisions recorded 2026-06-29 — see Unblocked section below.
+- Next: implement `build` subcommand to invoke Microkit 2.2.0 SDK.
+  Add x86_64_generic / x86_64_generic_vtx targets to SystemSpec.
 
 ## Queue
 
-- Implement `src/spec.rs` per task #35: SystemSpec data model
-  (PDs ≤ 63, channels, memory regions, IRQ delivery), serde TOML
-  parser, validation rules. Tests for valid round-trip + each
-  invariant violation.
-- Implement `src/plan.rs` per task #36: BuildPlan generation
-  with content-addressed inputs and deterministic plan_hash.
-  Tests for determinism + spec → plan output binding.
-- Rewrite `src/main.rs` per task #37: clap-based CLI with
-  `validate` / `plan` / `build` subcommands. `build` is a stub
-  in v0.1.x (prints "would run X" for each step) — actual seL4
-  cross-compile + QEMU boot is the future-session milestone (#14).
+- `[ ]` Implement task #14 — actual seL4 cross-compile (decisions now recorded in src/main.rs)
+- `[ ]` Add x86-64 build targets (`x86_64_generic`, `x86_64_generic_vtx`) to SystemSpec and BuildPlan
+- `[ ]` Wire `build` subcommand to invoke Microkit 2.2.0 SDK (aarch64-linux-gnu-gcc for ARM; native gcc for x86)
+- `[ ]` Ed25519-sign output images using identity/id_pointsav-administrator key
+- `[ ]` Remove `build-totebox.sh` legacy shell sketch once `moonshot-toolkit build` produces a bootable image
 
-## Blocked
+## Unblocked — task #14 decisions recorded (2026-06-29)
 
-- Actual seL4 hello-world build (#14) — Blocked on:
-  (a) cross-compile toolchain installation (aarch64-linux-gnu-gcc
-  or equivalent in workspace); (b) seL4 source vendoring strategy
-  decision (git submodule vs Cargo build.rs fetch vs
-  vendor-sel4-kernel snapshot); (c) reproducible-build harness
-  selection (Nix vs Bazel-hermetic). Surface to operator + Master
-  before scheduling that session.
+Three blocking decisions from the original task #14 are now resolved:
+
+1. **Toolchain:** Microkit 2.2.0 SDK. Primary target: `aarch64-linux-gnu-gcc`
+   (AArch64 EL2 — the only verified hypervisor-mode config as of mid-2026;
+   integrity proof April 2025, UK NCSC funded). Also: `x86_64_generic` +
+   `x86_64_generic_vtx` (added in Microkit 2.1.0, November 2025; runtime/dev
+   target — no formal verification on x86 VT-x).
+
+2. **seL4 source vendoring:** `vendor-sel4-kernel/` (1,074 files, seL4 15.0.0,
+   released 2025-03-31, already vendored). No git submodule; no network at
+   build time. Microkit SDK pins to seL4 15.0.0.
+
+3. **Reproducible-build harness:** BuildPlan content-addressed `plan_hash`
+   already implemented in `src/plan.rs`. Ed25519-sign output images with
+   `identity/id_pointsav-administrator` key (same key used for software.pointsav.com
+   distribution).
 
 ## Deferred
 

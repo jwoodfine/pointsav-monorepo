@@ -141,9 +141,16 @@ fn cmd_build(spec_path: &std::path::Path) -> Result<(), String> {
         println!("  [{}] {} — would run: {}", i + 1, step.name, cmd_summary);
     }
     eprintln!(
-        "\nNOTE: v0.1.x stub — actual seL4 cross-compile lands in cluster task #14 \
-         (FUTURE session; requires aarch64-linux-gnu toolchain + seL4 source vendoring + \
-         reproducible-build harness)."
+        "\nNOTE: v0.1.x stub — actual seL4 cross-compile lands in cluster task #14.\n\
+         Decisions recorded (2026-06-29):\n\
+         1. Toolchain: Microkit 2.2.0 SDK. Targets: aarch64-linux-gnu-gcc (primary, \
+         AArch64 EL2 verified production) + x86_64_generic / x86_64_generic_vtx \
+         (Microkit 2.1.0+ runtime/dev — no formal verification on x86 VT-x).\n\
+         2. seL4 source vendoring: vendor-sel4-kernel/ (1,074 files, seL4 15.0.0, \
+         already vendored). Microkit SDK pins to seL4 15.0.0 (released 2025-03-31).\n\
+         3. Reproducible-build harness: BuildPlan content-addressed plan_hash \
+         (implemented in plan.rs). Ed25519-sign output images with \
+         identity/id_pointsav-administrator key."
     );
     Ok(())
 }
@@ -153,7 +160,7 @@ fn hex_short(hash: &[u8; 32]) -> String {
     for b in &hash[..8] {
         s.push_str(&format!("{b:02x}"));
     }
-    s.push_str("…");
+    s.push('…');
     s
 }
 
