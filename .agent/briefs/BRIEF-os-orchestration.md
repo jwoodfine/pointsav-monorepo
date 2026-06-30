@@ -6,7 +6,7 @@ title: "os-orchestration build-out — app-orchestration-command v0.0.1"
 status: active
 owner: project-orchestration
 created: 2026-06-29
-updated: 2026-06-29T18:30Z
+updated: 2026-06-29T19:30Z
 ---
 
 ## Context
@@ -74,17 +74,21 @@ marketplace. [[BRIEF-OS-FAMILY]] [[BRIEF-sovereign-os-family-master-plan]]
 | License gate | Ed25519 embedded public key; no network call; air-gap safe | Matches slm pattern; Doctrine §54 no-kill constraint |
 | Pricing | $1 or $19 USDC one-time; Polygon USDC; no subscriptions | BRIEF-software-distribution-substrate spec |
 | Reference impl | app-orchestration-slm (license.rs, node_circuit.rs, wire type patterns) | Canonical existing pattern |
+| user-pairings.yaml | Separate file from pairings.yaml (same directory) | Infrastructure ACK (2026-06-29): topology vs application-layer separation; prevents scope contamination and unbounded growth in pairings.yaml |
+| WORM ledger schema_version | `"schema_version": "1"` in every JSONL append entry | Infrastructure ACK (2026-06-29): forward compatibility for future schema evolution (e.g., `revoked_on`, key rotation) |
 
 ---
 
 ## Decisions open
 
-| Question | Options | Owner | Target |
+| Question | Status | Owner | Target |
 |---|---|---|---|
-| graph stub port | Does app-orchestration-graph need a port for v0.0.1? | This archive | Before implementation |
-| Phase 4 VPN bind timing | When does WireGuard Part A land from Command? | Command Session | NEXT.md T1 |
-| Multi-tenant license tier | Number-of-archives gating in license payload? | Command Session | v0.1.0 |
-| token wire format version | Does token need a `version:` field for future compatibility? | project-console | Before outbox ACK |
+| graph stub port | Closed — port 8021 (implemented) | — | — |
+| token wire format version | Closed — resolved as `schema_version: "1"` in WORM ledger (infrastructure ACK) | — | — |
+| Phase 4 VPN bind timing | Open — when does WireGuard Part A land? | Command Session | NEXT.md T1 |
+| Multi-tenant license tier | Open — number-of-archives gating in license payload? | Command Session | v0.1.0 |
+| peer_type in PairResponse | Open — add `"peer_type": "orchestration"` to PairResponse wire type | project-totebox must ACK Totebox-side /v1/pair first | Before v0.0.2 |
+| Totebox-side /v1/pair | Open — does Totebox issue same Ed25519 invite token format? peer_type in payload or response? | project-totebox | Before v0.0.2; outbox sent 2026-06-29 |
 
 ---
 
@@ -96,6 +100,11 @@ marketplace. [[BRIEF-OS-FAMILY]] [[BRIEF-sovereign-os-family-master-plan]]
   Stage 6 pending — staging mirror rejected (remote main 18+ commits ahead);
   needs Command Session rebase + canonical merge via promote.sh.
   project-registry.md needs update on monorepo main branch via Command outbox.
+- 2026-06-29 — Actioned two high-priority Command relay messages:
+  (1) peer-agnostic pairing protocol amendment — unified /v1/pair wire protocol required;
+  (2) infrastructure schema ACK — user-pairings.yaml + schema_version + pairing-write.sh.
+  Locked two new decisions. Opened two new decisions (peer_type field, Totebox-side /v1/pair).
+  Outbox sent to project-totebox requesting Totebox-side /v1/pair design ACK.
 
 ---
 
@@ -104,9 +113,16 @@ marketplace. [[BRIEF-OS-FAMILY]] [[BRIEF-sovereign-os-family-master-plan]]
 - **J5 instrumentation (HOLD):** Collect session isolation timing + archive provisioning latency
   during Phase 3 implementation. Flag to totebox@project-system when data available.
   Msg-id: `project-system-20260527-j2-critical-bench9-blocker` (ref in project-system outbox)
-- **Cross-archive ACKs needed:** project-console, project-totebox, project-infrastructure
-  must ACK the invite token spec before any of those archives begin implementation.
-  Watch for outbox replies.
-- **Stage 6 → Command:** After first clean build, write outbox to command@claude-code:
-  "Stage 6 pending — project-orchestration — app-orchestration-command v0.0.1"
+- **J2 journal (HOLD):** Read J2 §3–§4 before expanding J5 or designing Phase 3
+  instrumentation suite. J2 blocked on Bench #9 at project-system.
+- **HOLD — peer_type wire change (v0.0.2):** Do NOT add `peer_type` field to PairResponse
+  or activate unified pairing protocol until project-totebox ACKs Totebox-side /v1/pair design.
+  Msg ref: `command-20260629-relay-pairing-protocol-must-be-peer-agnostic`
+  Outbox sent to project-totebox: `re: Totebox-side /v1/pair endpoint design — peer-agnostic pairing protocol`
+- **Code patch (v0.0.2) — after Totebox ACK:**
+  - `pairing.rs` → write to `user-pairings.yaml` (not pairings.yaml); add `schema_version: "1"` to WORM ledger entries
+  - `orchestration-command-core/src/lib.rs` → add `peer_type: String` to `PairResponse`
+  - F11 Peers tab: confirm with project-console
+- **Stage 6 → Command:** Outbox sent (command-20260629-stage-6-pending); awaiting Command
+  rebase + canonical merge. project-registry.md update also pending at Command.
 - **Marketplace listing:** Command Session action; request via outbox after Stage 6 confirmed.
