@@ -6,11 +6,37 @@
 > Read at session start when a Root Claude opens in this repo. Update
 > at session end when repo-scope open items change.
 
-Last updated: 2026-05-16 (session 4 — Stage 6 topology repair + Yo-Yo watchdog SCRIPT_DIR bug fixed).
+Last updated: 2026-06-30 (session — BETA catalog listings deployed; Stage 6 blocked on rebase depth).
 
 ---
 
 ## Currently open
+
+### software distribution — Stage 6 BLOCKED [2026-06-30 totebox@claude-code]
+
+Self-service promote failed: staging-j/main is 3146 commits ahead of cluster branch origin point.
+Rebase produces add/add conflicts at `928621e8` (full implementation) and context drift at `dc91b155` (revocation).
+6 commits already cherry-picked into canonical (detected by git rebase skip).
+
+**21 commits need Command cherry-pick onto staging main:**
+- Key: `dc91b155` (token revocation), `6fdb222f` (revocation hardening), `039bbe25` (fd-lock wallet), `7ec325af`–`21ac9b00` (PPn VM state machine)
+- All cargo gates green at HEAD `5e6a8063`
+- Command inbox: msg-id `command-20260630-stage-6-blocked-project-software-rebase-` (priority: high)
+
+- [ ] Command cherry-picks / resolves rebase for canonical promotion
+- [ ] After canonical promotion: app-privategit-source, app-privategit-marketplace, tool-wallet get binary-ledger entries + RELEASES_DIR entries for self-hosting
+
+### software distribution — BETA catalog pending [2026-06-30 totebox@claude-code]
+
+- [ ] `app-mediakit-knowledge` binary — awaiting project-knowledge Stage 6 P6-F rebuild; RELEASES_DIR slot ready; catalog entry live
+- [ ] `install.sh` — template not yet authored for any product; needed before public-facing launch
+- [ ] Self-produced catalog entries — `app-privategit-source`, `app-privategit-marketplace`, `tool-wallet` need RELEASES_DIR + catalog entries (blocked on Stage 6 first)
+- [ ] `os-privategit` engineering — scaffold only; full-stack installer binary not yet built
+- [ ] Product page template (S136) — design template with BETA badge, platform table, curl install, SHA256
+
+### binary-ledger uncommitted [2026-06-30 totebox@claude-code]
+
+- [ ] Command Session to commit `/srv/foundry/data/binary-ledger/os-network-admin.jsonl` and `soft-orchestration-command.jsonl` — written to disk, not yet in workspace git
 
 ### VM stability — crash prevention [2026-05-16 task@claude-code]
 
