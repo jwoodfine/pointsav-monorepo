@@ -1,3 +1,5 @@
 # Build artifacts
 *.iso
 *.elf
+*.AppImage
+dist/

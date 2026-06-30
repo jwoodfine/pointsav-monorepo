@@ -20,10 +20,11 @@
   - `cargo build --release --features daemon` → ELF x86-64, 526 KB
   - `scripts/package-appimage.sh`: AppImage scaffold (requires appimagetool on PATH)
   - TODO: wire HTTP fleet polling (FLEET_URL) + HTTP WORM append (SERVICE_FS_URL) when fleet endpoint is live
-- `[ ]` Package daemon as AppImage (Linux):
-  - Install appimagetool from AppImageKit releases
-  - Run `./scripts/package-appimage.sh <version>`
-  - Produces `os-network-admin-<ver>-x86_64.AppImage`
+- `[x]` Package daemon as AppImage (Linux) — done 2026-06-29:
+  - appimagetool installed from AppImageKit release 13 (`obsolete-appimagetool-x86_64.AppImage`, APPIMAGE_EXTRACT_AND_RUN=1)
+  - `APPIMAGE_EXTRACT_AND_RUN=1 CARGO_TARGET_DIR=/srv/foundry/cargo-target/mathew ./scripts/package-appimage.sh 0.1.0-beta.1`
+  - Output: `os-network-admin-0.1.0-beta.1-x86_64.AppImage` (414 KB, gitignored)
+  - Binary deps: libc + libgcc_s only — works on any Linux Mint 21.x without bundling
 - `[ ]` Test daemon on iMac Linux Mint (Intel x86-64, 2010-2012):
   - Set NODES_JSONL_PATH, WG_IFACE=wg0 — daemon reads peers from nodes.jsonl on startup
   - Install: `sudo apt install wireguard` + configure `wg0`
