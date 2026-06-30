@@ -1,7 +1,15 @@
+[workspace]
+
 [package]
 name = "os-network-admin"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+# daemon: standalone Linux process using system `wg` for peer management.
+# Build: cargo build --release --features daemon
+# Requires: CAP_NET_ADMIN or root; WireGuard kernel module loaded.
+daemon = []
+
 [dependencies]
-# No heavy dependencies needed for basic UDP telemetry
+# No heavy dependencies — daemon feature uses std only (Phase S3 initial impl).

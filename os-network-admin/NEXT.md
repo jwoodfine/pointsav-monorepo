@@ -7,25 +7,29 @@
 
 ## Right now
 
-- Phase S3 complete (commit `13ef4654`): fleet watch + auto WireGuard peer-table + WORM ledger; 8/8 tests.
-- Activated 2026-06-29 per project framework §9. CLAUDE.md written.
-- Next priority: daemon build mode for iMac Linux Mint test.
+- Phase S3 + daemon mode in working tree (2026-06-29): fleet_watch.rs + daemon feature flag;
+  `cargo build --release --features daemon` → ELF x86-64 526 KB; 3/3 tests pass.
+- Next priority: AppImage packaging + iMac Linux Mint test (D7 gate).
 
 ## Queue
 
-- `[ ]` Add daemon build mode feature flag:
-  - `Cargo.toml`: `[features] daemon = []`
-  - `src/main.rs`: `#[cfg(feature = "daemon")]` blocks for WireGuard CLI path (no seL4 deps)
-  - Confirm `cargo build --release --features daemon` produces a standalone Linux binary
+- `[x]` Add daemon build mode feature flag (done 2026-06-29):
+  - `Cargo.toml`: `[features] daemon = []` + `[workspace]` self-contained
+  - `src/fleet_watch.rs`: Phase S3 fleet watch loop — 30s poll, `wg set` via subprocess, WORM event append; 3/3 tests pass
+  - `src/main.rs`: `#[cfg(feature = "daemon")]` guards; Phase S1 UDP path preserved under `#[cfg(not(feature = "daemon"))]`
+  - `cargo build --release --features daemon` → ELF x86-64, 526 KB
+  - `scripts/package-appimage.sh`: AppImage scaffold (requires appimagetool on PATH)
+  - TODO: wire HTTP fleet polling (FLEET_URL) + HTTP WORM append (SERVICE_FS_URL) when fleet endpoint is live
 - `[ ]` Package daemon as AppImage (Linux):
-  - Download `appimagetool` from AppImageKit
-  - Wrap binary + WireGuard config helper script in AppDir
+  - Install appimagetool from AppImageKit releases
+  - Run `./scripts/package-appimage.sh <version>`
   - Produces `os-network-admin-<ver>-x86_64.AppImage`
 - `[ ]` Test daemon on iMac Linux Mint (Intel x86-64, 2010-2012):
+  - Set NODES_JSONL_PATH, WG_IFACE=wg0 — daemon reads peers from nodes.jsonl on startup
   - Install: `sudo apt install wireguard` + configure `wg0`
   - Run daemon: `./os-network-admin-<ver>-x86_64.AppImage`
   - Confirm peer joins fleet (service-vm-fleet at foundry-workspace)
-  - Three-node mesh verified: Laptop A + foundry-workspace + iMac
+  - Three-node mesh verified (D7): Laptop A + foundry-workspace + iMac
 - `[ ]` Sign daemon AppImage with `identity/id_pointsav-administrator` Ed25519 key
 - `[ ]` Upload to software.pointsav.com at $1 USDC (after three-node mesh test passes)
 
