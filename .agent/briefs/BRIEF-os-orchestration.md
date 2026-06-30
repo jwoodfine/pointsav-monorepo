@@ -120,9 +120,22 @@ marketplace. [[BRIEF-OS-FAMILY]] [[BRIEF-sovereign-os-family-master-plan]]
   Msg ref: `command-20260629-relay-pairing-protocol-must-be-peer-agnostic`
   Outbox sent to project-totebox: `re: Totebox-side /v1/pair endpoint design — peer-agnostic pairing protocol`
 - **Code patch (v0.0.2) — after Totebox ACK:**
-  - `pairing.rs` → write to `user-pairings.yaml` (not pairings.yaml); add `schema_version: "1"` to WORM ledger entries
   - `orchestration-command-core/src/lib.rs` → add `peer_type: String` to `PairResponse`
   - F11 Peers tab: confirm with project-console
 - **Stage 6 → Command:** Outbox sent (command-20260629-stage-6-pending); awaiting Command
   rebase + canonical merge. project-registry.md update also pending at Command.
-- **Marketplace listing:** Command Session action; request via outbox after Stage 6 confirmed.
+- **Binary distribution pipeline (v0.0.1 BETA):**
+  - Send binary `orchestration-command-server` (Linux x86_64, 1.7 MB) to project-software
+    for upload to software.pointsav.com. Product slug: `soft-orchestration-command`.
+  - **BETA mode — no payment gate.** Outbox sent to project-software (2026-06-29).
+    project-software must list the product at $0 / free download during BETA and confirm
+    the canonical download URL so bootstrap.sh can be updated with the real path.
+  - Install model: operators run bootstrap.sh which curl-downloads the binary from
+    software.pointsav.com. No `cargo build` required on target machine.
+  - **BETA → production flip:** when BETA ends, project-software re-enables $1/$19 USDC
+    pricing on software.pointsav.com. No code change in this crate needed.
+  - bootstrap.sh updated (2026-06-29) with download-first logic: `BINARY_URL` env var
+    overrides the default URL; `BINARY_SRC` env var allows local dev builds as fallback.
+- **Download URL confirmation (open):** project-software must reply with the canonical
+  software.pointsav.com download URL for `orchestration-command-server` Linux x86_64 once
+  the BETA listing is live. Update `DEFAULT_BINARY_URL` in bootstrap.sh when received.
