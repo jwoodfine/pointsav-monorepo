@@ -6,7 +6,7 @@ title: "os-orchestration build-out — app-orchestration-command v0.0.1"
 status: active
 owner: project-orchestration
 created: 2026-06-29
-updated: 2026-06-29T19:30Z
+updated: 2026-06-29T21:00Z
 ---
 
 ## Context
@@ -57,7 +57,7 @@ marketplace. [[BRIEF-OS-FAMILY]] [[BRIEF-sovereign-os-family-master-plan]]
 - Phase 4 VPN bind (10.42.0.9:8021 — awaits WireGuard Part A from Command)
 - Multi-tenancy (serving multiple operators from one instance)
 - app-orchestration-graph federation logic
-- software.pointsav.com listing (Command Session scope; request via outbox after Stage 6)
+- software.pointsav.com listing — outbox sent to project-software 2026-06-29 for BETA upload (no payment gate)
 
 ---
 
@@ -105,6 +105,14 @@ marketplace. [[BRIEF-OS-FAMILY]] [[BRIEF-sovereign-os-family-master-plan]]
   (2) infrastructure schema ACK — user-pairings.yaml + schema_version + pairing-write.sh.
   Locked two new decisions. Opened two new decisions (peer_type field, Totebox-side /v1/pair).
   Outbox sent to project-totebox requesting Totebox-side /v1/pair design ACK.
+- 2026-06-29 — v0.0.2 patch applied: pairing.rs — schema_version in WORM ledger, write-through
+  to user-pairings.yaml, renamed sha256_hex → key_fingerprint. 7/7 tests pass. Release binary rebuilt.
+- 2026-06-29 — Deployment provisioned: gateway-orchestration-command-1/ (MANIFEST + READMEs).
+  Infrastructure draft committed to cluster (systemd unit + bootstrap.sh). bootstrap.sh updated
+  to curl-download binary from software.pointsav.com (BINARY_URL/BINARY_SRC/default URL priority).
+  Outbox to Command for install; outbox to project-software for BETA listing (no payment gate).
+- 2026-06-29 — NEXT.md updated: P3.4 corrected (right deployment name, partial status), P3.5 closed.
+  Inbox: J5 + J2 HOLD messages actioned (confirmed HOLD; carry-forward in BRIEF).
 
 ---
 

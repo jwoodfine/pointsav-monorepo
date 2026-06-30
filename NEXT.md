@@ -99,17 +99,20 @@ Endpoints (HTTP, loopback only, port 8020):
 Implementation pattern: follow `app-orchestration-gis` structure (same codebase).
 Commit on `cluster/project-orchestration` branch in this cluster's pointsav-monorepo.
 
-### P3.4 — Deploy to deployments/orchestration-command-1/
+### P3.4 — Deploy to deployments/gateway-orchestration-command-1/ `[partial 2026-06-29 totebox@claude-code]`
 
-After v0.0.1 compiles:
-- Create `~/Foundry/deployments/orchestration-command-1/` with MANIFEST.md
-- Copy binary, write systemd unit to `infrastructure/`
-- Start service: `sudo systemctl start app-orchestration-command`
-- Test: `curl http://localhost:8020/archives`
+- [x] Deployment directory provisioned: `~/Foundry/deployments/gateway-orchestration-command-1/` (MANIFEST.md, README.md, README.es.md)
+- [x] Infrastructure draft committed to cluster: `infrastructure/local-orchestration-command/` (systemd unit + bootstrap.sh)
+- [x] bootstrap.sh updated: curl-downloads binary from software.pointsav.com; falls back to local BINARY_SRC env var for dev builds
+- [x] Outbox sent to Command Session to install systemd unit + run bootstrap.sh
+- [x] Outbox sent to project-software for BETA listing (no payment gate during BETA)
+- [ ] **Pending Command:** `sudo bootstrap.sh` install + smoke test at 127.0.0.1:8020/healthz
+- [ ] **Pending project-software:** Confirm BETA URL; update DEFAULT_BINARY_URL in bootstrap.sh
+- [ ] **Pending Stage 6:** Command Session rebase + canonical merge of v0.0.1 + v0.0.2 commits
 
-### P3.5 — Update NEXT.md
+### P3.5 — Update NEXT.md `[done 2026-06-29 totebox@claude-code]`
 
-Mark Phase 1 + 2 complete; update workspace NEXT.md with Phase 3 task link.
+P3.4 corrected (naming, status). This item closed.
 
 ---
 
