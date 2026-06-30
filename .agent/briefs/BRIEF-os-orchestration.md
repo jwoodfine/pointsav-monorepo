@@ -2,7 +2,7 @@
 artifact: brief
 schema: foundry-brief-v1
 brief-id: project-orchestration-os-orchestration
-title: "os-orchestration build-out — app-orchestration-command v0.0.1"
+title: "os-orchestration build-out — app-orchestration-command (v0.0.1/v0.0.2 in BETA)"
 status: active
 owner: project-orchestration
 created: 2026-06-29
@@ -79,6 +79,55 @@ marketplace. [[BRIEF-OS-FAMILY]] [[BRIEF-sovereign-os-family-master-plan]]
 
 ---
 
+## Architecture rationale
+
+**Why current_thread Tokio:**
+The workload is IO-bound — file reads for pairings.yaml, archive manifests, and inbox
+counts; HTTP request routing to archive inboxes. No CPU-parallel computation exists at
+v0.0.1. current_thread avoids spawning N OS threads and their associated stack memory
+(~8 MB per thread). Observed difference: 4–8 MB RSS vs 30–40 MB for multi-thread.
+Mandatory per BRIEF-OS-FAMILY Phase 2 idle target of ≤96 MB.
+
+**Why no central permission database:**
+DOCTRINE Claim #43 (single-boundary compute) + Claim #52 (moduleId isolation). A
+permissions database becomes a second source of truth that can drift from the pairing
+topology. pairings.yaml IS the topology. os-orchestration reads it at startup and
+exposes it — it does not own it. This is also what makes decommission structurally
+clean: delete the instance; the access scope evaporates with no database rows to clean.
+
+**Why invite token over TOFU fingerprinting:**
+TOFU (trust-on-first-use) was the Phase 1–2 model for Totebox pairing. It works when
+the operator is online for the team member's first connection. For os-orchestration, the
+operator may not be available at that moment. The token model allows asynchronous grants:
+issue a token → share via any channel → team member redeems on their own schedule.
+Single-use nonce prevents replay. Ed25519 signature ties the grant to the operator's key.
+TOFU is retained as a fallback for Totebox peers not yet issuing tokens.
+
+**Why user-pairings.yaml separate from pairings.yaml:**
+pairings.yaml is cluster topology (infrastructure scope) — it describes which archives
+are paired with which orchestration instances. user-pairings.yaml is application-layer
+runtime state — it records which humans/devices have paired via the invite token ceremony.
+Mixing them causes: (1) unbounded growth in a file meant to describe static topology;
+(2) scope contamination — infrastructure tooling reading pairings.yaml might misinterpret
+user entries as archive topology rows. Infrastructure ACK confirmed this separation
+2026-06-29.
+
+---
+
+## v0.1.0 planned scope
+
+- **app-orchestration-graph:** real federation queries replacing the v0.0.1-stub
+  - Design open: DataGraph proxy vs local entity graph vs hybrid (see Decisions open)
+- **PairingStore startup load:** read user-pairings.yaml at startup to restore
+  in-process state across restarts (currently rebuilt from empty on each start)
+- **WORM log revocation:** `pairing_revoked` event type; schema_version "2" upgrade
+- **Phase 4 VPN bind:** 10.42.0.9:8020 when WireGuard Part A lands from Command
+- **Fingerprint upgrade:** real SHA-256 via `sha2` crate (currently FNV-1a, correctly labeled)
+- **peer_type in PairResponse:** after project-totebox ACK on Totebox-side /v1/pair
+- **Multi-tenant license tier:** number-of-archives gating in license payload (Command scope)
+
+---
+
 ## Decisions open
 
 | Question | Status | Owner | Target |
@@ -89,6 +138,10 @@ marketplace. [[BRIEF-OS-FAMILY]] [[BRIEF-sovereign-os-family-master-plan]]
 | Multi-tenant license tier | Open — number-of-archives gating in license payload? | Command Session | v0.1.0 |
 | peer_type in PairResponse | Open — add `"peer_type": "orchestration"` to PairResponse wire type | project-totebox must ACK Totebox-side /v1/pair first | Before v0.0.2 |
 | Totebox-side /v1/pair | Open — does Totebox issue same Ed25519 invite token format? peer_type in payload or response? | project-totebox | Before v0.0.2; outbox sent 2026-06-29 |
+| Graph federation design | Open — what queries does app-orchestration-graph answer? DataGraph proxy? full entity graph? hybrid? | project-orchestration | v0.1.0 |
+| WORM log revocation | Open — pairing_revoked event? schema_version "2" migration? backward compat? | project-orchestration | v0.1.0 |
+| Fingerprint upgrade | Open — upgrade key_fingerprint FNV-1a → SHA-256 (sha2 crate dep); is the dep cost worth it? | project-orchestration | v0.1.0 |
+| PairingStore startup load | Open — read user-pairings.yaml at startup to restore in-process state across restarts? | project-orchestration | v0.1.0 |
 
 ---
 
