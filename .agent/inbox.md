@@ -277,7 +277,10 @@ re: JOURNAL distribution relay — J5 orchestration stub returned; HOLD until J2
 created: 2026-05-29T00:00:00Z
 priority: high
 priority-boosted: 2026-06-05
-status: pending
+status: actioned
+actioned: 2026-06-29T21:00Z
+actioned_by: totebox@claude-code
+actioned_note: HOLD confirmed — J2 blocked on Bench #9 at project-system; J5 carry-forward in BRIEF; no action until J2 submitted
 msg-id: command-20260529-journal-relay-orchestration-j5-return
 relayed-from: project-editorial-20260528-j5-return
 ---
@@ -289,7 +292,10 @@ re: JOURNAL distribution relay — J2 trustworthy systems; foundational substrat
 created: 2026-05-29T00:00:00Z
 priority: high
 priority-boosted: 2026-06-05
-status: pending
+status: actioned
+actioned: 2026-06-29T21:00Z
+actioned_by: totebox@claude-code
+actioned_note: HOLD confirmed — J2 at ASPLOS 19.4% AR; Bench #9 at project-system is the blocker; will contribute session isolation + WORM-log throughput data to J5 §4 when ready; carry-forward in BRIEF
 msg-id: command-20260529-journal-relay-orchestration-j2-xdist
 relayed-from: project-editorial-20260528-j2-orchestration-xdist
 ---
