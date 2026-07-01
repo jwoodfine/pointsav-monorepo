@@ -22,24 +22,15 @@ use crate::spec::SystemSpec;
 /// Execute the build plan produced from `spec`. `spec_dir` is the
 /// directory containing the `system-spec.toml` — all relative paths
 /// in the spec are resolved against it.
-pub fn run_build(
-    spec: &SystemSpec,
-    plan: &BuildPlan,
-    spec_dir: &Path,
-) -> Result<(), String> {
+pub fn run_build(spec: &SystemSpec, plan: &BuildPlan, spec_dir: &Path) -> Result<(), String> {
     let bc = &spec.build;
 
     if bc.board.is_empty() {
-        return Err(
-            "system-spec.toml is missing [build] section or board is empty".to_string(),
-        );
+        return Err("system-spec.toml is missing [build] section or board is empty".to_string());
     }
 
     let sdk = Path::new(&bc.sdk);
-    let board_dir = sdk
-        .join("board")
-        .join(&bc.board)
-        .join(&bc.config);
+    let board_dir = sdk.join("board").join(&bc.board).join(&bc.config);
     let output_dir = spec_dir.join(&bc.output_dir);
     let microkit_bin = sdk.join("bin/microkit");
 
@@ -64,8 +55,7 @@ pub fn run_build(
     );
 
     // 2. Create output directory.
-    fs::create_dir_all(&output_dir)
-        .map_err(|e| format!("create {}: {e}", output_dir.display()))?;
+    fs::create_dir_all(&output_dir).map_err(|e| format!("create {}: {e}", output_dir.display()))?;
 
     // 3. Write Microkit XML system description.
     let xml_path = output_dir.join("system.xml");
@@ -167,8 +157,15 @@ fn compile_pd(
     // Compile: source → object
     let mut compile = Command::new(tc.cc);
     compile
-        .args(["-nostdlib", "-ffreestanding", "-g", "-O2", "-Wall",
-               "-Wno-unused-function", "-Werror"])
+        .args([
+            "-nostdlib",
+            "-ffreestanding",
+            "-g",
+            "-O2",
+            "-Wall",
+            "-Wno-unused-function",
+            "-Werror",
+        ])
         .args(&tc.arch_cflags)
         .arg(format!("-I{}", board_include.display()))
         .arg("-c")

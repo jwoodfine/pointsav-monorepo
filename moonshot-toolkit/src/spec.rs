@@ -41,9 +41,15 @@ pub struct BuildConfig {
     pub output_dir: String,
 }
 
-fn default_config() -> String { "debug".to_string() }
-fn default_sdk() -> String { "/opt/microkit-sdk-2.2.0".to_string() }
-fn default_output_dir() -> String { "build".to_string() }
+fn default_config() -> String {
+    "debug".to_string()
+}
+fn default_sdk() -> String {
+    "/opt/microkit-sdk-2.2.0".to_string()
+}
+fn default_output_dir() -> String {
+    "build".to_string()
+}
 
 impl Default for BuildConfig {
     fn default() -> Self {
@@ -182,8 +188,8 @@ impl SystemSpec {
     /// Parse a `system-spec.toml` from text. Validates all
     /// invariants; returns the first failure encountered.
     pub fn from_toml_str(text: &str) -> Result<Self, SpecParseError> {
-        let spec: SystemSpec = toml::from_str(text)
-            .map_err(|e| SpecParseError::TomlError(e.to_string()))?;
+        let spec: SystemSpec =
+            toml::from_str(text).map_err(|e| SpecParseError::TomlError(e.to_string()))?;
         spec.validate()?;
         Ok(spec)
     }
@@ -208,8 +214,7 @@ impl SystemSpec {
         }
 
         // Channels-per-PD count.
-        let mut counts: std::collections::HashMap<&str, usize> =
-            std::collections::HashMap::new();
+        let mut counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
         for ch in &self.channels {
             *counts.entry(ch.end_a.as_str()).or_insert(0) += 1;
             *counts.entry(ch.end_b.as_str()).or_insert(0) += 1;
@@ -294,8 +299,7 @@ impl SystemSpec {
         }
 
         // Assign per-PD channel IDs in declaration order.
-        let mut pd_ch_id: std::collections::HashMap<&str, u8> =
-            std::collections::HashMap::new();
+        let mut pd_ch_id: std::collections::HashMap<&str, u8> = std::collections::HashMap::new();
         for ch in &self.channels {
             let id_a = {
                 let c = pd_ch_id.entry(ch.end_a.as_str()).or_insert(0);
@@ -556,10 +560,7 @@ stack_bytes = 4096
             xml.contains("<program_image path=\"hello.elf\""),
             "should reference hello.elf"
         );
-        assert!(
-            xml.contains("priority=\"100\""),
-            "should include priority"
-        );
+        assert!(xml.contains("priority=\"100\""), "should include priority");
         assert!(
             xml.contains("stack_size=\"0x1000\""),
             "should include stack_size in hex"

@@ -104,10 +104,12 @@ fn cmd_plan(spec_path: &std::path::Path, format: PlanFormat) -> Result<(), Strin
     let spec = read_spec(spec_path)?;
     let plan = BuildPlan::from_spec(&spec).map_err(|e| format!("plan: {e:?}"))?;
     let rendered = match format {
-        PlanFormat::Json => serde_json::to_string(&plan)
-            .map_err(|e| format!("render plan: {e}"))?,
-        PlanFormat::PrettyJson => serde_json::to_string_pretty(&plan)
-            .map_err(|e| format!("render plan: {e}"))?,
+        PlanFormat::Json => {
+            serde_json::to_string(&plan).map_err(|e| format!("render plan: {e}"))?
+        }
+        PlanFormat::PrettyJson => {
+            serde_json::to_string_pretty(&plan).map_err(|e| format!("render plan: {e}"))?
+        }
     };
     println!("{rendered}");
     Ok(())
@@ -184,9 +186,15 @@ stack_bytes = 4096
         // Spec with a PD but no [build] section → board is empty → Err.
         let f = write_spec(minimal_spec());
         let r = cmd_build(f.path());
-        assert!(r.is_err(), "build without [build].board should fail; got {r:?}");
+        assert!(
+            r.is_err(),
+            "build without [build].board should fail; got {r:?}"
+        );
         let msg = r.unwrap_err();
-        assert!(msg.contains("board"), "error should mention board; got: {msg}");
+        assert!(
+            msg.contains("board"),
+            "error should mention board; got: {msg}"
+        );
     }
 
     #[test]

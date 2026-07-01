@@ -182,6 +182,7 @@ mod tests {
             channels: vec![],
             memory_regions: vec![],
             irq_delivery: vec![],
+            build: Default::default(),
         }
     }
 
@@ -204,6 +205,7 @@ mod tests {
             channels: vec![],
             memory_regions: vec![],
             irq_delivery: vec![],
+            build: Default::default(),
         }
     }
 
@@ -214,6 +216,7 @@ mod tests {
             channels: vec![],
             memory_regions: vec![],
             irq_delivery: vec![],
+            build: Default::default(),
         };
         let r = BuildPlan::from_spec(&spec);
         assert_eq!(r, Err(PlanGenerationError::EmptySpec));
@@ -275,7 +278,10 @@ mod tests {
         let plan = BuildPlan::from_spec(&spec).unwrap();
         assert_eq!(plan.steps[0].output_paths, vec!["build/client.elf"]);
         assert_eq!(plan.steps[1].output_paths, vec!["build/server.elf"]);
-        assert_eq!(plan.steps[2].input_paths, vec!["build/client.elf", "build/server.elf"]);
+        assert_eq!(
+            plan.steps[2].input_paths,
+            vec!["build/client.elf", "build/server.elf"]
+        );
         assert_eq!(plan.steps[2].output_paths, vec!["build/loader.img"]);
     }
 
