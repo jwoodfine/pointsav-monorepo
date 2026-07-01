@@ -11,14 +11,15 @@
 //   4. Compute bounding box from zone geometry + authoritative area
 //   5. Emit DTCG JSON with structured furniture_refs + compliance record
 
-use std::{collections::HashMap, env, fs, path::Path};
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
+use std::{collections::HashMap, env, fs, path::Path};
 
 // ─── interior DTCG structures ──────────────────────────────────────────────
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 struct DimensionsMm {
     w: f64,
     d: f64,
@@ -27,6 +28,7 @@ struct DimensionsMm {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 struct ClearanceMm {
     front: f64,
     sides: f64,
@@ -34,6 +36,7 @@ struct ClearanceMm {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 struct FurnitureValue {
     manufacturer: String,
     product_line: Option<String>,
@@ -70,6 +73,7 @@ struct KeyPlanMeta {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct CirculationToml {
     standard: String,
     min_area_per_person_m2: f64,
@@ -79,6 +83,7 @@ struct CirculationToml {
 }
 
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct FurniturePlacement {
     token: String,
     zone: String,
@@ -95,8 +100,7 @@ struct FurniturePlacement {
 fn load_furniture_map(interior_path: &Path) -> Result<HashMap<String, FurnitureValue>> {
     let content = fs::read_to_string(interior_path)
         .with_context(|| format!("reading {}", interior_path.display()))?;
-    let root: Value = serde_json::from_str(&content)
-        .context("parsing interior DTCG JSON")?;
+    let root: Value = serde_json::from_str(&content).context("parsing interior DTCG JSON")?;
     let mut map = HashMap::new();
     collect_furniture_tokens(&root, "", &mut map)?;
     Ok(map)
@@ -161,9 +165,7 @@ fn validate(config: &KeyPlanToml, furniture_map: &HashMap<String, FurnitureValue
     } else {
         messages.push(format!(
             "ASR A1.2 ✗ — {:.2} m²/person < {:.1} m² minimum (capacity {})",
-            area_per_person,
-            config.circulation.min_area_per_person_m2,
-            config.key_plan.capacity,
+            area_per_person, config.circulation.min_area_per_person_m2, config.key_plan.capacity,
         ));
     }
 
@@ -177,9 +179,7 @@ fn validate(config: &KeyPlanToml, furniture_map: &HashMap<String, FurnitureValue
         let depth_mm = furniture_map
             .get(&p.token)
             .map(|s| {
-                if (p.rotation_deg - 90.0).abs() < 1.0
-                    || (p.rotation_deg - 270.0).abs() < 1.0
-                {
+                if (p.rotation_deg - 90.0).abs() < 1.0 || (p.rotation_deg - 270.0).abs() < 1.0 {
                     s.dimensions_mm.w
                 } else {
                     s.dimensions_mm.d
@@ -240,10 +240,15 @@ fn validate(config: &KeyPlanToml, furniture_map: &HashMap<String, FurnitureValue
 // ─── output generation ─────────────────────────────────────────────────────
 
 fn size_key_from_code(code: &str) -> &'static str {
-    if code.ends_with("-1") { "small" }
-    else if code.ends_with("-2") { "medium" }
-    else if code.ends_with("-3") { "large" }
-    else { "unknown" }
+    if code.ends_with("-1") {
+        "small"
+    } else if code.ends_with("-2") {
+        "medium"
+    } else if code.ends_with("-3") {
+        "large"
+    } else {
+        "unknown"
+    }
 }
 
 fn generate_output(config: &KeyPlanToml, v: &Validation) -> Value {
@@ -257,7 +262,7 @@ fn generate_output(config: &KeyPlanToml, v: &Validation) -> Value {
     let furniture_refs: Vec<String> = config
         .furniture
         .iter()
-        .flat_map(|p| std::iter::repeat(p.token.clone()).take(p.qty as usize))
+        .flat_map(|p| std::iter::repeat_n(p.token.clone(), p.qty as usize))
         .filter(|t| seen.insert(t.clone()))
         .collect();
 
@@ -377,10 +382,14 @@ fn main() -> Result<()> {
     let config_path = config_path.context("--config <config.toml> is required")?;
 
     let furniture_map = load_furniture_map(Path::new(&interior))?;
-    eprintln!("Loaded {} furniture tokens from {}", furniture_map.len(), interior);
+    eprintln!(
+        "Loaded {} furniture tokens from {}",
+        furniture_map.len(),
+        interior
+    );
 
-    let config_str = fs::read_to_string(&config_path)
-        .with_context(|| format!("reading {}", config_path))?;
+    let config_str =
+        fs::read_to_string(&config_path).with_context(|| format!("reading {}", config_path))?;
     let config: KeyPlanToml =
         toml::from_str(&config_str).with_context(|| format!("parsing {}", config_path))?;
 
@@ -396,16 +405,25 @@ fn main() -> Result<()> {
 
     let all_ok = v.asr_ok && v.lighting_ok && v.wheelchair_ok;
     if all_ok {
-        eprintln!("{}: ALL CONSTRAINTS SATISFIED", config.key_plan.internal_code);
+        eprintln!(
+            "{}: ALL CONSTRAINTS SATISFIED",
+            config.key_plan.internal_code
+        );
     } else {
-        eprintln!("{}: CONSTRAINT VIOLATIONS DETECTED", config.key_plan.internal_code);
+        eprintln!(
+            "{}: CONSTRAINT VIOLATIONS DETECTED",
+            config.key_plan.internal_code
+        );
     }
 
     if validate_only {
         return if all_ok {
             Ok(())
         } else {
-            bail!("{}: constraint violations detected", config.key_plan.internal_code)
+            bail!(
+                "{}: constraint violations detected",
+                config.key_plan.internal_code
+            )
         };
     }
 
