@@ -95,3 +95,13 @@ Commits via `~/Foundry/bin/commit-as-next.sh "<message>"` from archive root.
 **Stage 6 self-service (this archive):** `~/Foundry/bin/self-service-promote.sh`
 — pushes code commits to staging mirrors + appends to `promote-queue.jsonl`.
 Command Session processes canonical merge. Do NOT run `promote.sh` directly.
+
+## Deploy model
+
+`local-orchestration-command` (`app-orchestration-command`) runs locally on
+port 8020 — it is an internal admin tool, not a foundry-prod push target.
+(`~/Foundry/bin/push-to-prod.sh` targets: homepage, knowledge, marketing,
+design, software, gis, bim, bread — none map to this archive.) Port 8020 is
+forwarded in the `foundry-workspace-preview` SSH tunnel (operator laptop
+`~/.ssh/config`) purely for operator visibility into the admin dashboard —
+it does not go live on any public domain.
