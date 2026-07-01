@@ -6,37 +6,67 @@
 > Read at session start when a Root Claude opens in this repo. Update
 > at session end when repo-scope open items change.
 
-Last updated: 2026-06-30 (session — BETA catalog listings deployed; Stage 6 blocked on rebase depth).
+Last updated: 2026-07-01 (session — storefront static-HTML bug found + fixed; Stage 6 blocker escalated high-priority, now 3454 commits; os-privategit README rewritten).
 
 ---
 
 ## Currently open
 
-### software distribution — Stage 6 BLOCKED [2026-06-30 totebox@claude-code]
+### software distribution — Stage 6 BLOCKED, high-priority [2026-07-01 totebox@claude-code]
 
-Self-service promote failed: staging-j/main is 3146 commits ahead of cluster branch origin point.
-Rebase produces add/add conflicts at `928621e8` (full implementation) and context drift at `dc91b155` (revocation).
-6 commits already cherry-picked into canonical (detected by git rebase skip).
+Self-service promote re-attempted this session — still failing. origin/main is now 3454
+commits ahead of cluster/project-software (was 3146 on 2026-06-30; gap is growing, not
+shrinking). Escalated to Command as HIGH priority: msg-id
+`command-20260701-escalation-high-project-software-stage-6`.
 
-**21 commits need Command cherry-pick onto staging main:**
-- Key: `dc91b155` (token revocation), `6fdb222f` (revocation hardening), `039bbe25` (fd-lock wallet), `7ec325af`–`21ac9b00` (PPn VM state machine)
-- All cargo gates green at HEAD `5e6a8063`
-- Command inbox: msg-id `command-20260630-stage-6-blocked-project-software-rebase-` (priority: high)
+**23 commits now queued** (21 prior + 2 new this session):
+- `427bfff7` — storefront HTML fix (Knowledge Wiki product card was missing)
+- `67627b33` — os-privategit README correction
+- All cargo gates green at HEAD `67627b33`
 
-- [ ] Command cherry-picks / resolves rebase for canonical promotion
+- [ ] Command resolves rebase (cherry-pick or full rebase from Command Session) — or confirms self-service is no longer viable at this depth
 - [ ] After canonical promotion: app-privategit-source, app-privategit-marketplace, tool-wallet get binary-ledger entries + RELEASES_DIR entries for self-hosting
+
+### storefront `/products` page — static HTML, not catalog-driven [2026-07-01 totebox@claude-code]
+
+Discovered `app-privategit-marketplace/static/software.html` is baked into the binary via
+`include_str!` at `src/main.rs:102` — it never reads `products.yaml` at request time.
+Only `/v1/products` (JSON API) reflects catalog edits. The entire page is placeholder
+content: every "Install →" link is `href="#"` except the one card fixed this session, and
+there's a literal "Sample listing" disclaimer at the bottom.
+
+- [ ] Decide: render `/products` dynamically from products.yaml, or commit to hand-maintaining
+  cards per product (current state) — flagged to Command, not yet decided
+- [x] Added real Knowledge Wiki card with working href (commit `427bfff7`) — only fix so far
+- [ ] `os-network-admin` and `soft-orchestration-command` cards still stale/placeholder despite
+  being live BETA products
+
+### foundry-prod sync path — partially resolved [2026-07-01 totebox@claude-code]
+
+`software.pointsav.com` resolves to foundry-prod (34.168.19.68), a different machine from
+this session's host (foundry-workspace, 34.53.65.203). Found `~/Foundry/bin/push-to-prod.sh
+software` (Command-only, manual) which rsyncs the two marketplace binaries + RELEASES_DIR,
+but on read it has no reference to `/var/lib/local-software/catalog/products.yaml` — may
+leave prod's catalog stale even after a successful push. Flagged informationally to Command:
+msg-id `command-20260701-fyi-found-push-to-prod-sh-software-targe`.
+
+- [ ] Confirm whether products.yaml needs adding to push-to-prod.sh's `target_software()`
+- [ ] Nothing deposited in project-software sessions to date is confirmed live for real customers until this is resolved
 
 ### software distribution — BETA catalog pending [2026-06-30 totebox@claude-code]
 
-- [ ] `app-mediakit-knowledge` binary — awaiting project-knowledge Stage 6 P6-F rebuild; RELEASES_DIR slot ready; catalog entry live
+- [x] `app-mediakit-knowledge` QCOW2 (Format B) — deposited 2026-07-01: SHA verified, RELEASES_DIR slot at app-mediakit-knowledge/0.1.0/, MANIFEST.json written, products.yaml updated, ACK sent to project-knowledge
 - [ ] `install.sh` — template not yet authored for any product; needed before public-facing launch
-- [ ] Self-produced catalog entries — `app-privategit-source`, `app-privategit-marketplace`, `tool-wallet` need RELEASES_DIR + catalog entries (blocked on Stage 6 first)
-- [ ] `os-privategit` engineering — scaffold only; full-stack installer binary not yet built
+- [ ] Self-produced catalog entries — `app-privategit-source`, `app-privategit-marketplace` binaries confirmed live with sha+ledger; `tool-wallet` and `os-privategit` still need RELEASES_DIR + catalog entries (blocked on Stage 6 first)
+- [ ] `os-privategit` engineering — scaffold only (lib.rs stub, no main.rs); README rewritten to be product-accurate 2026-07-01 but binary not yet built. A 288 KB informal binary exists in RELEASES_DIR from 2026-05-31 (commit 03741cb9, 401-gated, unledgered) — provenance/purpose unclear
 - [ ] Product page template (S136) — design template with BETA badge, platform table, curl install, SHA256
 
-### binary-ledger uncommitted [2026-06-30 totebox@claude-code]
+### NEXT.md duplication — drift to close [2026-07-01 totebox@claude-code]
 
-- [ ] Command Session to commit `/srv/foundry/data/binary-ledger/os-network-admin.jsonl` and `soft-orchestration-command.jsonl` — written to disk, not yet in workspace git
+This archive has two NEXT.md files: this one (archive root, actively maintained) and
+`pointsav-monorepo/NEXT.md` (stale since 2026-05-16). Per `repo-layout.md`, NEXT.md belongs
+at the monorepo root — the archive-root copy may be the drift. Not resolved this session;
+needs a decision on which is canonical before the divergence grows further.
 
 ### VM stability — crash prevention [2026-05-16 task@claude-code]
 
