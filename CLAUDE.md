@@ -54,6 +54,17 @@ Commits to pointsav-monorepo use: `~/Foundry/bin/commit-as-next.sh "<msg>"`.
 Canonical promote is not self-service — write `"Stage 6 pending — project-workplace — <crate>"`
 to outbox at shutdown. Command Session processes canonical merge.
 
+## Deploy model
+
+This archive develops `app-mediakit-marketing` + `app-mediakit-shell`
+(clean-sheet rewrite, 2026-06), which maps to `~/Foundry/bin/push-to-prod.sh`'s
+`marketing` target — serves home.woodfinegroup.com / home.pointsav.com live.
+This archive does NOT push to foundry-prod itself: Stage 6 promotes the crate
+to canonical, then Command Session centrally rebuilds and runs
+`push-to-prod.sh marketing`. Local preview ports (workspace VM):
+`local-marketing-pointsav` :9101, `local-marketing` :9102 — review via
+`ssh foundry-workspace-preview` before requesting a push.
+
 ## Conflicts
 
 If a workspace rule conflicts with anything stated here, **stop and surface
