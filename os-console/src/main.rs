@@ -12,10 +12,9 @@ fn main() -> anyhow::Result<()> {
 fn pairing_server_alive() -> bool {
     use std::io::{Read, Write};
     let addr: std::net::SocketAddr = "127.0.0.1:9205".parse().unwrap();
-    let Ok(mut stream) = std::net::TcpStream::connect_timeout(
-        &addr,
-        std::time::Duration::from_millis(500),
-    ) else {
+    let Ok(mut stream) =
+        std::net::TcpStream::connect_timeout(&addr, std::time::Duration::from_millis(500))
+    else {
         return false;
     };
     if stream
@@ -70,13 +69,19 @@ fn inner_main() -> anyhow::Result<()> {
 
             let mut cmd = std::process::Command::new("ssh");
             cmd.arg("-N")
-               .arg("-o").arg("StrictHostKeyChecking=accept-new")
-               .arg("-o").arg("ServerAliveInterval=30")
-               .arg("-o").arg("ServerAliveCountMax=3")
-               .arg("-p").arg(p.gce_ssh_port.to_string())
-               .arg("-i").arg(&p.ssh_key_path);
+                .arg("-o")
+                .arg("StrictHostKeyChecking=accept-new")
+                .arg("-o")
+                .arg("ServerAliveInterval=30")
+                .arg("-o")
+                .arg("ServerAliveCountMax=3")
+                .arg("-p")
+                .arg(p.gce_ssh_port.to_string())
+                .arg("-i")
+                .arg(&p.ssh_key_path);
             for &(local_port, remote_port) in ssh_forwards {
-                cmd.arg("-L").arg(format!("{local_port}:localhost:{remote_port}"));
+                cmd.arg("-L")
+                    .arg(format!("{local_port}:localhost:{remote_port}"));
             }
             cmd.arg(format!("{}@{}", p.gce_user, p.gce_host));
             cmd.stdout(std::process::Stdio::null());
@@ -198,10 +203,12 @@ fn inner_main() -> anyhow::Result<()> {
                                 ),
                             )
                             .await
-                            .unwrap_or_else(|_| mba_client::MbaResult {
-                                active: false,
-                                fingerprint: "(timeout)".into(),
-                                tofu_server_fingerprint: None,
+                            .unwrap_or_else(|_| {
+                                mba_client::MbaResult {
+                                    active: false,
+                                    fingerprint: "(timeout)".into(),
+                                    tofu_server_fingerprint: None,
+                                }
                             })
                         })
                     });
