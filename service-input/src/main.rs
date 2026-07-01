@@ -29,12 +29,9 @@ async fn main() {
         )
         .init();
 
-    let module_id = std::env::var("INPUT_MODULE_ID")
-        .expect("INPUT_MODULE_ID is required");
-    let fs_url = std::env::var("INPUT_FS_URL")
-        .expect("INPUT_FS_URL is required");
-    let bind_addr = std::env::var("INPUT_BIND_ADDR")
-        .unwrap_or_else(|_| "0.0.0.0:9200".to_string());
+    let module_id = std::env::var("INPUT_MODULE_ID").expect("INPUT_MODULE_ID is required");
+    let fs_url = std::env::var("INPUT_FS_URL").expect("INPUT_FS_URL is required");
+    let bind_addr = std::env::var("INPUT_BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:9200".to_string());
 
     let dispatcher = Dispatcher::new()
         .with_pdf(Box::new(PdfParser))
@@ -58,7 +55,5 @@ async fn main() {
 
     info!(module_id, bind_addr, "service-input starting");
 
-    axum::serve(listener, app)
-        .await
-        .expect("axum server error");
+    axum::serve(listener, app).await.expect("axum server error");
 }

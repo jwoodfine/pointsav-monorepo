@@ -19,11 +19,7 @@ static TMPCTR: AtomicU64 = AtomicU64::new(0);
 
 fn tmpdir() -> PathBuf {
     let n = TMPCTR.fetch_add(1, Ordering::SeqCst);
-    let dir = std::env::temp_dir().join(format!(
-        "svc-fs-rt-test-{}-{}",
-        std::process::id(),
-        n
-    ));
+    let dir = std::env::temp_dir().join(format!("svc-fs-rt-test-{}-{}", std::process::id(), n));
     std::fs::create_dir_all(&dir).unwrap();
     dir
 }
@@ -111,7 +107,10 @@ async fn append_then_entries_returns_payload() {
     );
 
     let next_cursor = entries_json["next_cursor"].as_u64().unwrap();
-    assert_eq!(next_cursor, cursor, "next_cursor must equal the last entry's cursor");
+    assert_eq!(
+        next_cursor, cursor,
+        "next_cursor must equal the last entry's cursor"
+    );
 }
 
 /// Two appends then GET since=<first_cursor>: only the second entry
@@ -163,6 +162,10 @@ async fn entries_since_excludes_boundary() {
     assert_eq!(entries_resp.status(), StatusCode::OK);
     let entries_json = body_json(entries_resp.into_body()).await;
     let entries = entries_json["entries"].as_array().unwrap();
-    assert_eq!(entries.len(), 1, "only second entry is returned when since=c1");
+    assert_eq!(
+        entries.len(),
+        1,
+        "only second entry is returned when since=c1"
+    );
     assert_eq!(entries[0]["payload_id"], "b");
 }

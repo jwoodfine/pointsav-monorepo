@@ -18,7 +18,7 @@ use std::io::Cursor;
 
 use calamine::{open_workbook_from_rs, Data, Reader, Xlsx};
 
-use crate::{Format, ParsedDocument, ParseError, Parser};
+use crate::{Format, ParseError, ParsedDocument, Parser};
 
 pub struct XlsxParser;
 
@@ -112,8 +112,7 @@ mod tests {
         // Valid ZIP magic but not a real XLSX (no xl/ directory).
         let empty_zip: &[u8] = &[
             0x50, 0x4B, 0x05, 0x06, // End of central directory signature
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
             0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
         match p.parse("doc1", empty_zip) {
@@ -145,8 +144,7 @@ mod tests {
             "sheet_count must be 1"
         );
         assert_eq!(
-            doc.metadata["sheets"][0],
-            "Sheet1",
+            doc.metadata["sheets"][0], "Sheet1",
             "first sheet name must be Sheet1"
         );
     }

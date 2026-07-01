@@ -314,8 +314,8 @@ mod tests {
 
     fn tmpdir() -> PathBuf {
         let n = TMPCTR.fetch_add(1, Ordering::SeqCst);
-        let dir = std::env::temp_dir()
-            .join(format!("svc-fs-http-test-{}-{}", std::process::id(), n));
+        let dir =
+            std::env::temp_dir().join(format!("svc-fs-http-test-{}-{}", std::process::id(), n));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }

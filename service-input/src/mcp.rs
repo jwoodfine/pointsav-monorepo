@@ -75,7 +75,12 @@ pub struct JsonRpcError {
 
 impl JsonRpcResponse {
     fn ok(id: Value, result: Value) -> Self {
-        Self { jsonrpc: "2.0", id, result: Some(result), error: None }
+        Self {
+            jsonrpc: "2.0",
+            id,
+            result: Some(result),
+            error: None,
+        }
     }
 
     fn err(id: Value, code: i64, message: impl Into<String>) -> Self {
@@ -83,7 +88,11 @@ impl JsonRpcResponse {
             jsonrpc: "2.0",
             id,
             result: None,
-            error: Some(JsonRpcError { code, message: message.into(), data: None }),
+            error: Some(JsonRpcError {
+                code,
+                message: message.into(),
+                data: None,
+            }),
         }
     }
 }
@@ -151,9 +160,7 @@ fn check_module_id(state: &AppState, headers: &HeaderMap) -> Result<(), String> 
              (per-tenant boundary, Doctrine §IV.b)",
             state.module_id
         )),
-        None => Err(
-            "X-Foundry-Module-ID header is required (per-tenant boundary)".to_string(),
-        ),
+        None => Err("X-Foundry-Module-ID header is required (per-tenant boundary)".to_string()),
     }
 }
 
@@ -207,8 +214,8 @@ async fn handle_tools_call(
     state: &Arc<AppState>,
     params: Option<Value>,
 ) -> Result<Value, (i64, String)> {
-    let params = params
-        .ok_or_else(|| (INVALID_PARAMS, "params required for tools/call".to_string()))?;
+    let params =
+        params.ok_or_else(|| (INVALID_PARAMS, "params required for tools/call".to_string()))?;
     let name = params["name"]
         .as_str()
         .ok_or_else(|| (INVALID_PARAMS, "params.name is required".to_string()))?;
@@ -220,12 +227,18 @@ async fn handle_tools_call(
             let filename = args["filename"]
                 .as_str()
                 .ok_or_else(|| (INVALID_PARAMS, "arguments.filename is required".to_string()))?;
-            let source_id = args["source_id"]
-                .as_str()
-                .ok_or_else(|| (INVALID_PARAMS, "arguments.source_id is required".to_string()))?;
-            let bytes_b64 = args["bytes_base64"]
-                .as_str()
-                .ok_or_else(|| (INVALID_PARAMS, "arguments.bytes_base64 is required".to_string()))?;
+            let source_id = args["source_id"].as_str().ok_or_else(|| {
+                (
+                    INVALID_PARAMS,
+                    "arguments.source_id is required".to_string(),
+                )
+            })?;
+            let bytes_b64 = args["bytes_base64"].as_str().ok_or_else(|| {
+                (
+                    INVALID_PARAMS,
+                    "arguments.bytes_base64 is required".to_string(),
+                )
+            })?;
 
             let bytes = base64::engine::general_purpose::STANDARD
                 .decode(bytes_b64)
@@ -357,8 +370,7 @@ mod tests {
         // response must be a JSON-RPC error, not a panic.
         let state = make_state("m3");
         let app = crate::http::router(state);
-        let bytes_b64 =
-            base64::engine::general_purpose::STANDARD.encode(b"# Hello\n\nBody.");
+        let bytes_b64 = base64::engine::general_purpose::STANDARD.encode(b"# Hello\n\nBody.");
         let resp = mcp_call(
             app,
             "m3",
@@ -408,15 +420,17 @@ mod tests {
             .unwrap();
         let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
         let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        assert!(body["error"].is_object(), "expected RPC error for wrong module_id");
+        assert!(
+            body["error"].is_object(),
+            "expected RPC error for wrong module_id"
+        );
     }
 
     #[tokio::test]
     async fn unknown_format_returns_rpc_error() {
         let state = make_state("m5");
         let app = crate::http::router(state);
-        let bytes_b64 =
-            base64::engine::general_purpose::STANDARD.encode(b"arbitrary bytes");
+        let bytes_b64 = base64::engine::general_purpose::STANDARD.encode(b"arbitrary bytes");
         let resp = mcp_call(
             app,
             "m5",

@@ -90,10 +90,7 @@ pub struct ParsedDocument {
 pub enum ParseError {
     /// Caller supplied bytes that do not match the declared format
     /// (e.g., a `.pdf` file that fails the PDF magic-byte check).
-    FormatMismatch {
-        declared: Format,
-        reason: String,
-    },
+    FormatMismatch { declared: Format, reason: String },
     /// Caller supplied an unsupported format (no Parser registered
     /// for it).
     UnsupportedFormat(Format),
@@ -116,7 +113,10 @@ impl std::fmt::Display for ParseError {
                 write!(f, "unsupported format: {fmt:?} (no Parser registered)")
             }
             ParseError::FormatUndetected => {
-                write!(f, "format detection failed (no extension match; no magic-byte match)")
+                write!(
+                    f,
+                    "format detection failed (no extension match; no magic-byte match)"
+                )
             }
             ParseError::ParserInternal(msg) => write!(f, "parser internal error: {msg}"),
         }
@@ -330,9 +330,7 @@ mod tests {
     #[test]
     fn dispatch_to_registered_parser() {
         let d = Dispatcher::new().with_markdown(Box::new(EchoParser));
-        let r = d
-            .dispatch(Format::Markdown, "doc1", b"# hello")
-            .unwrap();
+        let r = d.dispatch(Format::Markdown, "doc1", b"# hello").unwrap();
         assert_eq!(r.source_id, "doc1");
         assert_eq!(r.text, "# hello");
     }

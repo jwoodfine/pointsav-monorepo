@@ -70,7 +70,12 @@ pub struct JsonRpcError {
 
 impl JsonRpcResponse {
     fn ok(id: Value, result: Value) -> Self {
-        Self { jsonrpc: "2.0", id, result: Some(result), error: None }
+        Self {
+            jsonrpc: "2.0",
+            id,
+            result: Some(result),
+            error: None,
+        }
     }
 
     fn err(id: Value, code: i64, message: impl Into<String>) -> Self {
@@ -78,7 +83,11 @@ impl JsonRpcResponse {
             jsonrpc: "2.0",
             id,
             result: None,
-            error: Some(JsonRpcError { code, message: message.into(), data: None }),
+            error: Some(JsonRpcError {
+                code,
+                message: message.into(),
+                data: None,
+            }),
         }
     }
 }
@@ -160,9 +169,7 @@ fn check_module_id(state: &AppState, headers: &HeaderMap) -> Result<(), String> 
              (per-tenant boundary, Doctrine §IV.b)",
             state.module_id
         )),
-        None => Err(
-            "X-Foundry-Module-ID header is required (per-tenant boundary)".to_string(),
-        ),
+        None => Err("X-Foundry-Module-ID header is required (per-tenant boundary)".to_string()),
     }
 }
 
@@ -207,10 +214,7 @@ fn handle_tools_list() -> Value {
     })
 }
 
-fn handle_tools_call(
-    state: &Arc<AppState>,
-    params: Option<Value>,
-) -> Result<Value, String> {
+fn handle_tools_call(state: &Arc<AppState>, params: Option<Value>) -> Result<Value, String> {
     let params = params.ok_or_else(|| "params required for tools/call".to_string())?;
     let name = params["name"]
         .as_str()
@@ -231,9 +235,10 @@ fn handle_tools_call(
                 .append(payload_id, payload)
                 .map_err(|e: LedgerError| e.to_string())?;
 
-            let result_text =
-                serde_json::to_string(&serde_json::json!({ "cursor": cursor, "payload_id": payload_id }))
-                    .unwrap_or_default();
+            let result_text = serde_json::to_string(
+                &serde_json::json!({ "cursor": cursor, "payload_id": payload_id }),
+            )
+            .unwrap_or_default();
 
             Ok(serde_json::json!({
                 "content": [{"type": "text", "text": result_text}],
@@ -258,10 +263,7 @@ fn handle_resources_list() -> Value {
     })
 }
 
-fn handle_resources_read(
-    state: &Arc<AppState>,
-    params: Option<Value>,
-) -> Result<Value, String> {
+fn handle_resources_read(state: &Arc<AppState>, params: Option<Value>) -> Result<Value, String> {
     let uri = params
         .as_ref()
         .and_then(|p| p["uri"].as_str())
@@ -314,8 +316,8 @@ mod tests {
 
     fn tmpdir() -> PathBuf {
         let n = TMPCTR.fetch_add(1, Ordering::SeqCst);
-        let dir = std::env::temp_dir()
-            .join(format!("svc-fs-mcp-test-{}-{}", std::process::id(), n));
+        let dir =
+            std::env::temp_dir().join(format!("svc-fs-mcp-test-{}-{}", std::process::id(), n));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -325,9 +327,7 @@ mod tests {
         Arc::new(AppState {
             module_id: module_id.to_string(),
             ledger: Box::new(InMemoryLedger::open(d.join("main"), module_id).unwrap()),
-            audit_ledger: Box::new(
-                InMemoryLedger::open(d.join("audit"), "audit-log").unwrap(),
-            ),
+            audit_ledger: Box::new(InMemoryLedger::open(d.join("audit"), "audit-log").unwrap()),
         })
     }
 
@@ -422,7 +422,10 @@ mod tests {
         let app = crate::http::router(state.clone());
 
         // Append via main ledger directly.
-        state.ledger.append("r1", &serde_json::json!({"x": 42})).unwrap();
+        state
+            .ledger
+            .append("r1", &serde_json::json!({"x": 42}))
+            .unwrap();
 
         let resp = mcp_call(
             app,
@@ -468,6 +471,9 @@ mod tests {
             .unwrap();
         let bytes = to_bytes(resp.into_body(), usize::MAX).await.unwrap();
         let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
-        assert!(body["error"].is_object(), "expected RPC error for wrong module_id");
+        assert!(
+            body["error"].is_object(),
+            "expected RPC error for wrong module_id"
+        );
     }
 }

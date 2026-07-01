@@ -14,7 +14,7 @@ use std::io::Cursor;
 
 use docx_rust::DocxFile;
 
-use crate::{Format, ParsedDocument, ParseError, Parser};
+use crate::{Format, ParseError, ParsedDocument, Parser};
 
 pub struct DocxParser;
 
@@ -35,13 +35,12 @@ impl Parser for DocxParser {
         }
 
         let cursor = Cursor::new(bytes);
-        let docx_file = DocxFile::from_reader(cursor).map_err(|e| {
-            ParseError::ParserInternal(format!("DocxFile::from_reader: {e}"))
-        })?;
+        let docx_file = DocxFile::from_reader(cursor)
+            .map_err(|e| ParseError::ParserInternal(format!("DocxFile::from_reader: {e}")))?;
 
-        let docx = docx_file.parse().map_err(|e| {
-            ParseError::ParserInternal(format!("DocxFile::parse: {e}"))
-        })?;
+        let docx = docx_file
+            .parse()
+            .map_err(|e| ParseError::ParserInternal(format!("DocxFile::parse: {e}")))?;
 
         let text = docx.document.body.text();
         let paragraph_count = docx
@@ -49,9 +48,7 @@ impl Parser for DocxParser {
             .body
             .content
             .iter()
-            .filter(|c| {
-                matches!(c, docx_rust::document::BodyContent::Paragraph(_))
-            })
+            .filter(|c| matches!(c, docx_rust::document::BodyContent::Paragraph(_)))
             .count();
 
         Ok(ParsedDocument {

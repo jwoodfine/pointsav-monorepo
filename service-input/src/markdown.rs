@@ -8,7 +8,7 @@
 
 use pulldown_cmark::{Event, Options, Parser as CmarkParser, Tag, TagEnd};
 
-use crate::{Format, ParsedDocument, ParseError, Parser};
+use crate::{Format, ParseError, ParsedDocument, Parser};
 
 pub struct MarkdownParser;
 
@@ -19,9 +19,8 @@ impl Parser for MarkdownParser {
             reason: format!("input is not valid UTF-8: {e}"),
         })?;
 
-        let opts = Options::ENABLE_TABLES
-            | Options::ENABLE_STRIKETHROUGH
-            | Options::ENABLE_TASKLISTS;
+        let opts =
+            Options::ENABLE_TABLES | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TASKLISTS;
         let cmark = CmarkParser::new_ext(input, opts);
 
         let mut text_buf = String::new();
@@ -76,7 +75,9 @@ mod tests {
     #[test]
     fn markdown_text_is_extracted() {
         let p = MarkdownParser;
-        let doc = p.parse("doc1", b"Hello **world**. This is a test.").unwrap();
+        let doc = p
+            .parse("doc1", b"Hello **world**. This is a test.")
+            .unwrap();
         assert_eq!(doc.format, Format::Markdown);
         assert_eq!(doc.source_id, "doc1");
         assert!(doc.text.contains("Hello"), "plain text should be present");
@@ -121,9 +122,6 @@ mod tests {
         let p = MarkdownParser;
         let doc = p.parse("empty", b"").unwrap();
         assert!(doc.text.is_empty());
-        assert_eq!(
-            doc.metadata["headings"].as_array().unwrap().len(),
-            0
-        );
+        assert_eq!(doc.metadata["headings"].as_array().unwrap().len(), 0);
     }
 }

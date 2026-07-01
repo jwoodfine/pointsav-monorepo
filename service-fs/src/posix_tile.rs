@@ -235,11 +235,7 @@ fn load_and_verify_log(log_path: &Path) -> Result<Vec<Entry>, LedgerError> {
 }
 
 impl LedgerBackend for PosixTileLedger {
-    fn append(
-        &self,
-        payload_id: &str,
-        payload: &serde_json::Value,
-    ) -> Result<u64, LedgerError> {
+    fn append(&self, payload_id: &str, payload: &serde_json::Value) -> Result<u64, LedgerError> {
         let mut inner = self.inner.lock().expect("ledger mutex poisoned");
         let cursor = inner.next_cursor;
         let prev_hash = Self::tip_hash(&inner)?;
@@ -536,7 +532,7 @@ mod tests {
         // Write a deterministic test key to a temp file.
         let key_dir = tmpdir();
         let key_path = key_dir.join("test.key");
-        std::fs::write(&key_path, &[3u8; 32]).unwrap();
+        std::fs::write(&key_path, [3u8; 32]).unwrap();
 
         let signing_key = ed25519_dalek::SigningKey::from_bytes(&[3u8; 32]);
         let vk_bytes = signing_key.verifying_key().to_bytes();
@@ -546,7 +542,10 @@ mod tests {
         l.append("a", &serde_json::json!({"x": 1})).unwrap();
         let cp = l.checkpoint().unwrap();
 
-        assert!(cp.signature.is_some(), "signed checkpoint must carry a signature");
+        assert!(
+            cp.signature.is_some(),
+            "signed checkpoint must carry a signature"
+        );
         assert!(
             crate::ledger::verify_checkpoint_signature(&cp, &vk_bytes).unwrap(),
             "signature must verify with the correct public key (independent of daemon)"

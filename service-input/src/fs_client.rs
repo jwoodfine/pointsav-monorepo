@@ -67,8 +67,8 @@ impl FsClient {
     /// Header: `X-Foundry-Module-ID: <module_id>` (per-tenant boundary
     /// enforcement on the server side per Doctrine §IV.b).
     pub fn submit(&self, doc: &ParsedDocument) -> Result<u64, FsClientError> {
-        let payload = serde_json::to_value(doc)
-            .map_err(|e| FsClientError::Serialization(e.to_string()))?;
+        let payload =
+            serde_json::to_value(doc).map_err(|e| FsClientError::Serialization(e.to_string()))?;
 
         let body = serde_json::json!({
             "payload_id": doc.source_id,
@@ -159,10 +159,7 @@ mod tests {
         // Brief pause to let the server reach its accept loop.
         std::thread::sleep(std::time::Duration::from_millis(50));
 
-        let client = FsClient::new(
-            format!("http://127.0.0.1:{port}"),
-            module_id.to_string(),
-        );
+        let client = FsClient::new(format!("http://127.0.0.1:{port}"), module_id.to_string());
 
         let doc = ParsedDocument {
             format: Format::Markdown,

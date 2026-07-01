@@ -68,7 +68,9 @@ pub enum LedgerError {
     /// verify_consistency: the two checkpoints are not in an
     /// append-only relationship (e.g., c2.tree_size < c1.tree_size,
     /// or recomputing forward from c1 doesn't reach c2.root_hash).
-    InconsistentCheckpoints { reason: String },
+    InconsistentCheckpoints {
+        reason: String,
+    },
     /// Signing key file is missing, wrong length, or not a valid
     /// Ed25519 compressed point (for verifying keys).
     InvalidKey(String),
@@ -84,7 +86,11 @@ impl std::fmt::Display for LedgerError {
             LedgerError::EntryNotFound(c) => {
                 write!(f, "entry not found at cursor {c}")
             }
-            LedgerError::ChainTampered { cursor, expected, got } => {
+            LedgerError::ChainTampered {
+                cursor,
+                expected,
+                got,
+            } => {
                 write!(
                     f,
                     "chain tampered at cursor {cursor}: expected {expected}, got {got}"
@@ -197,11 +203,7 @@ pub trait LedgerBackend {
     /// Append a new payload. Returns the assigned monotonic cursor.
     /// The entry is now permanent — no API surface can remove or
     /// modify it.
-    fn append(
-        &self,
-        payload_id: &str,
-        payload: &serde_json::Value,
-    ) -> Result<u64, LedgerError>;
+    fn append(&self, payload_id: &str, payload: &serde_json::Value) -> Result<u64, LedgerError>;
 
     /// Read entries with cursor strictly greater than `since`.
     fn read_since(&self, since: u64) -> Result<Vec<Entry>, LedgerError>;
@@ -310,9 +312,8 @@ pub(crate) fn signed_note_body(
     tree_size: u64,
     root_hash_hex: &str,
 ) -> Result<String, LedgerError> {
-    let hash_bytes = hex::decode(root_hash_hex).map_err(|e| {
-        LedgerError::SigningError(format!("root_hash hex decode failed: {e}"))
-    })?;
+    let hash_bytes = hex::decode(root_hash_hex)
+        .map_err(|e| LedgerError::SigningError(format!("root_hash hex decode failed: {e}")))?;
     let hash_b64 = B64.encode(&hash_bytes);
     Ok(format!("{origin}\n{tree_size}\n{hash_b64}\n\n"))
 }
@@ -366,7 +367,11 @@ pub fn verify_checkpoint_signature(
         None => return Ok(false),
         Some(v) => v,
     };
-    let body = signed_note_body(&checkpoint.origin, checkpoint.tree_size, &checkpoint.root_hash)?;
+    let body = signed_note_body(
+        &checkpoint.origin,
+        checkpoint.tree_size,
+        &checkpoint.root_hash,
+    )?;
     let vk_arr: [u8; 32] = verifying_key_bytes.try_into().map_err(|_| {
         LedgerError::InvalidKey(format!(
             "verifying key must be 32 bytes, got {}",
@@ -460,11 +465,7 @@ impl InMemoryLedger {
 }
 
 impl LedgerBackend for InMemoryLedger {
-    fn append(
-        &self,
-        payload_id: &str,
-        payload: &serde_json::Value,
-    ) -> Result<u64, LedgerError> {
+    fn append(&self, payload_id: &str, payload: &serde_json::Value) -> Result<u64, LedgerError> {
         let mut inner = self.inner.lock().expect("ledger mutex poisoned");
         let cursor = inner.next_cursor;
         let prev_hash = Self::tip_hash(&inner)?;
@@ -631,11 +632,8 @@ mod tests {
 
     fn tmpdir() -> PathBuf {
         let n = TMPCTR.fetch_add(1, Ordering::SeqCst);
-        let dir = std::env::temp_dir().join(format!(
-            "service-fs-test-{}-{}",
-            std::process::id(),
-            n
-        ));
+        let dir =
+            std::env::temp_dir().join(format!("service-fs-test-{}-{}", std::process::id(), n));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -778,7 +776,10 @@ mod tests {
         let l = InMemoryLedger::open_with_signing_key(tmpdir(), "foundry", key).unwrap();
         l.append("a", &serde_json::json!({"x": 1})).unwrap();
         let cp = l.checkpoint().unwrap();
-        assert!(cp.signature.is_some(), "signed checkpoint must carry a signature");
+        assert!(
+            cp.signature.is_some(),
+            "signed checkpoint must carry a signature"
+        );
         assert!(
             verify_checkpoint_signature(&cp, &vk_bytes).unwrap(),
             "signature must verify with the correct key"
@@ -791,7 +792,9 @@ mod tests {
         let l = InMemoryLedger::open_with_signing_key(tmpdir(), "foundry", key).unwrap();
         l.append("a", &serde_json::json!({"x": 1})).unwrap();
         let cp = l.checkpoint().unwrap();
-        let wrong_vk = SigningKey::from_bytes(&[2u8; 32]).verifying_key().to_bytes();
+        let wrong_vk = SigningKey::from_bytes(&[2u8; 32])
+            .verifying_key()
+            .to_bytes();
         assert!(
             !verify_checkpoint_signature(&cp, &wrong_vk).unwrap(),
             "signature must NOT verify with the wrong key"

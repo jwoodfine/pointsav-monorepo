@@ -126,12 +126,8 @@ mod tests {
                     "ParserInternal message should not be empty"
                 );
             }
-            Err(other) => panic!(
-                "expected ParserInternal, got {other:?}"
-            ),
-            Ok(doc) => panic!(
-                "expected error for non-PDF bytes; got OK: {doc:?}"
-            ),
+            Err(other) => panic!("expected ParserInternal, got {other:?}"),
+            Ok(doc) => panic!("expected error for non-PDF bytes; got OK: {doc:?}"),
         }
     }
 
