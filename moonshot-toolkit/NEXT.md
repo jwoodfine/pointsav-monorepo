@@ -1,23 +1,26 @@
 # NEXT.md — moonshot-toolkit
 
-> Last updated: 2026-06-29
+> Last updated: 2026-06-30
 > Read at session start. Update before session end.
 
 ---
 
 ## Right now
 
-- Task #14 decisions recorded 2026-06-29 — see Unblocked section below.
-- Next: implement `build` subcommand to invoke Microkit 2.2.0 SDK.
-  Add x86_64_generic / x86_64_generic_vtx targets to SystemSpec.
+- **Task #14 IMPLEMENTED** (commit `916e918b`, 2026-06-30) — `build` subcommand is real.
+- **BLOCKED: disk full** — `/srv/foundry/cargo-target/mathew/debug/` ENOSPC.
+  `cargo check` passed (exit 0). `cargo test` and first `build` run blocked until disk freed.
+  Command fix: `rm -rf /srv/foundry/cargo-target/mathew/debug/incremental/`
+- **First build run**: `moonshot-toolkit build os-infrastructure/system-spec.toml`
+  → should produce `os-infrastructure/build/loader.img` via Microkit 2.2.0.
 
 ## Queue
 
-- `[ ]` Implement task #14 — actual seL4 cross-compile (decisions now recorded in src/main.rs)
-- `[ ]` Add x86-64 build targets (`x86_64_generic`, `x86_64_generic_vtx`) to SystemSpec and BuildPlan
-- `[ ]` Wire `build` subcommand to invoke Microkit 2.2.0 SDK (aarch64-linux-gnu-gcc for ARM; native gcc for x86)
+- `[ ]` First real build run: `moonshot-toolkit build os-infrastructure/system-spec.toml` [2026-06-30 totebox@claude-code]
+- `[ ]` Run `cargo test` to confirm all 4 new spec tests + updated plan test pass [2026-06-30 totebox@claude-code]
 - `[ ]` Ed25519-sign output images using identity/id_pointsav-administrator key
 - `[ ]` Remove `build-totebox.sh` legacy shell sketch once `moonshot-toolkit build` produces a bootable image
+- `[ ]` AArch64 path: add `qemu_virt_aarch64/debug` variant to os-infrastructure system-spec.toml once x86 path confirmed
 
 ## Unblocked — task #14 decisions recorded (2026-06-29)
 
@@ -37,25 +40,3 @@ Three blocking decisions from the original task #14 are now resolved:
    already implemented in `src/plan.rs`. Ed25519-sign output images with
    `identity/id_pointsav-administrator` key (same key used for software.pointsav.com
    distribution).
-
-## Deferred
-
-- `build-totebox.sh` legacy shell sketch — Deferred: kept in
-  place as migration reference until Phase 1B Rust replacement is
-  operational. Remove when `moonshot-toolkit build` produces a
-  bootable image end-to-end. Tracked as a task #14 closure
-  artefact.
-- `src/main.rs` legacy stub (14-line "Forging Managed Substrate"
-  print routine) — Deferred to #37 rewrite this session.
-- Sigstore Cosign + customer-apex cosignature emission per
-  convention §6.1 — Deferred until BuildPlan output is real
-  (post-#14). The plan_hash field is in v0.1.x; cosignature
-  on top of plan_hash is straightforward when binary outputs
-  exist.
-
-## Recently done
-
-- 2026-04-27: framework §9 activation — CLAUDE.md / AGENTS.md /
-  NEXT.md / ARCHITECTURE.md / DEVELOPMENT.md created; bilingual
-  READMEs updated; workspace member entry added; registry row
-  Scaffold-coded → Active.
