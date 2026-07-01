@@ -94,6 +94,7 @@ impl BuildPlan {
         let spec_hash = sha256_bytes(canonical.as_bytes());
 
         // 2. Generate per-PD compile steps in declared order.
+        let out = spec.build.output_dir.as_str();
         let mut steps: Vec<BuildStep> = spec
             .protection_domains
             .iter()
@@ -101,31 +102,32 @@ impl BuildPlan {
                 name: format!("compile-pd-{}", pd.name),
                 description: format!("Cross-compile protection domain `{}`", pd.name),
                 input_paths: vec![pd.binary.clone()],
-                output_paths: vec![format!("build/{}.elf", pd.name)],
+                output_paths: vec![format!("{out}/{}.elf", pd.name)],
                 command: BuildCommand::CompilePd {
                     pd_name: pd.name.clone(),
                     source_path: pd.binary.clone(),
-                    binary_target: format!("build/{}.elf", pd.name),
+                    binary_target: format!("{out}/{}.elf", pd.name),
                 },
             })
             .collect();
 
-        // 3. Final assembly step.
+        // 3. Final assembly step — output path is loader.img (Microkit convention).
         let pd_binaries: Vec<String> = spec
             .protection_domains
             .iter()
-            .map(|pd| format!("build/{}.elf", pd.name))
+            .map(|pd| format!("{out}/{}.elf", pd.name))
             .collect();
+        let image_path = format!("{out}/loader.img");
         steps.push(BuildStep {
             name: "assemble-image".to_string(),
             description: "Assemble bootable seL4 image from PD binaries and system spec"
                 .to_string(),
             input_paths: pd_binaries.clone(),
-            output_paths: vec!["build/system-image.bin".to_string()],
+            output_paths: vec![image_path.clone()],
             command: BuildCommand::AssembleImage {
                 pd_binary_paths: pd_binaries,
                 spec_hash,
-                output_image: "build/system-image.bin".to_string(),
+                output_image: image_path,
             },
         });
 
@@ -274,7 +276,7 @@ mod tests {
         assert_eq!(plan.steps[0].output_paths, vec!["build/client.elf"]);
         assert_eq!(plan.steps[1].output_paths, vec!["build/server.elf"]);
         assert_eq!(plan.steps[2].input_paths, vec!["build/client.elf", "build/server.elf"]);
-        assert_eq!(plan.steps[2].output_paths, vec!["build/system-image.bin"]);
+        assert_eq!(plan.steps[2].output_paths, vec!["build/loader.img"]);
     }
 
     #[test]

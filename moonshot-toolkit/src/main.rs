@@ -7,16 +7,15 @@
 //! - `validate <spec.toml>` — parse + invariant-check; exit 0 on
 //!   valid, non-zero on parse/validation failure
 //! - `plan <spec.toml>` — parse + generate + print BuildPlan
-//! - `build <spec.toml>` — parse + plan + STUB execute (prints
-//!   "would run" for each step). Actual execution lands in
-//!   cluster task #14 (FUTURE session).
+//! - `build <spec.toml>` — parse + plan + execute seL4 cross-compile
+//!   via Microkit 2.2.0 SDK (task #14).
 
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 
-use moonshot_toolkit::plan::{BuildCommand, BuildPlan};
+use moonshot_toolkit::plan::BuildPlan;
 use moonshot_toolkit::spec::SystemSpec;
 
 #[derive(Parser, Debug)]
@@ -49,9 +48,8 @@ enum Command {
         #[arg(long, value_enum, default_value_t = PlanFormat::Json)]
         format: PlanFormat,
     },
-    /// Stub: parse + plan + print "would run X" for each step.
-    /// Actual seL4 cross-compile lands in a FUTURE session
-    /// (cluster task #14).
+    /// Parse, plan, and execute the seL4 cross-compile via Microkit 2.2.0 SDK.
+    /// Requires [build] section in system-spec.toml (board, config, sdk).
     Build {
         /// Path to system-spec.toml.
         spec_path: PathBuf,
@@ -118,50 +116,10 @@ fn cmd_plan(spec_path: &std::path::Path, format: PlanFormat) -> Result<(), Strin
 fn cmd_build(spec_path: &std::path::Path) -> Result<(), String> {
     let spec = read_spec(spec_path)?;
     let plan = BuildPlan::from_spec(&spec).map_err(|e| format!("plan: {e:?}"))?;
-    println!("Would execute BuildPlan (plan_hash = {})",
-        hex_short(&plan.plan_hash));
-    println!("Steps:");
-    for (i, step) in plan.steps.iter().enumerate() {
-        let cmd_summary = match &step.command {
-            BuildCommand::CompilePd {
-                pd_name,
-                source_path,
-                binary_target,
-            } => format!("CompilePd {pd_name}: {source_path} -> {binary_target}"),
-            BuildCommand::AssembleImage {
-                pd_binary_paths,
-                output_image,
-                ..
-            } => format!(
-                "AssembleImage: [{}] -> {}",
-                pd_binary_paths.join(", "),
-                output_image
-            ),
-        };
-        println!("  [{}] {} — would run: {}", i + 1, step.name, cmd_summary);
-    }
-    eprintln!(
-        "\nNOTE: v0.1.x stub — actual seL4 cross-compile lands in cluster task #14.\n\
-         Decisions recorded (2026-06-29):\n\
-         1. Toolchain: Microkit 2.2.0 SDK. Targets: aarch64-linux-gnu-gcc (primary, \
-         AArch64 EL2 verified production) + x86_64_generic / x86_64_generic_vtx \
-         (Microkit 2.1.0+ runtime/dev — no formal verification on x86 VT-x).\n\
-         2. seL4 source vendoring: vendor-sel4-kernel/ (1,074 files, seL4 15.0.0, \
-         already vendored). Microkit SDK pins to seL4 15.0.0 (released 2025-03-31).\n\
-         3. Reproducible-build harness: BuildPlan content-addressed plan_hash \
-         (implemented in plan.rs). Ed25519-sign output images with \
-         identity/id_pointsav-administrator key."
-    );
-    Ok(())
-}
-
-fn hex_short(hash: &[u8; 32]) -> String {
-    let mut s = String::with_capacity(16);
-    for b in &hash[..8] {
-        s.push_str(&format!("{b:02x}"));
-    }
-    s.push('…');
-    s
+    let spec_dir = spec_path
+        .parent()
+        .ok_or_else(|| format!("{}: no parent directory", spec_path.display()))?;
+    moonshot_toolkit::build_exec::run_build(&spec, &plan, spec_dir)
 }
 
 #[cfg(test)]
@@ -222,10 +180,13 @@ stack_bytes = 4096
     }
 
     #[test]
-    fn build_command_succeeds_as_stub() {
+    fn build_requires_board_in_spec() {
+        // Spec with a PD but no [build] section → board is empty → Err.
         let f = write_spec(minimal_spec());
         let r = cmd_build(f.path());
-        assert!(r.is_ok(), "build stub should succeed; got {r:?}");
+        assert!(r.is_err(), "build without [build].board should fail; got {r:?}");
+        let msg = r.unwrap_err();
+        assert!(msg.contains("board"), "error should mention board; got: {msg}");
     }
 
     #[test]
@@ -234,11 +195,5 @@ stack_bytes = 4096
         let f = write_spec("");
         let r = cmd_build(f.path());
         assert!(r.is_err(), "empty spec should fail plan; got {r:?}");
-    }
-
-    #[test]
-    fn hex_short_renders_first_eight_bytes() {
-        let h = [0xAB; 32];
-        assert!(hex_short(&h).starts_with("abababab"));
     }
 }

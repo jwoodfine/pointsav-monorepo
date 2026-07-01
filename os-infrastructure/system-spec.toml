@@ -1,0 +1,20 @@
+# os-infrastructure system specification — Microkit 2.2.0
+# Build: moonshot-toolkit build os-infrastructure/system-spec.toml
+#
+# Option B architecture: seL4 microkernel + CAmkES VMM PD + Linux guest.
+# Phase gate: pd/vmm.c is a placeholder until moonshot-sel4-vmm delivers
+# the full VMM implementation.
+
+[build]
+board      = "x86_64_generic"
+config     = "debug"
+sdk        = "/opt/microkit-sdk-2.2.0"
+output_dir = "build"
+
+# Protection domains
+# vmm: CAmkES Virtual Machine Monitor — hosts Linux (Debian 12) guest.
+[[protection_domains]]
+name        = "vmm"
+binary      = "pd/vmm.c"
+priority    = 100
+stack_bytes = 65536
