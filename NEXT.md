@@ -69,7 +69,23 @@ msg-id `command-20260701-fyi-found-push-to-prod-sh-software-targe`.
 
 - [x] `app-mediakit-knowledge` QCOW2 (Format B) — deposited 2026-07-01: SHA verified, RELEASES_DIR slot at app-mediakit-knowledge/0.1.0/, MANIFEST.json written, products.yaml updated, ACK sent to project-knowledge
 - [x] Self-produced catalog entries — `app-privategit-source` (sha `36ecb701…`, v0.1.0) and `app-privategit-marketplace` (sha `e53b629a…`, v0.0.3) deposited 2026-07-02: RELEASES_DIR + MANIFEST.json + live products.yaml + monorepo products.yaml (commit `037e51da`); both verified 200 OK, visible in `/v1/products`. `tool-wallet` does NOT need a catalog entry — binary taxonomy rule (§6 of the BRIEF) says tool binaries are NEVER distributed; prior note listing it as pending was itself stale. `os-privategit` still needs RELEASES_DIR + catalog entry once engineering produces a binary.
-- [ ] `install.sh` — template not yet authored for any product; needed before public-facing launch
+- [x] `install.sh` — **authored + deployed 2026-07-02** (commit `80e08c18`): one generic bare-binary
+  template, instantiated for the 4 live bare-binary products (`os-network-admin`,
+  `soft-orchestration-command`, `app-privategit-source`, `app-privategit-marketplace`);
+  deployed live at `RELEASES_DIR/<product>/install.sh`, verified serving via
+  `/releases/<product>/install.sh`. Templates tracked in
+  `app-privategit-source/scripts/install-templates/`. Not yet done: OS-image and
+  QCOW2-class products still have `href="#"` placeholder cards and no install.sh — deferred,
+  no real consumer today.
+  **Gap found + fixed:** the `/releases/:product/:version/MANIFEST` route does not resolve
+  `"latest"` the way the binary-download route does — a script hardcoded to check
+  `.../latest/MANIFEST` would silently skip SHA verification forever. Fixed by resolving the
+  redirect's concrete version first, then checking that version's MANIFEST. Verified
+  end-to-end against `app-privategit-source` (SHA confirmed matching).
+  **Still not live for real customers:** tested against the real public URL
+  (`https://software.pointsav.com`) and got 404 — confirms the foundry-prod sync gap above;
+  these scripts work correctly against foundry-workspace but the deposits haven't reached
+  the actual customer-facing host yet.
 - [ ] `os-privategit` engineering — scaffold only (lib.rs stub, no main.rs); README rewritten to be product-accurate 2026-07-01 but binary not yet built. A 288 KB informal binary exists in RELEASES_DIR from 2026-05-31 (commit 03741cb9, 401-gated, unledgered) — provenance/purpose unclear
 - [ ] Product page template (S136) — design template with BETA badge, platform table, curl install, SHA256
 
