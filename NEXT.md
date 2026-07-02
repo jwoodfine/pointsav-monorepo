@@ -6,25 +6,32 @@
 > Read at session start when a Root Claude opens in this repo. Update
 > at session end when repo-scope open items change.
 
-Last updated: 2026-07-01 (session — storefront static-HTML bug found + fixed; Stage 6 blocker escalated high-priority, now 3454 commits; os-privategit README rewritten).
+Last updated: 2026-07-02 (session — Stage 6 "blocker" resolved as false alarm; storefront cards, self-produced binary deposits, install.sh in progress).
 
 ---
 
 ## Currently open
 
-### software distribution — Stage 6 BLOCKED, high-priority [2026-07-01 totebox@claude-code]
+### software distribution — Stage 6 NOT blocked, queued for auto-promote [2026-07-02 totebox@claude-code]
 
-Self-service promote re-attempted this session — still failing. origin/main is now 3454
-commits ahead of cluster/project-software (was 3146 on 2026-06-30; gap is growing, not
-shrinking). Escalated to Command as HIGH priority: msg-id
-`command-20260701-escalation-high-project-software-stage-6`.
+**RESOLVED — was a false alarm.** Command investigated the prior high-priority escalation
+(msg-id `command-20260701-escalation-high-project-software-stage-6`) and found the
+"3146 → 3454 → 3482 growing" framing conflated *commits behind* (irrelevant unrelated
+history from other archives' promotes) with *commits ahead* (the actual work needing
+promotion). The real number is **30 commits ahead of origin/main** — same size/pattern as
+every other archive's routine promote. See msg-id
+`command-20260701-resolved-project-software-stage-6-escala`.
 
-**23 commits now queued** (21 prior + 2 new this session):
+**30 commits queued for promotion**, including:
 - `427bfff7` — storefront HTML fix (Knowledge Wiki product card was missing)
 - `67627b33` — os-privategit README correction
-- All cargo gates green at HEAD `67627b33`
+- `c3399e2e` — BETA catalog listings
+- ~10 clippy/fmt pre-promote-gate fixes; ~15 feature commits (VM fleet polling, PPN
+  heartbeat, wallet fd-lock, token revocation, original scaffold)
+- All cargo gates green
 
-- [ ] Command resolves rebase (cherry-pick or full rebase from Command Session) — or confirms self-service is no longer viable at this depth
+- [ ] Command will run the promote automatically once this Totebox session goes idle — no
+  action needed from this archive; do not re-attempt `self-service-promote.sh`
 - [ ] After canonical promotion: app-privategit-source, app-privategit-marketplace, tool-wallet get binary-ledger entries + RELEASES_DIR entries for self-hosting
 
 ### storefront `/products` page — static HTML, not catalog-driven [2026-07-01 totebox@claude-code]
@@ -52,12 +59,17 @@ msg-id `command-20260701-fyi-found-push-to-prod-sh-software-targe`.
 
 - [ ] Confirm whether products.yaml needs adding to push-to-prod.sh's `target_software()`
 - [ ] Nothing deposited in project-software sessions to date is confirmed live for real customers until this is resolved
+- [ ] **Clobber risk (2026-07-02):** `app-privategit-source` + `app-privategit-marketplace` were
+  just manually added to the live `/var/lib/local-software/catalog/products.yaml` (see below) —
+  this is exactly the file `push-to-prod.sh`'s `target_software()` does NOT currently sync. If
+  Command fixes that gap by adding a catalog rsync, confirm the source-of-truth direction
+  (workspace → prod) doesn't silently overwrite or drop these two live-added entries.
 
-### software distribution — BETA catalog pending [2026-06-30 totebox@claude-code]
+### software distribution — BETA catalog pending [2026-07-02 totebox@claude-code]
 
 - [x] `app-mediakit-knowledge` QCOW2 (Format B) — deposited 2026-07-01: SHA verified, RELEASES_DIR slot at app-mediakit-knowledge/0.1.0/, MANIFEST.json written, products.yaml updated, ACK sent to project-knowledge
+- [x] Self-produced catalog entries — `app-privategit-source` (sha `36ecb701…`, v0.1.0) and `app-privategit-marketplace` (sha `e53b629a…`, v0.0.3) deposited 2026-07-02: RELEASES_DIR + MANIFEST.json + live products.yaml + monorepo products.yaml (commit `037e51da`); both verified 200 OK, visible in `/v1/products`. `tool-wallet` does NOT need a catalog entry — binary taxonomy rule (§6 of the BRIEF) says tool binaries are NEVER distributed; prior note listing it as pending was itself stale. `os-privategit` still needs RELEASES_DIR + catalog entry once engineering produces a binary.
 - [ ] `install.sh` — template not yet authored for any product; needed before public-facing launch
-- [ ] Self-produced catalog entries — `app-privategit-source`, `app-privategit-marketplace` binaries confirmed live with sha+ledger; `tool-wallet` and `os-privategit` still need RELEASES_DIR + catalog entries (blocked on Stage 6 first)
 - [ ] `os-privategit` engineering — scaffold only (lib.rs stub, no main.rs); README rewritten to be product-accurate 2026-07-01 but binary not yet built. A 288 KB informal binary exists in RELEASES_DIR from 2026-05-31 (commit 03741cb9, 401-gated, unledgered) — provenance/purpose unclear
 - [ ] Product page template (S136) — design template with BETA badge, platform table, curl install, SHA256
 
