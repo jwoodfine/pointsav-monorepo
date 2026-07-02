@@ -1,0 +1,165 @@
+/* bim-components.css — BIM Object component styles */
+
+/* Ensure CDS data-table inherits our color tokens */
+cds-data-table,
+cds-table-head,
+cds-table-body,
+cds-table-row,
+cds-table-header-row,
+cds-table-header-cell,
+cds-table-cell {
+  --cds-interactive: #164679;
+  --cds-layer-accent-01: #dde7f1;
+}
+
+/* BIM tag chip */
+.bim-tag {
+  display: inline-block;
+  background: #dde7f1;
+  color: #164679;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  padding: 0.125em 0.5em;
+  border-radius: 1rem;
+  vertical-align: middle;
+}
+
+/* Side-nav custom link styling */
+cds-side-nav-link a.bim-nav-link,
+cds-side-nav-menu-item a.bim-nav-link {
+  color: inherit;
+  text-decoration: none;
+  display: block;
+  width: 100%;
+}
+
+/* Active link indicator in sidebar */
+[aria-current="page"] {
+  border-left: 3px solid #164679;
+  background: rgba(22, 70, 121, 0.08);
+}
+
+/* Carbon button overrides for bim-nav context */
+.cds-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 400;
+  cursor: pointer;
+  border: 1px solid transparent;
+  text-decoration: none;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.cds-btn--primary {
+  background: #164679;
+  color: #ffffff;
+  border-color: #164679;
+}
+
+.cds-btn--primary:hover {
+  background: #1a5491;
+  border-color: #1a5491;
+}
+
+.cds-btn--ghost {
+  background: transparent;
+  color: #164679;
+  border-color: transparent;
+}
+
+.cds-btn--ghost:hover {
+  background: rgba(22, 70, 121, 0.08);
+}
+
+/* BIM Object card hover shadow */
+.bim-category-card {
+  cursor: pointer;
+}
+
+/* Key plan category accent bars */
+.bim-kp-card[data-category="private-office"] .bim-kp-svg { background: #eaf0f7; }
+.bim-kp-card[data-category="medical"] .bim-kp-svg { background: #e6f4ed; }
+.bim-kp-card[data-category="business"] .bim-kp-svg { background: #f0ebf7; }
+.bim-kp-card[data-category="laboratory"] .bim-kp-svg { background: #fdf0e0; }
+.bim-kp-card[data-category="academic"] .bim-kp-svg { background: #e5f4f0; }
+.bim-kp-card[data-category="civic"] .bim-kp-svg { background: #f5e9eb; }
+.bim-kp-card[data-category="corporate-office"] .bim-kp-svg { background: #e8f1f8; }
+
+/* Notification inline */
+.bim-save-notification {
+  margin-top: 1rem;
+}
+
+/* Visual property editor table + token category table */
+.bim-prop-table,
+.bim-token-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+.bim-prop-table th,
+.bim-token-table th {
+  background: #f4f4f4;
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  font-weight: 600;
+  border-bottom: 2px solid #dde;
+  color: #333;
+}
+.bim-prop-table td,
+.bim-token-table td {
+  padding: 0.375rem 0.75rem;
+  border-bottom: 1px solid #e8e8e8;
+  vertical-align: middle;
+}
+.bim-prop-key label {
+  color: #555;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.bim-prop-input {
+  width: 100%;
+  border: 1px solid #dde;
+  border-radius: 3px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.875rem;
+  font-family: inherit;
+  background: #fafafa;
+  transition: border-color 0.15s;
+  box-sizing: border-box;
+}
+.bim-prop-input:focus {
+  outline: none;
+  border-color: #164679;
+  background: #fff;
+}
+.bim-prop-empty {
+  color: #888;
+  font-style: italic;
+  padding: 1rem 0.75rem;
+}
+
+/* Editor layout */
+.bim-editor-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.bim-editor-pane {
+  margin-bottom: 1rem;
+}
+.bim-codemirror-host {
+  border: 1px solid #dde;
+  border-radius: 4px;
+  min-height: 300px;
+}
+.bim-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 0.75rem;
+}
