@@ -1,3 +1,4 @@
+use serde_json::Value;
 use std::{collections::HashMap, fs, path::Path};
 
 /// Parse `---`-delimited flat `key: value` frontmatter, ported from
@@ -84,51 +85,123 @@ fn field(fields: &HashMap<String, String>, key: &str) -> String {
     fields.get(key).cloned().unwrap_or_default()
 }
 
-/// Load `site-content/categories/NN-<slug>.md` in filename order. The `NN-`
-/// prefix is the nav-order source of truth; the slug (after the prefix,
-/// before `.md`) must match the corresponding `tokens/bim/<slug>.dtcg.json`
-/// stem.
-pub fn load_categories(site_content_dir: &Path) -> Vec<CategoryMeta> {
-    let dir = site_content_dir.join("categories");
-    let mut paths: Vec<_> = match fs::read_dir(&dir) {
-        Ok(rd) => rd
-            .filter_map(|e| e.ok())
-            .map(|e| e.path())
-            .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("md"))
-            .collect(),
-        Err(e) => {
-            eprintln!("warn: site-content categories dir not found ({dir:?}): {e}");
-            return Vec::new();
-        }
-    };
-    paths.sort();
-
-    paths
-        .into_iter()
-        .filter_map(|path| {
-            let stem = path.file_stem().and_then(|s| s.to_str())?.to_string();
-            // Strip a leading "NN-" ordering prefix if present.
-            let slug = match stem.split_once('-') {
-                Some((prefix, rest)) if prefix.chars().all(|c| c.is_ascii_digit()) => {
-                    rest.to_string()
-                }
-                _ => stem.clone(),
-            };
-            let raw = fs::read_to_string(&path).ok()?;
-            let (fields, body) = parse_frontmatter(&raw);
-            Some(CategoryMeta {
-                slug,
-                display_name: field(&fields, "display_name"),
-                ifc_anchor: field(&fields, "ifc_anchor"),
-                uniclass: field(&fields, "uniclass"),
-                ifc_hierarchy: field(&fields, "ifc_hierarchy"),
-                elements: field(&fields, "elements"),
-                card_desc: field(&fields, "card_desc"),
-                property_sets: parse_property_sets(&field(&fields, "property_sets")),
-                intro_html: render_markdown(body.trim()),
-            })
+/// Render a token-file stem ("floor-plate-assembly-rules") as a fallback
+/// display name ("Floor Plate Assembly Rules") for categories with no
+/// site-content sidecar yet.
+fn title_case_slug(slug: &str) -> String {
+    slug.split('-')
+        .map(|word| {
+            let mut chars = word.chars();
+            match chars.next() {
+                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
+                None => String::new(),
+            }
         })
-        .collect()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// Load BIM category metadata. `tokens/bim/*.dtcg.json` (already loaded by
+/// the caller into `tokens`) is the source of truth for which categories
+/// exist; `site-content/categories/*.md` is optional per-slug enrichment
+/// (display_name/card_desc/ifc_anchor/etc), matched by filename stem after
+/// stripping a leading "NN-" ordering prefix if present. A token file with
+/// no matching sidecar still gets a full CategoryMeta — using its own
+/// `$description` as fallback card/intro text and a title-cased slug as
+/// display name — rather than being silently omitted from nav, cards, and
+/// search the way it previously was.
+pub fn load_categories(tokens: &HashMap<String, Value>, site_content_dir: &Path) -> Vec<CategoryMeta> {
+    let dir = site_content_dir.join("categories");
+    let mut sidecars: HashMap<String, (u32, HashMap<String, String>, String)> = HashMap::new();
+    match fs::read_dir(&dir) {
+        Ok(rd) => {
+            for path in rd
+                .filter_map(|e| e.ok())
+                .map(|e| e.path())
+                .filter(|p| p.extension().and_then(|s| s.to_str()) == Some("md"))
+            {
+                let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                    continue;
+                };
+                let (order, slug) = match stem.split_once('-') {
+                    Some((prefix, rest)) if prefix.chars().all(|c| c.is_ascii_digit()) => {
+                        (prefix.parse().unwrap_or(u32::MAX), rest.to_string())
+                    }
+                    _ => (u32::MAX, stem.to_string()),
+                };
+                let Ok(raw) = fs::read_to_string(&path) else {
+                    continue;
+                };
+                let (fields, body) = parse_frontmatter(&raw);
+                sidecars.insert(slug, (order, fields, body));
+            }
+        }
+        Err(e) => eprintln!("warn: site-content categories dir not found ({dir:?}): {e}"),
+    }
+
+    let mut slugs: Vec<&String> = tokens.keys().collect();
+    slugs.sort();
+
+    let mut ordered: Vec<(u32, CategoryMeta)> = slugs
+        .into_iter()
+        .map(|slug| {
+            let fallback_desc = tokens
+                .get(slug)
+                .and_then(|v| v.get("$description"))
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string();
+            match sidecars.get(slug) {
+                Some((order, fields, body)) => {
+                    let mut card_desc = field(fields, "card_desc");
+                    if card_desc.is_empty() {
+                        card_desc = fallback_desc.clone();
+                    }
+                    let intro_source = if body.trim().is_empty() {
+                        fallback_desc.as_str()
+                    } else {
+                        body.trim()
+                    };
+                    (
+                        *order,
+                        CategoryMeta {
+                            slug: slug.clone(),
+                            display_name: field(fields, "display_name"),
+                            ifc_anchor: field(fields, "ifc_anchor"),
+                            uniclass: field(fields, "uniclass"),
+                            ifc_hierarchy: field(fields, "ifc_hierarchy"),
+                            elements: field(fields, "elements"),
+                            card_desc,
+                            property_sets: parse_property_sets(&field(fields, "property_sets")),
+                            intro_html: render_markdown(intro_source),
+                        },
+                    )
+                }
+                None => {
+                    eprintln!(
+                        "warn: no site-content/categories sidecar for token file '{slug}' — using fallback display metadata"
+                    );
+                    (
+                        u32::MAX,
+                        CategoryMeta {
+                            slug: slug.clone(),
+                            display_name: title_case_slug(slug),
+                            ifc_anchor: String::new(),
+                            uniclass: String::new(),
+                            ifc_hierarchy: String::new(),
+                            elements: String::new(),
+                            card_desc: fallback_desc.clone(),
+                            property_sets: Vec::new(),
+                            intro_html: render_markdown(&fallback_desc),
+                        },
+                    )
+                }
+            }
+        })
+        .collect();
+
+    ordered.sort_by(|a, b| a.0.cmp(&b.0).then_with(|| a.1.slug.cmp(&b.1.slug)));
+    ordered.into_iter().map(|(_, meta)| meta).collect()
 }
 
 pub struct PageSection {

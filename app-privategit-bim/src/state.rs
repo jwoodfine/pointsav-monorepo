@@ -27,7 +27,7 @@ impl AppState {
         let research_count = count_md_files(&config.vault_dir.join("research"));
 
         let site_content_dir = config.library_dir.join("site-content");
-        let categories = content::load_categories(&site_content_dir);
+        let categories = content::load_categories(&tokens, &site_content_dir);
         let about_page = content::load_page(&site_content_dir, "about")
             .ok_or("site-content/pages/about.md not found")?;
         let home_page = content::load_page(&site_content_dir, "home")
