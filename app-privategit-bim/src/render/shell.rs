@@ -45,6 +45,17 @@ pub fn page_shell(title: &str, active_path: &str, content: &str, state: &AppStat
       </button>"#
             .to_string()
     };
+    // Carbon Web Components + their CSS are only used by /edit/* (real
+    // <cds-content-switcher> etc.) — the public catalog no longer borrows
+    // Carbon's visual language, so it no longer ships Carbon's CSS either.
+    let carbon_assets = if editor_route {
+        r#"
+  <link rel="stylesheet" href="/static/carbon.min.css">
+  <link rel="stylesheet" href="/static/carbon-overrides.css">
+  <script type="module" src="/static/carbon.esm.js"></script>"#
+    } else {
+        ""
+    };
     let html_theme_attr = if editor_route { r#" data-theme="light""# } else { "" };
     let theme_preload_script = if editor_route {
         String::new()
@@ -71,45 +82,21 @@ pub fn page_shell(title: &str, active_path: &str, content: &str, state: &AppStat
   <meta name="description" content="Building specifications that enforce compliance at placement, not inspection after the fact. Open-standard IFC 4.3 BIM Object catalog.">
   <link rel="stylesheet" href="/static/fonts.css">
   <link rel="stylesheet" href="/static/tokens.css">
-  <link rel="stylesheet" href="/static/carbon.min.css">
-  <link rel="stylesheet" href="/static/carbon-overrides.css">
   <link rel="stylesheet" href="/static/bim-layout.css">
-  <link rel="stylesheet" href="/static/bim-components.css">{theme_preload_script}
-  <script type="module" src="/static/carbon.esm.js"></script>
+  <link rel="stylesheet" href="/static/bim-components.css">{carbon_assets}{theme_preload_script}
   <script type="module" src="/static/bim.js"></script>
 </head>
 <body class="bim-body">
-  <div class="bim-utility">
-    <div class="bim-utility__inner">
-      <a href="https://woodfinegroup.com" class="bim-utility__home">Woodfine Capital Projects</a>
-      <nav class="bim-utility__nav" aria-label="Woodfine network">
-        <a class="bim-utility__link" href="https://corporate.woodfinegroup.com" target="_blank" rel="noopener">Corporate</a>
-        <a class="bim-utility__link" href="https://projects.woodfinegroup.com" target="_blank" rel="noopener">Projects</a>
-        <a class="bim-utility__link" href="https://github.com/pointsav" target="_blank" rel="noopener">GitHub</a>
-      </nav>
-    </div>
-  </div>
   <header class="bim-header">
     <div class="bim-header__inner">
       <button class="bim-topbar__toggle" aria-label="Toggle menu" aria-expanded="false" type="button">&#9776;</button>
       <a href="/" class="bim-header__brand" aria-label="Woodfine — BIM Object Library" data-path="/">
         {wordmark}
-        <span class="bim-header__lockup">
-          <span class="bim-header__word">Woodfine</span>
-          <span class="bim-header__subtitle">BIM Object Library</span>
-        </span>
       </a>
-      <form class="bim-search" action="/search" method="get" role="search">
-        <label class="bim-search__label" for="bim-search-input">Search BIM Objects</label>
-        <div class="bim-search__form">
-          <svg class="bim-search__icon" aria-hidden="true" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="9" cy="9" r="6.5" stroke="currentColor" stroke-width="1.5"></circle>
-            <path d="M14 14L18 18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
-          </svg>
-          <input id="bim-search-input" class="bim-search__input" type="search" name="q" placeholder="Search categories, entities, research&hellip;" autocomplete="off">
-          <button class="bim-search__button" type="submit"><span class="bim-search__button-label">Search</span></button>
-        </div>
-      </form>
+      <span class="bim-header__divider" aria-hidden="true"></span>
+      <span class="bim-header__descriptor">BIM Object Library</span>
+      <span class="bim-header__spacer"></span>
+      <span class="bim-header__standards">IFC 4.3 &middot; ISO 16739-1:2024 &middot; DTCG</span>
       {theme_toggle}
     </div>
   </header>
@@ -207,6 +194,7 @@ pub fn page_shell(title: &str, active_path: &str, content: &str, state: &AppStat
 </html>"#,
         full_title = full_title,
         html_theme_attr = html_theme_attr,
+        carbon_assets = carbon_assets,
         theme_preload_script = theme_preload_script,
         wordmark = wordmark,
         theme_toggle = theme_toggle,

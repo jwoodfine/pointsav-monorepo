@@ -51,6 +51,65 @@ pub fn render_markdown(md: &str) -> String {
     out
 }
 
+/// The four content sections a category belongs to, grouped by DTCG entity
+/// shape rather than a flat list: Taxonomy (IFC classification/scalar
+/// tokens), Objects (instantiable/placeable BIM Object families), Compositions
+/// (rules that assemble Objects into Tiles/Floor Plates), Context (site/
+/// environmental overlay data). See NEXT.md 2026-07-03 IA reorganization.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum Section {
+    Taxonomy,
+    Objects,
+    Compositions,
+    Context,
+}
+
+impl Section {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Section::Taxonomy => "Taxonomy",
+            Section::Objects => "Objects",
+            Section::Compositions => "Compositions",
+            Section::Context => "Context",
+        }
+    }
+
+    pub fn all() -> [Section; 4] {
+        [
+            Section::Taxonomy,
+            Section::Objects,
+            Section::Compositions,
+            Section::Context,
+        ]
+    }
+
+    fn from_frontmatter(s: &str) -> Option<Section> {
+        match s.trim().to_lowercase().as_str() {
+            "taxonomy" => Some(Section::Taxonomy),
+            "objects" => Some(Section::Objects),
+            "compositions" => Some(Section::Compositions),
+            "context" => Some(Section::Context),
+            _ => None,
+        }
+    }
+
+    /// Static fallback for token files whose sidecar has no `section:` key
+    /// yet (covers the 4 files added 2026-07-03, before this field existed).
+    fn fallback_for_slug(slug: &str) -> Section {
+        match slug {
+            "spatial" | "elements" | "systems" | "materials" | "assemblies" | "performance"
+            | "identity-codes" | "relationships" | "professional-office-subtypes"
+            | "building-width-calculator" => Section::Taxonomy,
+            "key-plans" | "amenity-key-plan" | "retail-select" | "tech-industrial" | "interior"
+            | "furniture" => Section::Objects,
+            "tile-system" | "floor-plate-standards" | "floor-plate-assembly-rules"
+            | "building-grid" | "tenant-mix" => Section::Compositions,
+            "climate-zones" | "landscape-parking" | "water-management" => Section::Context,
+            _ => Section::Taxonomy,
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct CategoryMeta {
     pub slug: String,
@@ -62,6 +121,7 @@ pub struct CategoryMeta {
     pub card_desc: String,
     pub property_sets: Vec<(String, String, String)>,
     pub intro_html: String,
+    pub section: Section,
 }
 
 fn parse_property_sets(raw: &str) -> Vec<(String, String, String)> {
@@ -162,6 +222,8 @@ pub fn load_categories(tokens: &HashMap<String, Value>, site_content_dir: &Path)
                     } else {
                         body.trim()
                     };
+                    let section = Section::from_frontmatter(&field(fields, "section"))
+                        .unwrap_or_else(|| Section::fallback_for_slug(slug));
                     (
                         *order,
                         CategoryMeta {
@@ -174,6 +236,7 @@ pub fn load_categories(tokens: &HashMap<String, Value>, site_content_dir: &Path)
                             card_desc,
                             property_sets: parse_property_sets(&field(fields, "property_sets")),
                             intro_html: render_markdown(intro_source),
+                            section,
                         },
                     )
                 }
@@ -193,6 +256,7 @@ pub fn load_categories(tokens: &HashMap<String, Value>, site_content_dir: &Path)
                             card_desc: fallback_desc.clone(),
                             property_sets: Vec::new(),
                             intro_html: render_markdown(&fallback_desc),
+                            section: Section::fallback_for_slug(slug),
                         },
                     )
                 }
