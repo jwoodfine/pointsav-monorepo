@@ -15,6 +15,7 @@ pub fn render_markdown(md: &str) -> String {
 pub fn render_nav(
     env: &Environment<'static>,
     nav: &HashMap<String, Vec<String>>,
+    component_groups: &[(String, Vec<String>)],
     sections: &[(&str, &str)],
     active_section: &str,
     active_slug: &str,
@@ -25,6 +26,7 @@ pub fn render_nav(
         .expect("nav.html missing")
         .render(context! {
             nav => nav,
+            component_groups => component_groups,
             sections => section_names,
             default_tabs => default_tabs,
             active_section => active_section,
