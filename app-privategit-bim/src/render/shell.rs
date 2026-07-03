@@ -29,6 +29,8 @@ pub fn page_shell(title: &str, active_path: &str, content: &str, state: &AppStat
     // server-side rather than trying to make Carbon's chrome theme-reactive.
     let editor_route = active_path.starts_with("/edit/");
     let wordmark = wordmark_svg("bim-header__logo");
+    let important_information =
+        crate::content::render_important_information(&state.config.library_dir.join("site-content"));
     let theme_toggle = if editor_route {
         String::new()
     } else {
@@ -123,7 +125,8 @@ pub fn page_shell(title: &str, active_path: &str, content: &str, state: &AppStat
     <details class="bim-disclosure__details">
       <summary class="bim-disclosure__summary">Important Information</summary>
       <div class="bim-disclosure__body">
-        <p>BIM Object specifications in this library are provided for reference and coordination. They are not a substitute for project-specific code review, and do not represent final regulatory approval — verify all classifications, property values, and regulatory overlays against the current code requirements in the applicable jurisdiction before construction. Platform capabilities described here, including planned regulatory-overlay and compliance-status features, are planned or intended and may change during development.</p>
+        {important_information}
+        <p class="bim-disclosure__more"><a href="/disclaimers" data-path="/disclaimers">Read the full disclaimer &rarr;</a></p>
       </div>
     </details>
   </section>
@@ -182,9 +185,21 @@ pub fn page_shell(title: &str, active_path: &str, content: &str, state: &AppStat
               <span class="bim-badge__name">Apache-2.0</span>
             </span>
           </a>
+          <a class="bim-badge bim-badge--license" href="https://creativecommons.org/licenses/by-nd/4.0/" target="_blank" rel="noopener license" aria-label="Editorial content licensed CC BY-ND 4.0">
+            <span class="bim-badge__cc" aria-hidden="true">
+              <img class="bim-cc-icon" src="/static/cc.svg" alt="" width="18" height="18">
+              <img class="bim-cc-icon" src="/static/cc-by.svg" alt="" width="18" height="18">
+              <img class="bim-cc-icon" src="/static/cc-nd.svg" alt="" width="18" height="18">
+            </span>
+            <span class="bim-badge__text">
+              <span class="bim-badge__lead">Editorial content</span>
+              <span class="bim-badge__name">CC BY-ND 4.0</span>
+            </span>
+          </a>
         </div>
       </div>
       <p>Copyright &copy; 2026 Woodfine Capital Projects Inc. See LICENSE for terms. &middot; {public_url}</p>
+      <p class="bim-footer__disclaimer">Provided for reference and coordination only — not a substitute for code review. See <a href="/disclaimers" data-path="/disclaimers">Important Information</a>.</p>
       <p class="bim-footer__trademark">Woodfine Capital Projects&trade;, Woodfine Management Corp&trade;, PointSav Digital Systems&trade;, Totebox Orchestration&trade;, Totebox Archive&trade;, and Capability Geometry&trade; are trademarks of Woodfine Capital Projects Inc., used in Canada, the United States, Latin America, and Europe. Capability Geometry&trade; is an unregistered trademark of Woodfine Capital Projects Inc. All other trademarks are the property of their respective owners.</p>
     </div>
   </footer>
@@ -195,6 +210,7 @@ pub fn page_shell(title: &str, active_path: &str, content: &str, state: &AppStat
         theme_preload_script = theme_preload_script,
         wordmark = wordmark,
         theme_toggle = theme_toggle,
+        important_information = important_information,
         sidebar = sidebar,
         content = content,
         tc = tc,

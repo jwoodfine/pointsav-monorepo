@@ -183,3 +183,24 @@ pub fn load_page(site_content_dir: &Path, name: &str) -> Option<PageContent> {
 
     Some(PageContent { fields, sections })
 }
+
+/// Renders `site-content/pages/important-information.md` for the footer
+/// disclosure band. Read at request time rather than required at startup
+/// (unlike about/home/disclaimers) — this is compliance-sensitive text that
+/// counsel may edit independently of a release, and a temporary read
+/// failure should degrade to a safe default rather than take the whole
+/// site down. Mirrors the fallback pattern in the reference wiki engine
+/// (app-mediakit-knowledge's compliance_band()).
+pub fn render_important_information(site_content_dir: &Path) -> String {
+    let path = site_content_dir.join("pages").join("important-information.md");
+    match fs::read_to_string(&path) {
+        Ok(raw) => render_markdown(raw.trim()),
+        Err(_) => render_markdown(
+            "This site presents records maintained by Woodfine Capital Projects Inc. \
+             The information is provided for general information only and does not \
+             constitute an offer, solicitation, or professional advice. Statements \
+             regarding planned or intended future capabilities are forward-looking and \
+             subject to change without notice.",
+        ),
+    }
+}

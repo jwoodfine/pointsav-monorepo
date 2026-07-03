@@ -960,6 +960,29 @@ h1, h2 {
   line-height: 1.5;
 }
 
+/* Persistent one-line disclaimer — always visible (not just the
+   collapsible Important Information band), so a collapsed band never
+   screenshots bare. Matches app-mediakit-knowledge's .k-footer__disclaimer. */
+.bim-footer__disclaimer {
+  font-size: 0.75rem;
+  color: #a8adb8;
+  margin: 0 0 0.5rem;
+}
+
+.bim-footer__disclaimer a {
+  color: #a8c8f8;
+}
+
+.bim-badge__cc {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+}
+
+.bim-cc-icon {
+  display: block;
+}
+
 .bim-footer__base-row {
   display: flex;
   flex-wrap: wrap;
@@ -1079,4 +1102,13 @@ a.bim-badge:hover {
   font-size: 0.8125rem;
   line-height: 1.6;
   color: var(--bim-fg-secondary, #374151);
+}
+
+.bim-disclosure__body p {
+  margin: 0 0 0.75rem;
+}
+
+.bim-disclosure__more {
+  margin-top: 1rem !important;
+  font-size: 0.75rem;
 }
