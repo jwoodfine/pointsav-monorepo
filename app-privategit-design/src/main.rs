@@ -1,6 +1,8 @@
 mod ai;
+mod component_meta;
 mod component_preview;
 mod config;
+mod mcp;
 mod render;
 mod routes;
 mod schema;

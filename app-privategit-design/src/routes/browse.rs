@@ -1,4 +1,4 @@
-use crate::{component_preview, render, schema, state::AppState, tokens_gallery, vault};
+use crate::{component_meta, component_preview, render, schema, state::AppState, tokens_gallery, vault};
 use axum::{
     body::Body,
     extract::{Path, State},
@@ -146,9 +146,13 @@ pub async fn item_tab(
     let mut content = schema::render(schema_type, &frontmatter, &body);
 
     // P1.1 — live component preview (recipe.json variants, sandboxed via iframe).
+    // Phase 3 — origin + freshness meta badges, ahead of the preview.
     if section == "components" {
+        let badges = component_meta::render_meta_badges(&state.component_groups, &state.vault, &slug);
         if let Some(preview) = component_preview::render_preview(&state.vault, &slug) {
-            content = format!("{preview}{content}");
+            content = format!("{badges}{preview}{content}");
+        } else {
+            content = format!("{badges}{content}");
         }
     }
 
