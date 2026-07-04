@@ -1,3 +1,4 @@
+use crate::vault::Layout;
 use minijinja::{context, Environment};
 use pulldown_cmark::{html, Options, Parser};
 use std::collections::HashMap;
@@ -16,12 +17,12 @@ pub fn render_nav(
     env: &Environment<'static>,
     nav: &HashMap<String, Vec<String>>,
     component_groups: &[(String, Vec<String>)],
-    sections: &[(&str, &str)],
+    sections: &[(&str, &str, Layout)],
     active_section: &str,
     active_slug: &str,
 ) -> String {
-    let section_names: Vec<&str> = sections.iter().map(|(s, _)| *s).collect();
-    let default_tabs: HashMap<&str, &str> = sections.iter().copied().collect();
+    let section_names: Vec<&str> = sections.iter().map(|(s, _, _)| *s).collect();
+    let default_tabs: HashMap<&str, &str> = sections.iter().map(|(s, t, _)| (*s, *t)).collect();
     env.get_template("nav.html")
         .expect("nav.html missing")
         .render(context! {
