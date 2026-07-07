@@ -15,6 +15,9 @@ Last updated: 2026-07-06
       canonical, the watcher-refactor item has no trace either side, and the UI item is backwards
       (local already exceeds canonical). Replied via outbox 2026-07-06 asking Command to reconcile
       which state that message was generated against — no rework attempted pending that reply.
+- [ ] **Stage 6 pending — pointsav-monorepo sub-clone** — 14 commits ahead of origin/main as of
+      2026-07-06 (13 pre-existing + this session's `d9c203af` Cargo.lock fix). Flagged via outbox
+      alongside the discrepancy above.
 - [ ] **briefs/state versioning gap** — after the "Option A" gitignore change, BRIEFs + NEXT.md +
       session-context.md durability/versioning story is still unverified (NEXT.md and briefs/ are
       tracked; session-context.md is gitignored/untracked) — confirm this is the intended final
@@ -52,8 +55,9 @@ Last updated: 2026-07-06
 - [x] **Sub-clone git hygiene** — restored an accidentally-deleted, out-of-scope
       `app-orchestration-gis/www/index.html`; committed 6 previously-untracked `Cargo.lock` files
       (app-workplace-aibridge, moonshot-bim-engine/crdt/docengine/editor/parser).
-- [x] **`.agent/binary-targets.yaml` created** — declares `app-privategit-workbench`,
-      `soft_enabled: false` (internal dev tool), per the 2026-07-02 binary-distribution broadcast.
+- [x] **`.agent/binary-targets.yaml` created** — declares both undeclared `[[bin]]` targets found
+      in this archive, `app-privategit-workbench` and `app-workplace-http-prototype`, both
+      `soft_enabled: false` (internal dev tools), per the 2026-07-02 binary-distribution broadcast.
 - [x] **local-workplace-http-prototype.service crash loop fixed** — binary rebuilt and redeployed;
       service confirmed active.
 
