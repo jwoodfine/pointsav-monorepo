@@ -2,7 +2,7 @@
 
 # project-workplace — Archive Guide
 
-> **State:** active | **Last updated:** 2026-06-19
+> **State:** active | **Last updated:** 2026-07-06
 > **Cluster manifest:** `.agent/manifest.md`
 > **Workspace AGENT.md takes precedence on conflict.**
 
@@ -10,17 +10,16 @@
 
 ## Cluster mission
 
-Editorial gateway for all three content platforms (documentation, projects, corporate).
-Responsibilities: language pass (banned-vocab + BCSC compliance), bilingual EN+ES review,
-TOPIC/GUIDE routing to content-wiki-* and woodfine-fleet-deployment, wiki commit pipeline.
-Manages media-knowledge-documentation, media-knowledge-projects, and media-knowledge-corporate
-as canonical sub-clones (DOCTRINE §IV.e exception — commits go directly to canonical; GitHub
-is downstream mirror).
+Workbench OS surface — `app-privategit-workbench` + `moonshot-*` crates. Browser+localhost
+staging OS for the PointSav developer experience. Hosts the Workbench launcher, code IDE, and
+document surfaces. Consolidating three overlapping prototypes
+(`app-workplace-workbench`, `app-privategit-workbench`, `app-workplace-http-prototype`) into
+one, on a clean-sheet Rust→WASM document engine, per `BRIEF-workplace-workbench.md`. Every
+third-party dependency is tracked as a `moonshot-*` full-stack-ownership target
+(docengine, parser, crdt, editor, bim-engine).
 
-**Active cartridges:** F2 People, F4 Content, F9 SLM, F11 System, F12 Input (Anchor), F3 Email, F6 Bookkeeper.
-**Phase 10 complete 2026-06-16:** F2 PeopleCartridge scaffold, Rgb color helpers, session persistence, chassis reconnect watchdog.
-**Phase H1 complete 2026-06-19:** moonshot-sel4-vmm `#![no_std]` PD runtime + console_hello.c seL4 rootserver; QEMU gate passed ("Hello from os-console seL4 PD"). Use `-m 1G` (DTB reports 1 GiB).
-**Next:** Phase 11 — F7 BIM cartridge (`app-console-bim`); blocked on project-bim Phase 1 service. Phase H2 — VirtIO serial PD + ratatui on seL4.
+Tetrad legs are all `leg-pending` (see `.agent/manifest.md`) — no vendor/customer/deployment/wiki
+artifact has shipped yet; this archive is still in active prototype development.
 
 ## Tetrad
 
@@ -34,7 +33,7 @@ Per `~/Foundry/AGENT.md` § Session roles:
 1. Confirm role: `~/Foundry/bin/foundry-role.sh` (Totebox Session expected)
 2. Write session lock: `.agent/engines/<engine-id>/session.lock`
 3. Read `.agent/manifest.md` — cluster mission + tetrad
-4. Call `get_session_brief(role="totebox", archive="project-proforma")` — replaces inbox, NOTAM, session-context reads
+4. Call `get_session_brief(role="totebox", archive="project-workplace")` — replaces inbox, NOTAM, session-context reads
 5. Read `~/Foundry/NOTAM.md` — workspace warnings
 6. Read `.agent/rules/*.md` if present (may be absent for newer archives)
 
@@ -47,23 +46,17 @@ Per `~/Foundry/AGENT.md` § Session roles:
 
 ## Commit + promote
 
-Commits to media-knowledge-* go directly to canonical (DOCTRINE §IV.e).
-Commits to woodfine-fleet-deployment use admin-tier: `~/Foundry/bin/commit-as-next.sh --admin woodfine "<msg>"`.
-Commits to pointsav-monorepo use: `~/Foundry/bin/commit-as-next.sh "<msg>"`.
+Commits to pointsav-monorepo (the nested `pointsav-monorepo/` sub-clone; separate `.git`,
+tracks `main`) use: `~/Foundry/bin/commit-as-next.sh "<msg>"`.
 **Stage 6:** Build + deploy to staging is self-service (`self_service: build-deploy`).
 Canonical promote is not self-service — write `"Stage 6 pending — project-workplace — <crate>"`
 to outbox at shutdown. Command Session processes canonical merge.
 
 ## Deploy model
 
-This archive develops `app-mediakit-marketing` + `app-mediakit-shell`
-(clean-sheet rewrite, 2026-06), which maps to `~/Foundry/bin/push-to-prod.sh`'s
-`marketing` target — serves home.woodfinegroup.com / home.pointsav.com live.
-This archive does NOT push to foundry-prod itself: Stage 6 promotes the crate
-to canonical, then Command Session centrally rebuilds and runs
-`push-to-prod.sh marketing`. Local preview ports (workspace VM):
-`local-marketing-pointsav` :9101, `local-marketing` :9102 — review via
-`ssh foundry-workspace-preview` before requesting a push.
+This archive runs `app-workplace-http-prototype` on localhost only (port 9110, via
+`local-workplace-http-prototype.service`) for office staff to iterate with. There is no
+`foundry-prod` push today — no live public deployment exists yet for this archive's surfaces.
 
 ## Conflicts
 
