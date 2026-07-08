@@ -3,7 +3,7 @@
 > Hot open items. ≤200 lines. Backlog at `.agent/next-backlog.md` (not yet created).
 > **Scope: this archive only.** Cross-repo and workspace-level items live at `~/Foundry/NEXT.md`.
 
-Last updated: 2026-07-06
+Last updated: 2026-07-07
 
 ---
 
@@ -15,22 +15,56 @@ Last updated: 2026-07-06
       canonical, the watcher-refactor item has no trace either side, and the UI item is backwards
       (local already exceeds canonical). Replied via outbox 2026-07-06 asking Command to reconcile
       which state that message was generated against — no rework attempted pending that reply.
-- [ ] **Stage 6 pending — pointsav-monorepo sub-clone** — 14 commits ahead of origin/main as of
-      2026-07-06 (13 pre-existing + this session's `d9c203af` Cargo.lock fix). Flagged via outbox
-      alongside the discrepancy above.
+      **2026-07-07 update:** likely root cause found — see new duplication finding below.
+- [ ] **Stage 6 pending — pointsav-monorepo sub-clone** — 20 commits ahead of origin/main as of
+      2026-07-07 (14 pre-existing + 6 new this session: moonshot workspace-table fix, fmt fix,
+      smoke tests, app-privategit-workbench workspace-membership regression fix, unwrap fixes,
+      anyhow::Result main() refactor). Flagged via outbox
+      `project-workplace-20260708-stage-6-pending-20-commits-2-new-structu`.
 - [ ] **briefs/state versioning gap** — after the "Option A" gitignore change, BRIEFs + NEXT.md +
       session-context.md durability/versioning story is still unverified (NEXT.md and briefs/ are
       tracked; session-context.md is gitignored/untracked) — confirm this is the intended final
       state or needs a different versioning home.
+- [ ] **NEW (2026-07-07) — archive-root vs. pointsav-monorepo sub-clone duplication:** the archive
+      root directly contains its own full duplicate of ~150 monorepo directories (every
+      app-*/service-*/system-*/moonshot-*/tool-*/vendor-*/os-* dir), tracked by the archive's own
+      git, with independent commit history already diverged from the sub-clone's copies of the
+      same crate names (confirmed for app-workplace-http-prototype and app-privategit-workbench —
+      each has feature commits in one copy absent from the other). Very likely the root cause of
+      the Stage-6 discrepancy above. Flagged to Command via the same outbox message; needs a
+      dedicated investigation to establish canonical source per directory before any fix — not
+      attempted this session.
+- [ ] **NEW (2026-07-07) — pointsav-monorepo/CLAUDE.md contamination:** carries `project-design`
+      content (and its `.agent/rules/brief-discipline.md` too), likely on the shared `main`
+      branch — would affect every archive that clones this monorepo, not just project-workplace.
+      Flagged to Command via the same outbox message; cross-archive-governance scope, not a
+      unilateral Totebox fix.
 
 ## Active (Totebox scope)
 
 - [ ] **app-workplace-aibridge Phase 3** — deeper docengine + crdt cross-crate composition layers
 - [ ] **moonshot crates Phase 3** — parser incremental retokenize; crdt undo/redo hardening; bim-engine full STEP grammar
-- [ ] **BRIEF-workplace-workbench.md "Decisions open"** — line noting sub-clone branch as
-      "operator decision pending" is stale (moonshot crates already committed+promoted to `main`);
-      update to reflect that the sub-clone intentionally stays on `main` while the archive root
-      uses `cluster/project-workplace`, unless the branch model is being revisited.
+
+## Completed (2026-07-07 — automode cleanup pass, plan `can-we-make-a-validated-cloud`)
+
+- [x] **BRIEF-workplace-workbench.md "Decisions open" stale line** — sub-clone branch note
+      updated to reflect moonshot crates already committed+promoted to `main`; several other
+      stale claims in the same BRIEF (DOCTRINE ratification, Stage-6 status) also cleared.
+- [x] **moonshot-docengine + moonshot-bim-engine missing `[workspace]` table** — standalone
+      `cargo check` was failing via ancestor-workspace walk; fixed to match crdt/editor/parser
+      siblings, plus pre-existing `cargo fmt` drift on those three siblings.
+- [x] **app-privategit-workbench nested-workspace regression** — caught and fixed same session:
+      the moonshot fix above broke this crate (a root workspace member path-depending on both
+      moonshot crates); made it standalone `[workspace]` too, matching aibridge/http-prototype's
+      already-working pattern. Verified `cargo check --workspace` from repo root clean after.
+- [x] **app-workplace-http-prototype code quality** — first-ever smoke tests for the workbench
+      router; two panicking `Content-Disposition` unwraps fixed in both workbench crates'
+      PDF-export handlers; `main()` converted to `anyhow::Result`, matching
+      app-privategit-workbench's existing pattern.
+- [x] **Outbox frontmatter dedupe** — 7 message blocks with stray duplicate `status:` lines
+      (leftover from prior hand-edits) cleaned up to a single trailing status each.
+- [x] **Ratified doctrine draft archived** — `DOCTRINE-AMENDMENT-workbench-as-os-surface.draft.md`
+      moved to `drafts-outbound/archived/`.
 
 ## Completed (2026-07-06 — governance cleanup session)
 
