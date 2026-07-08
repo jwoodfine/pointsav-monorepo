@@ -1,0 +1,23 @@
+schema: foundry-binary-targets-v1
+cluster: project-orchestration
+updated: 2026-07-08
+
+targets:
+  - product_id: orchestration-command-server
+    binary_name: orchestration-command-server
+    source_crate: orchestration-command-server
+    license: LicenseRef-PointSav-Proprietary
+    license_tier: commercial
+    class: service-package
+    layer: base
+    requires: []
+    platforms: [x86_64-unknown-linux-gnu]
+    soft_enabled: true
+    notes: >
+      Standalone workspace nested at app-orchestration-command/ (own Cargo.lock).
+      Live-deployed internally since 2026-06-29 (systemd local-orchestration-command,
+      port 8020 loopback, observation mode — no license token required for internal
+      use). Also received by project-software 2026-06-30 as a BETA listing for
+      software.pointsav.com (product_requires_license=false for the BETA release).
+      See data/binary-ledger/orchestration-command-server.jsonl and
+      data/binary-ledger/soft-orchestration-command.jsonl for full deploy history.
