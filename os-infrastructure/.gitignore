@@ -5,3 +5,4 @@
 linker.ld
 build_iso/staging/
 build_iso/system-substrate
+build/

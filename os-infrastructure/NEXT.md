@@ -1,6 +1,6 @@
 # NEXT.md — os-infrastructure
 
-> Last updated: 2026-06-29
+> Last updated: 2026-07-09
 > State: Active (pre-release; three-node mesh test required before listing)
 
 ---
@@ -8,21 +8,40 @@
 ## Right now
 
 - Activated 2026-06-29 per project framework §9. CLAUDE.md written.
-- Build pipeline (moonshot-toolkit task #14) is the blocking prerequisite for all milestones below.
-- Legacy `forge_iso.sh` / `build_iso/` scaffold in place as migration reference.
+- **moonshot-toolkit `build` subcommand landed** (task #14, commit `916e918b`, 2026-06-30) —
+  the "blocking prerequisite" framing below is stale as of that commit.
+- **First real `moonshot-toolkit build os-infrastructure/system-spec.toml` run succeeded
+  2026-07-09** — produced `build/loader.img` (217 KB, ELF x86-64), `sel4.elf`, `vmm.elf`,
+  `system.xml`, `report.txt`. This is a real seL4 boot image with the CAmkES VMM protection
+  domain — but `pd/vmm.c` is still the two-line placeholder (prints debug strings only, no
+  Linux guest, no WireGuard, no Genesis Protocol). Not signed, not an ISO, not release-ready.
+- **`src/main.rs` clarified as orphaned/legacy 2026-07-09**: this bare-metal Multiboot2
+  Rust crate predates the seL4+Microkit pipeline and is never loaded by
+  `moonshot-toolkit build` (which consumes `system-spec.toml` + `pd/vmm.c` only). The
+  EAPOL-monitor-mode packet-visualization code was retired (operator decision: Genesis
+  Protocol, not EAPOL) — left as an inert compiling placeholder per "do not delete"
+  scaffold policy, not deleted. **Real Genesis Protocol implementation belongs in
+  `pd/vmm.c`**, not `src/main.rs` — this needs a CAmkES VMM Linux-guest-hosting
+  implementation against the Microkit C API, which is substantial new systems work not
+  attempted this session (no verified Microkit API reference was available to write it
+  safely against).
+- Legacy `forge_iso.sh` / `build_iso/` scaffold still in place as migration reference.
 
 ## Queue
 
-- `[ ]` Write `system-spec.toml` for x86-64 boot target:
-  - Protection domains: seL4 root task + CAmkES VMM PD
-  - Linux guest: Debian 12 genericcloud QCOW2 (at `infrastructure/virt/work/debian-12*.qcow2`)
-  - CAmkES VMM: wire Linux guest VCPU + memory regions
-- `[ ]` Implement `build` subcommand in moonshot-toolkit (task #14) with Microkit 2.2.0 SDK
-  targeting `x86_64_generic_vtx` — this is the primary blocker
+- `[x]` Write `system-spec.toml` for x86-64 boot target — done (predates this NEXT.md entry)
+- `[x]` Implement `build` subcommand in moonshot-toolkit (task #14) — done 2026-06-30
+- `[ ]` **Implement the real CAmkES VMM in `pd/vmm.c`** — currently a placeholder. Needs:
+  Linux (Debian 12) guest VCPU + memory region wiring, guest boot from
+  `infrastructure/virt/work/debian-12*.qcow2`. This is the actual Genesis Protocol
+  implementation target.
 - `[ ]` Wire WireGuard inside Linux guest: install `wireguard-tools`, bring up `wg0` at boot,
   load config from `/etc/wireguard/wg0.conf`
 - `[ ]` Wire `service-vm-fleet` + `service-vm-host` inside Linux guest as systemd units
-- `[ ]` Build bootable `.iso` from `moonshot-toolkit BuildPlan` for x86-64
+- `[ ]` Extend build pipeline: `loader.img` → GRUB2 ISO wrap + `.qcow2` variant (currently
+  produces only the raw seL4/Microkit loader image, not the distributable three-artifact set)
+- `[ ]` Ed25519-sign build output with `identity/id_pointsav-administrator` once a real
+  (non-placeholder) image exists
 
 ## Test milestones
 
