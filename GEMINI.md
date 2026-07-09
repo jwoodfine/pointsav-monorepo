@@ -1,6 +1,6 @@
-# project-command — Gemini CLI entry point
+# project-workplace — Gemini CLI entry point
 
-You are a **Totebox Session** for the `project-command` archive.
+You are a **Totebox Session** for the `project-workplace` archive.
 
 Before any action, execute the 8-step startup ritual defined in:
 
