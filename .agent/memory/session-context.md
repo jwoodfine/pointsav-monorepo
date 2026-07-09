@@ -14,12 +14,52 @@ archive: project-orchestration
 
 ## Cross-archive carry-forward
 
-- **Command Session** — Stage 6 canonical merge pending (app-orchestration-command v0.0.1+v0.0.2 commits on cluster branch); install local-orchestration-command.service via bootstrap.sh; project-registry.md update on monorepo main
-- **project-software** — BETA listing for soft-orchestration-command; confirm download URL; disable payment gate
-- **project-totebox** — Totebox-side /v1/pair endpoint design ACK; peer_type field decision
+- **Command Session** — v0.0.1 confirmed in canonical origin/main (commit 29d0b4a1, done).
+  v0.0.2 pushed to staging mirrors + queued in promote-queue.jsonl 2026-07-09 (commit
+  95f4ca2f) — awaiting canonical merge. Once merged, requested `bin/build-soft.sh` run
+  (never actually run for this binary — data/app-repository/registry.yaml is empty) +
+  registry-update routed to project-software to supersede the informal BETA handoff.
+  project-registry.md update on monorepo main still pending.
+- **project-totebox** — Totebox-side /v1/pair endpoint design ACK; peer_type field
+  decision. Re-pinged 2026-07-09 (11 days silent as of that date) — no response yet.
 - **project-system** — J2/J5 HOLD until Bench #9 complete
 
 ## Session entries
+
+### 2026-07-09 — Backlog sweep: BRIEF consolidation + v0.0.2 Stage 6 push (totebox@claude-code)
+
+**Done this session:**
+- Interrogated operator on 4 decision points (BRIEF merge strategy, stale-brief handling,
+  Stage 6 push timing, formal-vs-informal SOFT- pipeline, /v1/pair re-ping, ship scope) —
+  all recommended options accepted.
+- BRIEFs re-scoped to eliminate overlap: `BRIEF-os-orchestration.md` = concrete shipping
+  state; `BRIEF-os-orchestration-build-out.md` = long-range architecture/roadmap. Each
+  cross-references the other. `BRIEF-brief-audit-2026-06.md` archived (stale one-time
+  audit log). `.agent/briefs/README.md` tables rewritten to match.
+- Found and corrected drift: NEXT.md P3.4 claimed install/smoke-test/BETA-URL were
+  "pending" — ledger (`data/binary-ledger/orchestration-command-server.jsonl`) showed
+  they were already done. Checkboxes corrected with evidence citations.
+- Found a real gap NEXT.md was hiding: v0.0.2 (pairing.rs WORM schema_version fix) was
+  never promoted past the cluster branch — only v0.0.1 made it to canonical origin/main.
+  Re-verified tests green (7/7), got explicit operator go-ahead, ran
+  `self-service-promote.sh` — v0.0.2 now on staging mirrors + in promote-queue.jsonl
+  (commit 95f4ca2f).
+- Found the "BETA listing on software.pointsav.com" is informal — `bin/build-soft.sh`
+  has never run for this binary; `data/app-repository/registry.yaml` is `packages: {}`.
+  Sent Command a consolidated request: canonical-merge v0.0.2 → run build-soft.sh →
+  route registry-update to project-software.
+- Re-pinged project-totebox on the 11-day-silent `/v1/pair` design ACK.
+- Marked the binary-distribution-tracking broadcast (msg-id
+  command-20260702-binary-distribution-tracking...) actioned — binary-targets.yaml
+  already compliant, no change needed.
+- Committed all doc/BRIEF/NEXT.md changes to cluster/project-orchestration (39c50bf3).
+
+**Pending/carry-forward:** see Cross-archive carry-forward above (all Command/project-totebox).
+
+**Operator preferences surfaced:**
+- Wants a full "GRILL ME one by one with recommendations" interrogation pass before
+  large backlog/consolidation work, not just a single confirm-to-proceed — confirmed
+  this style landed well (all recommended options accepted without pushback).
 
 ### 2026-06-29/30 — app-orchestration-command v0.0.1/v0.0.2 + BRIEF buildout (totebox@claude-code)
 
