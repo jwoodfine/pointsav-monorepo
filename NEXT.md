@@ -3,7 +3,7 @@
 > Hot open items. ≤200 lines. Backlog at `.agent/next-backlog.md` (not yet created).
 > **Scope: this archive only.** Cross-repo and workspace-level items live at `~/Foundry/NEXT.md`.
 
-Last updated: 2026-07-07
+Last updated: 2026-07-08
 
 ---
 
@@ -17,10 +17,14 @@ Last updated: 2026-07-07
       which state that message was generated against — no rework attempted pending that reply.
       **2026-07-07 update:** likely root cause found — see new duplication finding below.
 - [ ] **Stage 6 pending — pointsav-monorepo sub-clone** — 20 commits ahead of origin/main as of
-      2026-07-07 (14 pre-existing + 6 new this session: moonshot workspace-table fix, fmt fix,
-      smoke tests, app-privategit-workbench workspace-membership regression fix, unwrap fixes,
-      anyhow::Result main() refactor). Flagged via outbox
-      `project-workplace-20260708-stage-6-pending-20-commits-2-new-structu`.
+      2026-07-07 (confirmed still 20, sub-clone still clean, as of 2026-07-08). 14 pre-existing +
+      6 new from the 2026-07-07 session: moonshot workspace-table fix, fmt fix, smoke tests,
+      app-privategit-workbench workspace-membership regression fix, unwrap fixes,
+      anyhow::Result main() refactor. **Correction (2026-07-08):** the 2026-07-07 session-context
+      and this file both claimed this was flagged via outbox msg-id
+      `project-workplace-20260708-stage-6-pending-20-commits-2-new-structu` — that message was
+      never actually written (verified by grep against outbox.md + inbox-archive.md, no match).
+      Actually sent 2026-07-08 as `project-workplace-20260709-stage-6-pending-20-commits-2-new-structu`.
 - [ ] **briefs/state versioning gap** — after the "Option A" gitignore change, BRIEFs + NEXT.md +
       session-context.md durability/versioning story is still unverified (NEXT.md and briefs/ are
       tracked; session-context.md is gitignored/untracked) — confirm this is the intended final
