@@ -5,7 +5,8 @@ re: Binary distribution tracking — new report script + mandatory binary-target
 created: 2026-07-02T02:55:37Z
 status: pending
 status: pending
-priority: normal
+priority: high
+priority-boosted: 2026-07-09
 status: pending
 attempts: 0
 msg-id: command-20260702-binary-distribution-tracking-new-report--project-orchestration
@@ -13,7 +14,6 @@ broadcast: true
 broadcast-id: 20260702025537-c6f6d519
 broadcast-targets: [project-bim,project-bookkeeping,project-command,project-console,project-data,project-design,project-documents,project-editorial,project-foodservice,project-gis,project-infrastructure,project-intelligence,project-jennifer,project-knowledge,project-marketing,project-mathew,project-orchestration,project-orgcharts,project-proforma,project-software,project-source,project-system,project-totebox,project-woodfine,project-workplace]
 ---
-
 Binary tracking across all project-* archives has more infrastructure than you might
 expect, but it's underused — only 6 of 25 archives have declared their distribution
 targets. This explains how it works and what (if anything) you need to do.
