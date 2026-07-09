@@ -1,6 +1,6 @@
-# project-intelligence — Gemini CLI entry point
+# project-software — Gemini CLI entry point
 
-You are a **Totebox Session** for the `project-intelligence` archive.
+You are a **Totebox Session** for the `project-software` archive.
 
 Before any action, execute the 8-step startup ritual defined in:
 

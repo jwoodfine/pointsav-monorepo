@@ -2,22 +2,72 @@
 
 # project-software — Archive Guide
 
-> This CLAUDE.md covers the `pointsav-monorepo/` sub-clone common to all
-> Totebox Archives that use the monorepo as their vendor leg.
-> **Archive-level guidance (mission, tetrad, MCP startup) lives in `../CLAUDE.md`.**
+> **State:** active | **Last updated:** 2026-07-09
+> **Cluster manifest:** `.agent/manifest.md`
 > **Workspace AGENT.md takes precedence on conflict.**
 
 ---
 
-## Sub-clone role
+## Cluster mission
 
-`pointsav-monorepo` is the vendor-leg sub-clone for any Totebox Archive whose
-work lives in this monorepo. Commit here via `commit-as-next.sh`; promote to
-canonical (`vendor/pointsav-monorepo`) via Command Session `promote.sh`.
+Software distribution substrate — `software.pointsav.com`. Owns the
+Ed25519 license key pipeline, Polygon USDC payment verification, and
+SOFT artifact type governance. This archive's root IS the
+`pointsav-monorepo` clone (there is no separate sub-clone one level
+down) — `Cargo.toml` and the crate/app/service directories sit
+directly at this directory's root.
 
-The monorepo is shared — multiple Totebox Archives may have clones of it.
-Never force-push; never reset --hard without operator approval and all sessions
-confirming inactive.
+**Owns:**
+- `app-privategit-marketplace` — software.pointsav.com storefront (static pages, `/v1/products`, `/v1/license`, `/v1/claim`)
+- `app-privategit-source` — release server (`/releases/*` binary streaming + MANIFEST; `/git/*` smart-HTTP stub)
+- `app-mediakit-distributions` — distribution catalogue server
+- `tool-wallet` — Polygon USDC watcher (`eth_getLogs` + receipt writer)
+- `os-privategit` — deployment target OS image (hosts marketplace + source + wallet)
+
+See `~/Foundry/.agent/memory/project_software_distribution_substrate.md`
+and `~/Foundry/.agent/memory/project_software_architecture_decisions.md`
+for ratified architecture decisions (pricing, payment rail, license
+key format).
+
+## Tetrad
+
+See `.agent/manifest.md` `tetrad:` block for the canonical declaration
+across vendor / customer / deployment / wiki legs. As of this writing
+all four legs are declared `leg-pending` in the manifest, though
+`pairings.yaml` already lists two live deployment routes owned by
+this cluster (`vault-privategit-software-1`, `media-distribution-software-1`)
+— reconcile the manifest's tetrad block against `pairings.yaml` before
+relying on the leg-pending status.
+
+## At session start
+
+Per `~/Foundry/AGENT.md` § Session roles:
+
+1. Confirm role: `~/Foundry/bin/foundry-role.sh` (Totebox Session expected)
+2. Write session lock: `.agent/engines/<engine-id>/session.lock`
+3. Read `.agent/manifest.md` — cluster mission + tetrad
+4. Call `get_session_brief(role="totebox", archive="project-software")` — replaces inbox, NOTAM, session-context reads
+5. Read `~/Foundry/NOTAM.md` — workspace warnings
+6. Read `.agent/rules/*.md` — includes `project-registry.md`, `repo-layout.md`, `cleanup-log.md`, `datagraph-discipline.md`, `handoffs-outbound.md`
+
+## Hard rules (workspace-level, do not duplicate; reference only)
+
+- `~/Foundry/AGENT.md` § Hard rules — identity store immutable, never
+  chmod; preview before writing; edit in place (no `_V2` files);
+  one session per repo; Bloomberg standard; BCSC posture; SYS-ADR-07/10/19.
+- `~/Foundry/CLAUDE.md` § Size discipline — per-archive CLAUDE.md ≤ 150 lines.
+
+## Cluster branch + promote
+
+This archive runs on `cluster/project-software`. `.agent/` commits stay here permanently.
+Code commits promote to canonical via `~/Foundry/bin/promote.sh` (filters `.agent/` automatically).
+
+Session start: `git branch --show-current` → must return `cluster/project-software`.
+Commits via `~/Foundry/bin/commit-as-next.sh "<message>"` from archive root.
+**Stage 6 self-service (this archive): `build-deploy-stage6lite`** (per `pairings.yaml`) —
+`~/Foundry/bin/self-service-promote.sh` pushes code commits to staging mirrors and
+appends to `promote-queue.jsonl`. Command Session processes the canonical merge.
+Do NOT run `promote.sh` directly.
 
 ## Fast gates
 
@@ -28,37 +78,12 @@ cargo clippy -p <crate> -- -D warnings
 cargo fmt -p <crate> --check
 ```
 
-Substitute the crate for the active project. For project-knowledge: `app-mediakit-knowledge`.
-
-## Key layout
-
-```
-pointsav-monorepo/
-├── Cargo.toml              workspace manifest (all member crates)
-├── app-mediakit-knowledge/ wiki engine (project-knowledge focus)
-├── app-console-*/          TUI cartridges (project-console focus)
-├── service-*/              backend services
-└── scripts/                xtask, dtcg-to-css.py, stage6-gate.sh
-```
-
-## Commit + promote
-
-Commits via `~/Foundry/bin/commit-as-next.sh "<message>"` from archive root.
-**Stage 6 self-service (this archive):** `~/Foundry/bin/self-service-promote.sh`
-— pushes code commits to staging mirrors + appends to `promote-queue.jsonl`.
-Command Session processes canonical merge. Do NOT run `promote.sh` directly.
-
-## Commit rules
-
-- `git add <specific files>` — never `git add .`
-- `~/Foundry/bin/commit-as-next.sh "<type>(<scope>): <message>"` from sub-clone CWD
-- Run `cargo test -p <crate>` before every commit
-- If unpromoted commits exist, write `"Stage 6 pending — project-knowledge — <crate>"` to outbox
+Substitute the crate for the active project (e.g. `app-privategit-marketplace`, `tool-wallet`).
 
 ## Conflicts
 
-Surface via archive outbox (`../.agent/outbox.md`) — not here.
-Do not write to another archive's state files.
+If a workspace rule conflicts with anything stated here, **stop and surface
+the conflict via outbox to Command Session** — do not silently override.
 
 ## MCP tools — `foundry` server (use at startup)
 
@@ -71,3 +96,10 @@ inbox.md, outbox.md, NOTAM.md, session-context.md. Call it first.
 | `send_mailbox_message` | Send any mailbox message (M-2/M-10 audit compliant) |
 | `query_datagraph` | Entity lookup before answering about people/projects |
 | `ask_local` | OLMo 7B local inference — free, SYS-ADR-07-safe |
+
+## Artifact types — bright-line rules
+
+SOFT = Ed25519 license key + marketplace listing + price → software.pointsav.com.
+CODE = runs our systems; no customer license; internal deploy only.
+Storefront (`app-privategit-marketplace`) is CODE; the merchandise it sells is SOFT.
+Cash register test: licensable + marketplace-listed → SOFT; everything else → CODE.
