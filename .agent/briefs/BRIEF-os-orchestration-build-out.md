@@ -13,6 +13,16 @@ doctrine_anchors: [claim-23, claim-34, claim-43, claim-49, claim-52, SYS-ADR-19]
 
 # BRIEF — os-orchestration: Stateless Aggregation Layer — Full Build-Out
 
+> **Scope note (2026-07-09, resolved reconciliation with BRIEF-os-orchestration.md):**
+> this BRIEF is the **long-range architecture and roadmap** document for
+> os-orchestration — the three-binary context, the seL4 protection-domain design,
+> the capability-broker chokepoint, the five-app activation sequence (Phase O0–O6),
+> and journal tie-ins (J2/J5). It does **not** track current shipping/deployment
+> state for any specific `app-orchestration-*` crate — that lives in
+> `BRIEF-os-orchestration.md`, which owns the concrete v0.0.x implementation,
+> deployment, and licensing decisions for `app-orchestration-command`. Consult both:
+> this one for "why/where this is going," the other for "what's actually running today."
+
 > **Redistribution note (2026-07-09, Command Session):** this BRIEF originated in
 > project-data (later merged into project-totebox 2026-06-20) but its entire subject
 > matter — the `os-orchestration` binary, `app-orchestration-*` PDs, capability-broker

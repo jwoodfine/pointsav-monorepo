@@ -3,11 +3,16 @@ artifact: brief
 schema: foundry-brief-v1
 brief-id: project-orchestration-brief-audit-2026-06
 title: "BRIEF audit — project-orchestration — 2026-06"
-status: active
+status: archived
 owner: project-orchestration
 created: 2026-06-12
-updated: 2026-06-12
+updated: 2026-07-09
 ---
+
+> **Archived 2026-07-09:** point-in-time audit record (0 BRIEFs existed at the time).
+> Stale now that two real BRIEFs exist (`BRIEF-os-orchestration.md`,
+> `BRIEF-os-orchestration-build-out.md`). No ongoing decisions or carry-forward items;
+> kept per brief-discipline.md (never delete, supersede via status field).
 
 ## Context
 Automated BRIEF audit run 2026-06-12 (command@claude-code, Phase D governance sprint).

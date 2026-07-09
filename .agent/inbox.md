@@ -13,6 +13,10 @@ msg-id: command-20260702-binary-distribution-tracking-new-report--project-orches
 broadcast: true
 broadcast-id: 20260702025537-c6f6d519
 broadcast-targets: [project-bim,project-bookkeeping,project-command,project-console,project-data,project-design,project-documents,project-editorial,project-foodservice,project-gis,project-infrastructure,project-intelligence,project-jennifer,project-knowledge,project-marketing,project-mathew,project-orchestration,project-orgcharts,project-proforma,project-software,project-source,project-system,project-totebox,project-woodfine,project-workplace]
+status: actioned
+actioned: 2026-07-09
+actioned_by: totebox@claude-code
+actioned_note: .agent/binary-targets.yaml already exists (created 2026-07-08 per c853387b), declares orchestration-command-server correctly, cluster field matches. No further action needed.
 ---
 Binary tracking across all project-* archives has more infrastructure than you might
 expect, but it's underused — only 6 of 25 archives have declared their distribution

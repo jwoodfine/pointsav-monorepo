@@ -6,8 +6,14 @@ title: "os-orchestration build-out — app-orchestration-command (v0.0.1/v0.0.2 
 status: active
 owner: project-orchestration
 created: 2026-06-29
-updated: 2026-06-29T21:00Z
+updated: 2026-07-09
 ---
+
+> **Scope note (2026-07-09):** this BRIEF is the concrete shipping BRIEF for
+> `app-orchestration-command` — implementation, deployment, and licensing decisions
+> for the binary actually running today. For the long-range os-orchestration
+> architecture (seL4 PDs, capability-broker, five-app activation roadmap, journal
+> tie-ins) see `BRIEF-os-orchestration-build-out.md`.
 
 ## Context
 
@@ -166,6 +172,14 @@ user entries as archive topology rows. Infrastructure ACK confirmed this separat
   Outbox to Command for install; outbox to project-software for BETA listing (no payment gate).
 - 2026-06-29 — NEXT.md updated: P3.4 corrected (right deployment name, partial status), P3.5 closed.
   Inbox: J5 + J2 HOLD messages actioned (confirmed HOLD; carry-forward in BRIEF).
+- 2026-07-09 — Backlog sweep: BRIEFs re-scoped (this one = shipping state;
+  build-out BRIEF = architecture/roadmap), brief-audit-2026-06 archived, NEXT.md P3.4
+  checkboxes corrected against ledger evidence (install/smoke-test/BETA-URL were already
+  done, just unchecked). Confirmed v0.0.1 in canonical `origin/main`; v0.0.2 was NOT —
+  pushed to staging mirrors via `self-service-promote.sh` and queued for Command
+  (commit `95f4ca2f`). Discovered the formal `bin/build-soft.sh` signed pipeline has
+  never run for this binary; requested from Command via outbox. Re-pinged project-totebox
+  on the stalled `/v1/pair` design ACK (11 days silent).
 
 ---
 
@@ -183,8 +197,18 @@ user entries as archive topology rows. Infrastructure ACK confirmed this separat
 - **Code patch (v0.0.2) — after Totebox ACK:**
   - `orchestration-command-core/src/lib.rs` → add `peer_type: String` to `PairResponse`
   - F11 Peers tab: confirm with project-console
-- **Stage 6 → Command:** Outbox sent (command-20260629-stage-6-pending); awaiting Command
-  rebase + canonical merge. project-registry.md update also pending at Command.
+- **Stage 6 → Command:**
+  - v0.0.1 confirmed present in canonical `origin/main` (commit `29d0b4a1`) — done.
+  - v0.0.2 (pairing.rs schema_version + user-pairings.yaml write-through) pushed to
+    staging mirrors and queued in `promote-queue.jsonl` 2026-07-09 (commit `95f4ca2f`);
+    awaiting Command's next canonical-merge pass.
+  - project-registry.md update also pending at Command.
+- **Formal SOFT- pipeline (2026-07-09 finding):** `bin/build-soft.sh` has never actually
+  run for this binary — `data/app-repository/registry.yaml` is `packages: {}`. The live
+  BETA listing is an informal handoff (project-software manually installed the dev
+  binary; ledger `source_commit: "pending-stage6"`). Requested from Command via outbox
+  2026-07-09: run `build-soft.sh` once v0.0.2 is canonical, producing a real signed
+  `data/app-repository/` entry + `registry-update` to project-software.
 - **Binary distribution pipeline (v0.0.1 BETA):**
   - Send binary `orchestration-command-server` (Linux x86_64, 1.7 MB) to project-software
     for upload to software.pointsav.com. Product slug: `soft-orchestration-command`.
