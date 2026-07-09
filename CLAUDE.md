@@ -56,7 +56,7 @@ Phases 1 and 2 workspace changes (CLAUDE.md, AGENT.md, bin/, pairings.yaml)
 are **Command Session scope** — commit at `~/Foundry/` using
 `bin/commit-as-next.sh`. Do not commit workspace files from this cluster.
 
-Phase 3 Rust code (`app-orchestration-command/`) is Task Session scope —
+Phase 3 Rust code (`app-orchestration-command/`) is Totebox Session scope —
 commit from this cluster using `bin/commit-as-next.sh`.
 
 ---
