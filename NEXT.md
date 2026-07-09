@@ -106,9 +106,11 @@ Commit on `cluster/project-orchestration` branch in this cluster's pointsav-mono
 - [x] bootstrap.sh updated: curl-downloads binary from software.pointsav.com; falls back to local BINARY_SRC env var for dev builds
 - [x] Outbox sent to Command Session to install systemd unit + run bootstrap.sh
 - [x] Outbox sent to project-software for BETA listing (no payment gate during BETA)
-- [ ] **Pending Command:** `sudo bootstrap.sh` install + smoke test at 127.0.0.1:8020/healthz
-- [ ] **Pending project-software:** Confirm BETA URL; update DEFAULT_BINARY_URL in bootstrap.sh
-- [ ] **Pending Stage 6:** Command Session rebase + canonical merge of v0.0.1 + v0.0.2 commits
+- [x] **Command install + smoke test** `[closed: 2026-06-29 command@claude-code]` — confirmed via `data/binary-ledger/orchestration-command-server.jsonl`: `smoke_test: "pass"`, systemd unit `local-orchestration-command` installed, restarted.
+- [x] **project-software BETA URL confirmed** `[closed: 2026-06-30 totebox@project-software]` — `DEFAULT_BINARY_URL` set in `infrastructure/local-orchestration-command/bootstrap.sh`; ledger confirms download returns 200. Note: this was an **informal handoff** (project-software manually installed the dev binary; ledger records `source_commit: "pending-stage6"`), not the formal signed `bin/build-soft.sh` pipeline — see below.
+- [x] **Stage 6 — v0.0.1** `[closed: pre-2026-07-09, confirmed 2026-07-09 totebox@claude-code]` — confirmed present in canonical `origin/main` (`git log origin/main -- app-orchestration-command` shows commit `29d0b4a1`).
+- [ ] **Stage 6 — v0.0.2** (pairing.rs: WORM ledger `schema_version`, write-through to `user-pairings.yaml`) — NOT yet in canonical `origin/main`; pushed to promote-queue this session (2026-07-09), awaiting Command's canonical merge pass.
+- [ ] **Formal SOFT- pipeline** — `bin/build-soft.sh` has never actually run for this binary; `data/app-repository/registry.yaml` is empty (`packages: {}`). Requested from Command via outbox 2026-07-09, gated on v0.0.2 canonical merge above. Will produce a real signed `data/app-repository/` entry + `registry-update` to project-software, superseding the informal BETA handoff.
 
 ### P3.5 — Update NEXT.md `[done 2026-06-29 totebox@claude-code]`
 

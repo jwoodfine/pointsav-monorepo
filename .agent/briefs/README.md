@@ -7,19 +7,16 @@
 
 | File | brief-id | Title | Status | Updated |
 |------|----------|-------|--------|---------|
-| [BRIEF-os-orchestration.md](BRIEF-os-orchestration.md) | project-orchestration-os-orchestration | os-orchestration build-out — app-orchestration-command v0.0.1 | active | 2026-06-29 |
+| [BRIEF-os-orchestration.md](BRIEF-os-orchestration.md) | project-orchestration-os-orchestration | os-orchestration build-out — app-orchestration-command (v0.0.1/v0.0.2 in BETA) | active | 2026-07-09 |
 | [BRIEF-os-orchestration-build-out.md](BRIEF-os-orchestration-build-out.md) | project-orchestration-os-orchestration-build-out | os-orchestration: Stateless Aggregation Layer — Full Build-Out | active | 2026-07-09 |
 
-**Needs reconciliation (flagged 2026-07-09, Command redistribution):** these two BRIEFs
-overlap substantially — both cover os-orchestration's commercial-tier positioning and the
-`app-orchestration-command`/`app-orchestration-*` family. `BRIEF-os-orchestration.md` is
-narrower and more current (the actual shipping v0.0.1/v0.0.2 deployment/permission/licensing
-model). `BRIEF-os-orchestration-build-out.md` is broader and older (full 5-app architecture,
-seL4 capability-broker PD design, Phase O0-O6 roadmap, journal tie-ins) — just physically
-redistributed here from project-totebox, where it had been misscoped since a 2026-06-20
-archive merge. Next project-orchestration session should decide: merge into one BRIEF, or
-keep both with `-build-out` scoped explicitly to the broader/older architectural vision and
-`BRIEF-os-orchestration.md` to the current concrete shipping work — not decided here.
+**Reconciled 2026-07-09:** the two BRIEFs are scoped to be non-overlapping.
+`BRIEF-os-orchestration.md` owns concrete shipping/deployment/licensing state for
+`app-orchestration-command` — what's actually coded and running today.
+`BRIEF-os-orchestration-build-out.md` owns the long-range architecture and roadmap —
+the three-binary context, seL4 capability-broker PD design, five-app activation
+sequence (Phase O0–O6), and journal (J2/J5) tie-ins. Each BRIEF cross-references the
+other at the top for readers who land on the wrong one.
 
 ## Artifact routing
 When a BRIEF graduates to a deliverable, it routes here:
@@ -39,3 +36,4 @@ BRIEFs with `status: archived` or `status: superseded` are listed here or moved 
 
 | File | Archived date | Notes |
 |------|--------------|-------|
+| [BRIEF-brief-audit-2026-06.md](BRIEF-brief-audit-2026-06.md) | 2026-07-09 | Point-in-time audit log (0 BRIEFs existed 2026-06-12); stale now that two real BRIEFs exist. |
