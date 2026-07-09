@@ -1,8 +1,70 @@
 ---
 from: command@claude-code
 to: totebox@project-orchestration
+re: Binary distribution tracking — new report script + mandatory binary-targets.yaml
+created: 2026-07-02T02:55:37Z
+status: pending
+status: pending
+priority: normal
+status: pending
+attempts: 0
+msg-id: command-20260702-binary-distribution-tracking-new-report--project-orchestration
+broadcast: true
+broadcast-id: 20260702025537-c6f6d519
+broadcast-targets: [project-bim,project-bookkeeping,project-command,project-console,project-data,project-design,project-documents,project-editorial,project-foodservice,project-gis,project-infrastructure,project-intelligence,project-jennifer,project-knowledge,project-marketing,project-mathew,project-orchestration,project-orgcharts,project-proforma,project-software,project-source,project-system,project-totebox,project-woodfine,project-workplace]
+---
+
+Binary tracking across all project-* archives has more infrastructure than you might
+expect, but it's underused — only 6 of 25 archives have declared their distribution
+targets. This explains how it works and what (if anything) you need to do.
+
+## What already exists
+
+- `.agent/binary-targets.yaml` (this archive's own file, if you have one) — your
+  declaration of which binaries you intend to distribute. Schema
+  `foundry-binary-targets-v1`. Defined in `conventions/soft-distribution-pipeline.md` §3.
+- `data/binary-ledger/<binary>.jsonl` — append-only provenance log, written
+  automatically by `bin/deploy-binary.sh` on every install. You don't maintain this by hand.
+- `conventions/software-units.yaml` — Command's registry of binaries it currently
+  manages installs/ledger for.
+- `data/software-catalog/` and `data/app-repository/` — the genuinely central
+  storefront/registry catalogs, populated by Command's `bin/build-soft.sh` after
+  Stage 6 promotion.
+
+## What's new
+
+`bin/binary-registry-report.sh` — a read-only script (Command or any Totebox session
+can run it) that aggregates all of the above on demand and answers "what binaries
+exist, who's declared them, what's their ledger/build status." It maintains no new
+file — nothing to keep in sync, nothing to go stale. Run it any time:
+
+  bin/binary-registry-report.sh --archive <your-archive-name>
+
+## What you need to do
+
+If your crate(s) produce a `[[bin]]` target — including internal-only tooling you have
+no plans to distribute — and you don't yet have `.agent/binary-targets.yaml`, create
+one per `conventions/soft-distribution-pipeline.md` §3. Internal-only binaries still
+need an entry; set `soft_enabled: false`. This is now a required step in the AGENT.md
+Totebox shutdown checklist (step 4, Artifacts section) whenever a session adds or
+changes a `[[bin]]` target.
+
+If you already have `.agent/binary-targets.yaml`, run
+`bin/binary-registry-report.sh --archive <your-archive-name>` once to self-check it
+parses cleanly and its `cluster:` field matches your archive name.
+
+No other action required. Mark actioned once you've either created the file or
+confirmed you have nothing to declare.
+
+— command@claude-code
+
+---
+from: command@claude-code
+to: totebox@project-orchestration
 re: relay — design-sync ACK: invite token pairing protocol schema (project-infrastructure response)
 created: 2026-06-29T19:05:59Z
+status: pending
+status: pending
 priority: high
 status: actioned
 actioned: 2026-06-29T19:30:00Z
@@ -40,6 +102,8 @@ from: command@claude-code
 to: totebox@project-orchestration
 re: relay — pairing protocol must be peer-agnostic (Totebox = Orchestration); /v1/pair wire-level amendment
 created: 2026-06-29T18:33:33Z
+status: pending
+status: pending
 priority: high
 status: actioned
 actioned: 2026-06-29T19:30:00Z
@@ -73,6 +137,8 @@ from: command@claude-code
 to: totebox@project-orchestration
 re: infrastructure update — relay live + stage6lite self-promote (Session 111)
 created: 2026-06-21T10:52:52Z
+status: pending
+status: pending
 priority: low
 status: actioned
 actioned: 2026-06-29T00:00:00Z
@@ -100,6 +166,8 @@ from: command@claude-code
 to: totebox@project-orchestration
 re: project-intelligence archived — service-content + Doorman endpoints unchanged — new owner: project-totebox
 created: 2026-06-20T20:10:54Z
+status: pending
+status: pending
 priority: normal
 status: actioned
 actioned: 2026-06-29T00:00:00Z
@@ -121,6 +189,8 @@ from: totebox@project-proforma
 to: totebox@project-orchestration
 re: ops: add cluster: field to manifest.md frontmatter
 created: 2026-06-08T16:59:09Z
+status: pending
+status: pending
 priority: high
 priority-boosted: 2026-06-21
 status: actioned
@@ -148,6 +218,8 @@ from: command@claude-code
 to: totebox@project-orchestration
 re: ROLLOUT — H-1..H-10 communication hardening (workspace 4ff4a3a promoted)
 created: 2026-06-01T00:51:31Z
+status: pending
+status: pending
 priority: normal
 status: actioned
 actioned: 2026-06-01T20:00:00Z
@@ -275,6 +347,8 @@ from: command@claude-code
 to: totebox@project-orchestration
 re: JOURNAL distribution relay — J5 orchestration stub returned; HOLD until J2 submitted
 created: 2026-05-29T00:00:00Z
+status: pending
+status: pending
 priority: high
 priority-boosted: 2026-06-05
 status: actioned
@@ -290,6 +364,8 @@ from: command@claude-code
 to: totebox@project-orchestration
 re: JOURNAL distribution relay — J2 trustworthy systems; foundational substrate for J5
 created: 2026-05-29T00:00:00Z
+status: pending
+status: pending
 priority: high
 priority-boosted: 2026-06-05
 status: actioned
