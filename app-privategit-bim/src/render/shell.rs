@@ -35,7 +35,7 @@ undertaken to be updated except as required by law.</p>",
     let objects_current = if active_path.starts_with("/objects") { r#" aria-current="page""# } else { "" };
     let compositions_current = if active_path.starts_with("/compositions") { r#" aria-current="page""# } else { "" };
     let research_current = if active_path.starts_with("/research") { r#" aria-current="page""# } else { "" };
-    let discipline_current = if active_path.starts_with("/discipline") { r#" aria-current="page""# } else { "" };
+    let method_current = if active_path.starts_with("/method") { r#" aria-current="page""# } else { "" };
     let theme_toggle = if editor_route {
         String::new()
     } else {
@@ -104,7 +104,7 @@ undertaken to be updated except as required by law.</p>",
         <a href="/objects"{objects_current}>Objects</a>
         <a href="/compositions"{compositions_current}>Compositions</a>
         <a href="/research"{research_current}>Research</a>
-        <a href="/discipline"{discipline_current}>Discipline</a>
+        <a href="/method"{method_current}>Method</a>
       </nav>
       <form class="bim-header__search" method="get" action="/search" role="search">
         <input type="search" name="q" placeholder="Search" aria-label="Search the registry">
@@ -134,7 +134,7 @@ undertaken to be updated except as required by law.</p>",
               <a href="/objects"{objects_current}>Objects</a>
               <a href="/compositions"{compositions_current}>Compositions</a>
               <a href="/research"{research_current}>Research</a>
-              <a href="/discipline"{discipline_current}>Discipline</a>
+              <a href="/method"{method_current}>Method</a>
             </nav>
           </div>
         </details>
@@ -234,7 +234,7 @@ undertaken to be updated except as required by law.</p>",
         objects_current = objects_current,
         compositions_current = compositions_current,
         research_current = research_current,
-        discipline_current = discipline_current,
+        method_current = method_current,
         disclosure_body = disclosure_body,
         content = content,
         tc = tc,

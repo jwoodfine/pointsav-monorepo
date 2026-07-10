@@ -291,8 +291,7 @@ initPlanDrawOn();
 // Hovering a "PARTS LIST" row highlights its paired furniture group on the
 // plan SVG, and vice versa. Pairing is a shared `data-plan-obj` ordinal
 // assigned at render time (render/svg.rs, render/catalog.rs's bill_html) —
-// see the notes there. Desktop hover only; no mobile-tap equivalent is
-// wired up — a stated scope cut.
+// see the notes there.
 function setPlanHighlight(idx, on) {
   if (idx == null) return;
   document.querySelectorAll('.bim-plan-obj[data-plan-obj="' + idx + '"]').forEach((g) => {
@@ -314,6 +313,50 @@ document.addEventListener('mouseout', (e) => {
   if (row) { setPlanHighlight(row.dataset.planObj, false); return; }
   const grp = e.target.closest('.bim-plan-obj[data-plan-obj]');
   if (grp) setPlanHighlight(grp.dataset.planObj, false);
+});
+
+// Tap/click parity (Round 5, 2026-07-10): the hover linkage above has no
+// touch equivalent — `mouseover`/`mouseout` don't fire the same way on a
+// tap, so this flagship interaction was dead on every phone and tablet
+// (live-verified finding). Tap-to-pin instead of tap-to-preview: tapping a
+// row or plan group toggles a persistent highlight (independent of the
+// hover classes above, so it can't get stuck mid-hover-state on a device
+// with no real pointer); tapping the same one again, or tapping elsewhere
+// on the page, clears it. This also benefits keyboard/mouse users as a
+// "pin it" affordance layered on top of hover, not a replacement for it.
+function clearPinnedPlanHighlight() {
+  document.querySelectorAll('.bim-plan-obj--hi-pinned, .bim-bill-row--hi-pinned').forEach((el) => {
+    el.classList.remove('bim-plan-obj--hi-pinned', 'bim-bill-row--hi-pinned');
+  });
+}
+function setPinnedPlanHighlight(idx) {
+  document.querySelectorAll('.bim-plan-obj[data-plan-obj="' + idx + '"]').forEach((g) => {
+    g.classList.add('bim-plan-obj--hi-pinned');
+  });
+  document.querySelectorAll('.bim-bill-row[data-plan-obj="' + idx + '"]').forEach((r) => {
+    r.classList.add('bim-bill-row--hi-pinned');
+  });
+}
+document.addEventListener('click', (e) => {
+  const row = e.target.closest('.bim-bill-row[data-plan-obj]');
+  const grp = e.target.closest('.bim-plan-obj[data-plan-obj]');
+  // Bug found + fixed same session (Round 5 final verification): a linked
+  // bill row (`.bim-bill-row--linked`) is a real `<a href>` to the object's
+  // own page — the original version of this handler tried to pin AND never
+  // called preventDefault, so the click just navigated away every time and
+  // the pin never visibly applied. Fix: a linked row's tap keeps its
+  // existing, valuable "go see the object" navigation untouched — it does
+  // not also try to pin. Only the plan-SVG groups (never navigational) and
+  // unlinked rows (plain <div>, nothing to navigate to) get the tap-to-pin
+  // behavior, which is where real touch parity was actually missing.
+  if (row && row.tagName === 'A') return;
+  const target = row || grp;
+  if (!target) { clearPinnedPlanHighlight(); return; }
+  const idx = target.dataset.planObj;
+  const wasPinned = target.classList.contains('bim-plan-obj--hi-pinned')
+    || target.classList.contains('bim-bill-row--hi-pinned');
+  clearPinnedPlanHighlight();
+  if (!wasPinned) setPinnedPlanHighlight(idx);
 });
 
 // ── Objects compare (item 8, 2026-07-09) ────────────────────────────────

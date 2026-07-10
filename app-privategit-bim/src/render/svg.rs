@@ -204,7 +204,7 @@ pub fn render_kp_zone_svg(
         plan_center_x - 13.0, "var(--bim-bg-surface)"
     ));
     s.push_str(&format!(
-        "<text x=\"{:.1}\" y=\"8.5\" font-size=\"5.5\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"middle\" letter-spacing=\"1.2\">FACADE</text>",
+        "<text x=\"{:.1}\" y=\"8.5\" font-size=\"5.5\" fill=\"{}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" letter-spacing=\"1.2\">FACADE</text>",
         plan_center_x, accent
     ));
 
@@ -258,30 +258,37 @@ pub fn render_kp_zone_svg(
     }
 
     // Zone labels (left of plan) — caption weight, uniform across zones.
+    // Z1/Z2/Z3 letters are the primary identity of each band (kept visible
+    // at every viewport, class `--zone`); the depth-in-metres numbers below
+    // each letter are tertiary detail (class `--dim`) — real, but the least
+    // load-bearing text on the diagram, and the one Round 5's live 360px
+    // audit found rendering as small as 4.0px computed. `--dim` nodes are
+    // hidden below a render-width threshold in bim-planroom.css rather than
+    // shrunk further; the letters stay legible on their own at every size.
     s.push_str(&format!(
-        "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"end\">Z1</text>",
+        "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"{}\" class=\"bim-plan-mono bim-plan-mono--zone\" text-anchor=\"end\">Z1</text>",
         lz1a, caption
     ));
     s.push_str(&format!(
-        "<text x=\"21\" y=\"{:.1}\" font-size=\"4\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"end\">{:.1}m</text>",
+        "<text x=\"21\" y=\"{:.1}\" font-size=\"4\" fill=\"{}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"end\">{:.1}m</text>",
         lz1b, caption, z1
     ));
     s.push_str(&format!(
-        "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"end\">Z2</text>",
+        "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"{}\" class=\"bim-plan-mono bim-plan-mono--zone\" text-anchor=\"end\">Z2</text>",
         lz2a, caption
     ));
     s.push_str(&format!(
-        "<text x=\"21\" y=\"{:.1}\" font-size=\"4\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"end\">{:.1}m</text>",
+        "<text x=\"21\" y=\"{:.1}\" font-size=\"4\" fill=\"{}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"end\">{:.1}m</text>",
         lz2b, caption, z2
     ));
     if h3 >= 8.0 {
         s.push_str(&format!(
-            "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"end\">Z3</text>",
+            "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"{}\" class=\"bim-plan-mono bim-plan-mono--zone\" text-anchor=\"end\">Z3</text>",
             lz3a, caption
         ));
         if h3 >= 14.0 {
             s.push_str(&format!(
-                "<text x=\"21\" y=\"{:.1}\" font-size=\"4\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"end\">{:.1}m</text>",
+                "<text x=\"21\" y=\"{:.1}\" font-size=\"4\" fill=\"{}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"end\">{:.1}m</text>",
                 lz3b, caption, d3
             ));
         }
@@ -890,7 +897,7 @@ pub fn render_kp_zone_svg(
     }
 
     s.push_str(&format!(
-        "<text x=\"{:.1}\" y=\"110\" font-size=\"5.5\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"middle\" letter-spacing=\"1.2\">CORE</text>",
+        "<text x=\"{:.1}\" y=\"110\" font-size=\"5.5\" fill=\"{}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" letter-spacing=\"1.2\">CORE</text>",
         plan_center_x, accent
     ));
 
@@ -928,7 +935,7 @@ pub fn render_floor_scale_svg() -> String {
         hx += 6.0;
     }
     s.push_str("<text x=\"90\" y=\"9\" font-size=\"5\" fill=\"var(--bim-fg-caption)\" class=\"bim-plan-mono\" text-anchor=\"middle\" letter-spacing=\"1.1\">FLOOR-SCALE — ZONE LAYOUT NOT MODELED</text>");
-    s.push_str("<text x=\"90\" y=\"104\" font-size=\"4.5\" fill=\"var(--bim-fg-caption)\" class=\"bim-plan-mono\" text-anchor=\"middle\">CORE (illustrative)</text>");
+    s.push_str("<text x=\"90\" y=\"104\" font-size=\"4.5\" fill=\"var(--bim-fg-caption)\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\">CORE (illustrative)</text>");
     s.push_str("</svg>");
     s
 }

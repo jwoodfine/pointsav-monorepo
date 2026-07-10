@@ -46,7 +46,7 @@ fn build_app(app_state: state::AppState, static_dir: PathBuf) -> Router {
             "/compositions/{slug}/o/{object}",
             get(routes::compositions::composition_object_handler),
         )
-        .route("/discipline", get(routes::about::about_handler))
+        .route("/method", get(routes::about::about_handler))
         .route("/disclaimers", get(routes::disclaimers::disclaimers_handler))
         .route("/tokens", get(routes::tokens::tokens_index_handler))
         .route(
@@ -347,7 +347,7 @@ mod route_tests {
         assert!(!html.contains("bim-cat-pagehead"), "/edit is not restyled");
     }
 
-    /// The /about and /disclaimers passes are visual only: the article body
+    /// The /method and /disclaimers passes are visual only: the article body
     /// derived from `about_page` / `disclaimers_page` must be byte-identical
     /// to what the source data produces. Disclaimers is issuer-of-record
     /// disclosure (NI 51-102 / OSC SN 51-721) — its text is a content
@@ -357,7 +357,7 @@ mod route_tests {
         let (state, app) = test_state_and_app().await;
 
         for (path, page) in [
-            ("/discipline", state.about_page.as_ref()),
+            ("/method", state.about_page.as_ref()),
             ("/disclaimers", state.disclaimers_page.as_ref()),
         ] {
             let html = get_html(&app, path).await;

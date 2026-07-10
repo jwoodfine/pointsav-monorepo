@@ -48,20 +48,41 @@
   margin-left: 1.75rem;
 }
 .bim-header__nav a {
+  position: relative;
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--bim-fg-secondary, #54595D);
   text-decoration: none;
   padding: 0.375rem 0.1875rem;
   margin: 0 -0.1875rem;
-  border-bottom: 2px solid transparent;
+  border-bottom: 1px solid transparent;
 }
 .bim-header__nav a:hover { color: var(--bim-accent, #164679); }
+/* Round 5 (2026-07-10): replaced the plain 2px underline slab — confirmed
+   generic in a live side-by-side screenshot against the object cards'
+   already-distinctive drafting-annotation system directly below it — with
+   a treatment drawn from that same system: a 1px hairline baseline plus
+   short perpendicular end ticks, echoing the `⊢ ⊣` dimension-string
+   terminators already used on composition-card plan diagrams. No numerals
+   here (a nav label is not a dimension string) — only the terminator
+   shape is borrowed. Weight 600 + accent color still carry the active
+   state at a glance; the tick rewards a closer look. */
 .bim-header__nav a[aria-current="page"] {
   color: var(--bim-accent, #164679);
   border-bottom-color: var(--bim-accent, #164679);
   font-weight: 600;
 }
+.bim-header__nav a[aria-current="page"]::before,
+.bim-header__nav a[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  width: 1px;
+  height: 4px;
+  background: var(--bim-accent, #164679);
+}
+.bim-header__nav a[aria-current="page"]::before { left: 0.1875rem; }
+.bim-header__nav a[aria-current="page"]::after { right: 0.1875rem; }
 .bim-header__search {
   flex: 0 1 220px;
   min-width: 0;
@@ -211,6 +232,7 @@
   padding-top: 0.75rem;
 }
 .bim-drawer__nav a {
+  position: relative;
   padding: 0.75rem 0.5rem;
   margin: 0 -0.5rem;
   border-radius: var(--bim-radius-sm, 4px);
@@ -218,15 +240,31 @@
   font-weight: 500;
   color: var(--bim-fg, #111827);
   text-decoration: none;
-  border-left: 3px solid transparent;
+  border-left: 1px solid transparent;
 }
 .bim-drawer__nav a:hover { background: var(--bim-bg-subtle, #EEF1F5); }
+/* Round 5 (2026-07-10): same terminator system as the desktop nav tick
+   above, rotated 90deg for the drawer's vertical list — a 1px hairline
+   left edge plus short perpendicular ticks at top and bottom, instead of
+   the previous plain 3px solid border-left (same genericness the operator
+   flagged for the desktop underline). */
 .bim-drawer__nav a[aria-current="page"] {
   color: var(--bim-accent, #164679);
   font-weight: 600;
   border-left-color: var(--bim-accent, #164679);
   background: var(--bim-accent-subtle, #E8EEF5);
 }
+.bim-drawer__nav a[aria-current="page"]::before,
+.bim-drawer__nav a[aria-current="page"]::after {
+  content: "";
+  position: absolute;
+  left: -1px;
+  width: 4px;
+  height: 1px;
+  background: var(--bim-accent, #164679);
+}
+.bim-drawer__nav a[aria-current="page"]::before { top: 0.5rem; }
+.bim-drawer__nav a[aria-current="page"]::after { bottom: 0.5rem; }
 
 /* Lock page scroll behind the open drawer (bim.js toggles this class on
    the <details>'s native `toggle` event). */
@@ -258,6 +296,22 @@ body.bim-drawer-open { overflow: hidden; }
   fill: var(--bim-fg-caption, #54595D);
 }
 .bim-plan-mono { font-family: var(--bim-font-mono); }
+
+/* Round 5 (2026-07-10) legibility floor: the plan-diagram annotations carry
+   two tiers. `--zone` (Z1/Z2/Z3 letters) is the primary identity of each
+   band and stays visible at every size. `--dim` (depth-in-metres numbers,
+   FACADE, CORE, "CORE (illustrative)") is real but tertiary detail — live
+   360px measurement found these rendering as small as 4.0-5.5px computed,
+   genuinely illegible rather than merely small. Progressive disclosure
+   (drop at small render widths) rather than shrinking further: these plan
+   thumbnails are drawn at drafting scale, so uniformly enlarging the source
+   font-size values would make the annotations disproportionately large
+   relative to the rest of the diagram. CSS class rules override the SVG's
+   own font-size presentation attribute at normal specificity, so this is
+   sufficient without touching the generator's numeric values again. */
+@media (max-width: 480px) {
+  .bim-plan-mono--dim { display: none; }
+}
 
 /* ============================================================================
    CATALOG CARDS — square Object module vs. broad 2:1 Composition sheet
@@ -294,6 +348,17 @@ body.bim-drawer-open { overflow: hidden; }
    atom-vs-assembly distinction, not a badge pill (2026-07-09 spec). */
 .bim-cat-card--comp .bim-cat-thumb { aspect-ratio: 16 / 9; }
 .bim-cat-thumb .bim-kp-diagram { width: 100%; height: 100%; display: block; aspect-ratio: 180 / 112; }
+
+/* Defensive fallback (Round 5, 2026-07-10): the SVG markup itself carries a
+   fixed width="360" height="224" attribute (needed as an intrinsic-size
+   fallback for contexts with no CSS at all, e.g. a raw API/RSS consumer).
+   Every known on-site wrapper (.bim-cat-thumb, .bim-cat-preview above)
+   already overrides this responsively — this bare-class rule is insurance
+   against any future context that embeds .bim-kp-diagram without one of
+   those wrappers, so a fixed-360px SVG can never overflow a narrower
+   container (flagged as a real risk at 320-360px viewports; not confirmed
+   to have actually fired in a live wrapper, but cheap to close either way). */
+.bim-kp-diagram { max-width: 100%; height: auto; }
 .bim-cat-thumb__fmt {
   position: absolute;
   top: 0.5rem;
@@ -401,18 +466,23 @@ body.bim-drawer-open { overflow: hidden; }
   display: inline-flex;
   cursor: pointer;
 }
+/* Round 5 (2026-07-10) WCAG 2.5.8 fix: was 1.375rem (22px) — live-measured
+   below the 24x24 CSS-pixel minimum target size, a real failure (no
+   inline-text-link exception applies to a checkbox). Raised to a real
+   24px floor on both the invisible real input (the actual click/tap
+   target) and its visible styled sibling. */
 .bim-cat-card__comparetoggle input {
   position: absolute;
   opacity: 0;
-  width: 1.375rem;
-  height: 1.375rem;
+  width: 1.5rem;
+  height: 1.5rem;
   margin: 0;
   cursor: pointer;
 }
 .bim-cat-card__checkbox {
   position: relative;
-  width: 1.375rem;
-  height: 1.375rem;
+  width: 1.5rem;
+  height: 1.5rem;
   border-radius: var(--bim-radius-sm, 4px);
   border: 1.5px solid var(--bim-border-strong, #C8CCD1);
   background: var(--bim-bg-surface, #fff);
@@ -425,8 +495,8 @@ body.bim-drawer-open { overflow: hidden; }
 .bim-cat-card__comparetoggle input:checked + .bim-cat-card__checkbox::after {
   content: "";
   position: absolute;
-  left: 4px;
-  top: 1px;
+  left: 5px;
+  top: 2px;
   width: 6px;
   height: 10px;
   border: solid #fff;
@@ -499,6 +569,15 @@ body.bim-drawer-open { overflow: hidden; }
    HOME (`/`) — compact registry front door
    ============================================================================ */
 .bim-main:has(.bim-home) { max-width: 1180px; }
+
+/* Round 5 (2026-07-10): /objects and /compositions list pages had no `:has`
+   override at all — stuck at the base 896px prose column, so at 1920px the
+   catalog grid rendered 4-across in under half the viewport (live-measured
+   finding). Widen to 1360px, matching the header's new max-width so both
+   share the same horizontal rhythm at large screens; harmless at narrower
+   widths since 1360px only engages above .bim-main's own 896px floor. */
+.bim-main:has(.bim-cat-grid--obj),
+.bim-main:has(.bim-cat-grid--comp) { max-width: 1360px; }
 .bim-home { display: flex; flex-direction: column; gap: clamp(2rem, 4vw, 3rem); }
 
 .bim-home-masthead {
@@ -870,12 +949,19 @@ body.bim-drawer-open { overflow: hidden; }
 }
 a.bim-bill-row--linked { text-decoration: none; color: inherit; background: var(--bim-bg-surface, #fff); }
 a.bim-bill-row--linked:hover { border-color: var(--bim-accent, #164679); }
-.bim-bill-row__name { color: var(--bim-fg, #111827); font-weight: 500; }
+.bim-bill-row__name { color: var(--bim-fg, #111827); font-weight: 500; min-width: 0; }
+/* Round 5 (2026-07-10) WCAG 1.4.10 fix: `white-space: nowrap` on a flex
+   child with no `min-width: 0` on either sibling kept this at its full
+   content width regardless of container size — real, live-measured 15px
+   horizontal overflow at 320px CSS width (400%-zoom-equivalent reflow
+   check). Removed nowrap so long codes wrap onto a second line at narrow
+   widths instead of forcing the row wider than its container. */
 .bim-bill-row__code {
   font-family: var(--bim-font-mono);
   font-size: 0.75rem;
   color: var(--bim-accent, #164679);
-  white-space: nowrap;
+  min-width: 0;
+  text-align: right;
 }
 .bim-bill-row--unlinked { background: var(--bim-bg-page, #F7F9FA); }
 
@@ -885,6 +971,7 @@ a.bim-bill-row--linked:hover { border-color: var(--bim-accent, #164679); }
    the brand navy, matching this codebase's existing convention that the
    machine accent marks "the system is telling you something," distinct
    from ordinary navy UI chrome. */
+.bim-plan-obj[data-plan-obj] { cursor: pointer; }
 .bim-plan-obj rect,
 .bim-plan-obj circle,
 .bim-plan-obj line,
@@ -892,20 +979,34 @@ a.bim-bill-row--linked:hover { border-color: var(--bim-accent, #164679); }
   transition: stroke 0.12s ease, fill 0.12s ease, fill-opacity 0.12s ease;
 }
 .bim-plan-obj--hi rect,
-.bim-plan-obj--hi circle {
+.bim-plan-obj--hi circle,
+.bim-plan-obj--hi-pinned rect,
+.bim-plan-obj--hi-pinned circle {
   fill: var(--bim-machine-accent-bg, #E8EEF5) !important;
   fill-opacity: 1 !important;
   stroke: var(--bim-machine-accent, #234ED8) !important;
 }
 .bim-plan-obj--hi line,
-.bim-plan-obj--hi path {
+.bim-plan-obj--hi path,
+.bim-plan-obj--hi-pinned line,
+.bim-plan-obj--hi-pinned path {
   stroke: var(--bim-machine-accent, #234ED8) !important;
 }
-.bim-bill-row[data-plan-obj] { transition: border-color 0.12s ease, background 0.12s ease; }
-.bim-bill-row--hi {
+.bim-bill-row[data-plan-obj] { transition: border-color 0.12s ease, background 0.12s ease; cursor: pointer; }
+.bim-bill-row--hi,
+.bim-bill-row--hi-pinned {
   border-color: var(--bim-machine-accent, #234ED8) !important;
   background: var(--bim-machine-accent-bg, #E8EEF5) !important;
 }
+/* Pinned state (tap/click) gets a visible ring on top of the shared fill,
+   so a touch user gets a slightly stronger confirmation than a transient
+   hover would give a mouse user — same underlying highlight, one extra
+   affordance layered on for the "I tapped this on purpose" case. */
+.bim-plan-obj--hi-pinned rect,
+.bim-plan-obj--hi-pinned circle {
+  stroke-width: 1.6px !important;
+}
+.bim-bill-row--hi-pinned { box-shadow: 0 0 0 1px var(--bim-machine-accent, #234ED8) inset; }
 .bim-bill-row__tag {
   font-family: var(--bim-font-mono);
   font-size: 0.6875rem;
@@ -918,6 +1019,22 @@ a.bim-bill-row--linked:hover { border-color: var(--bim-accent, #164679); }
 .bim-cat-spectable th, .bim-cat-spectable td { text-align: left; padding: 0.5rem 0; border-bottom: 1px solid var(--bim-hairline, #E6E7E8); }
 .bim-cat-spectable th { font-weight: 500; color: var(--bim-fg-muted, #6B7280); width: 46%; }
 .bim-cat-spectable td { color: var(--bim-fg, #111827); font-family: var(--bim-font-mono); }
+/* Round 5 (2026-07-10): Pset-style group header rows (render/catalog.rs's
+   spec_rows_grouped) — a real IFC property-set name where one applies
+   (Pset_ManufacturerTypeInformation), a plain honest label otherwise.
+   Addresses the "spec tables are flat" gap from the hyperscaler audit. */
+.bim-cat-spectable__grouprow th {
+  padding-top: 0.875rem;
+  border-bottom: none;
+  font-family: var(--bim-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bim-accent, #164679);
+  width: auto;
+}
+.bim-cat-spectable__grouprow:first-child th { padding-top: 0; }
 
 .bim-cat-classblock { display: flex; flex-direction: column; gap: 0.625rem; }
 .bim-cat-clrow { display: flex; flex-direction: column; gap: 0.125rem; }

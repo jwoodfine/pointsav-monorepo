@@ -68,10 +68,24 @@ h1, h2 {
      search + toggle are now one continuous, left-anchored cluster with only
      small deliberate gaps between groups; no max-width container or 2-zone
      grid (explicitly rejected — the void moves to the right edge instead of
-     the middle, which is fine). */
+     the middle, which is fine).
+
+     Round 5 (2026-07-10) addendum, large screens only: at 1920px the
+     right-edge void grew to 1000px+ (live-measured), a much starker
+     asymmetry than the 1440px case this comment describes, and the header
+     no longer shared a horizontal rhythm with .bim-main's own centered,
+     capped column. max-width + margin:0 auto below has zero effect at or
+     below 1360px (the row is already narrower than that) — it only engages
+     on very wide viewports, redistributing the same void evenly on both
+     sides instead of dumping all of it on the right, matching how the main
+     content column already centers itself. This does not reintroduce the
+     space-between bug above: it caps the row's own width, it does not
+     change how brand/nav/search/toggle distribute within that row. */
   justify-content: flex-start;
   gap: 0.75rem;
   width: 100%;
+  max-width: 1360px;
+  margin: 0 auto;
   padding: 0 1.5rem;
 }
 
