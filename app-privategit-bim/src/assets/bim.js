@@ -201,6 +201,159 @@ const SchemaState = {
   },
 };
 
+// ── Mobile nav drawer ────────────────────────────────────────────────────
+// The drawer itself is a native <details class="bim-drawer">, so open/close
+// already works with zero JavaScript (the <summary> is the hamburger
+// button). This just layers on the affordances native <details> doesn't
+// give for free: tap-outside-to-close, an explicit close button, and
+// Escape — plus locking page scroll behind the open panel.
+
+document.querySelectorAll('details.bim-drawer').forEach((drawer) => {
+  drawer.addEventListener('toggle', () => {
+    document.body.classList.toggle('bim-drawer-open', drawer.open);
+  });
+});
+
+document.addEventListener('click', (e) => {
+  const closer = e.target.closest('.bim-drawer__backdrop, .bim-drawer__close');
+  if (!closer) return;
+  const drawer = closer.closest('details.bim-drawer');
+  if (drawer) drawer.open = false;
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  document.querySelectorAll('details.bim-drawer[open]').forEach((drawer) => {
+    drawer.open = false;
+  });
+});
+
+// ── Key-plan draw-on animation ──────────────────────────────────────────
+// The composition detail page's main key-plan SVG "inks itself in" via
+// stroke-dashoffset instead of appearing instantly. Only every stroked
+// line-work element (walls, zone-boundary dashes, mullion ticks, furniture
+// symbol outlines) animates — filled areas (zone washes) render immediately
+// as normal, since dasharray only affects the stroke, which reads as
+// "the color settles in, then the line-work draws itself" rather than a
+// jarring reveal. Catalog thumbnail SVGs (/objects, /compositions grids)
+// are deliberately left static — a stated scope cut: animating dozens of
+// small on-screen SVGs at once cost real paint time for no real payoff: the
+// single large plan on the detail page is the one moment that reads as an
+// actual "drawing."
+function drawOnAnimate(svg) {
+  if (!svg || svg.dataset.drawnOn === '1') return;
+  svg.dataset.drawnOn = '1';
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const shapes = svg.querySelectorAll('path, rect, line, circle, polyline, polygon');
+  shapes.forEach((el, i) => {
+    const stroke = el.getAttribute('stroke');
+    if (!stroke || stroke === 'none') return;
+    if (typeof el.getTotalLength !== 'function') return;
+    let len;
+    try { len = el.getTotalLength(); } catch (_) { return; }
+    if (!len || !isFinite(len)) return;
+    el.style.strokeDasharray = String(len);
+    el.style.strokeDashoffset = String(len);
+    el.style.transition = 'stroke-dashoffset 0.6s ease';
+    el.style.transitionDelay = Math.min(i, 40) * 12 + 'ms';
+    // Two nested rAFs: the first commits the dashoffset-at-full-length
+    // style so the browser has actually painted that starting state before
+    // the second rAF flips it to 0 — setting both in the same frame would
+    // let the browser coalesce them and skip straight to the end state.
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el.style.strokeDashoffset = '0';
+      });
+    });
+  });
+}
+
+function initPlanDrawOn() {
+  const svg = document.querySelector('.bim-inspector-page__plan .bim-kp-diagram');
+  if (!svg) return;
+  if ('IntersectionObserver' in window) {
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          drawOnAnimate(svg);
+          io.disconnect();
+        }
+      });
+    }, { threshold: 0.15 });
+    io.observe(svg);
+  } else {
+    drawOnAnimate(svg);
+  }
+}
+initPlanDrawOn();
+
+// ── Plan <-> parts-list hover linkage ───────────────────────────────────
+// Hovering a "PARTS LIST" row highlights its paired furniture group on the
+// plan SVG, and vice versa. Pairing is a shared `data-plan-obj` ordinal
+// assigned at render time (render/svg.rs, render/catalog.rs's bill_html) —
+// see the notes there. Desktop hover only; no mobile-tap equivalent is
+// wired up — a stated scope cut.
+function setPlanHighlight(idx, on) {
+  if (idx == null) return;
+  document.querySelectorAll('.bim-plan-obj[data-plan-obj="' + idx + '"]').forEach((g) => {
+    g.classList.toggle('bim-plan-obj--hi', on);
+  });
+  document.querySelectorAll('.bim-bill-row[data-plan-obj="' + idx + '"]').forEach((r) => {
+    r.classList.toggle('bim-bill-row--hi', on);
+  });
+}
+
+document.addEventListener('mouseover', (e) => {
+  const row = e.target.closest('.bim-bill-row[data-plan-obj]');
+  if (row) { setPlanHighlight(row.dataset.planObj, true); return; }
+  const grp = e.target.closest('.bim-plan-obj[data-plan-obj]');
+  if (grp) setPlanHighlight(grp.dataset.planObj, true);
+});
+document.addEventListener('mouseout', (e) => {
+  const row = e.target.closest('.bim-bill-row[data-plan-obj]');
+  if (row) { setPlanHighlight(row.dataset.planObj, false); return; }
+  const grp = e.target.closest('.bim-plan-obj[data-plan-obj]');
+  if (grp) setPlanHighlight(grp.dataset.planObj, false);
+});
+
+// ── Objects compare (item 8, 2026-07-09) ────────────────────────────────
+// The compare feature is a real <form method="get" action="/objects/
+// compare"> with checkboxes named "ids" (bim-planroom.css / catalog.rs) —
+// it already works with JavaScript disabled via the plain "Compare
+// selected" submit button. This just adds the live count + "appears once
+// 2+ selected" polish: disabling the button below 2 checked, and a Clear
+// button that unchecks everything.
+function syncCompareBar() {
+  const bar = document.getElementById('bim-compare-bar');
+  if (!bar) return;
+  const n = document.querySelectorAll('.bim-compare-check:checked').length;
+  const go = document.getElementById('bim-compare-go');
+  const labelEl = document.getElementById('bim-compare-label');
+  if (labelEl) {
+    labelEl.innerHTML = n >= 2
+      ? 'Compare <b>' + n + '</b> selected Objects, side by side.'
+      : (n === 1
+        ? 'Check 1 more Object to compare dimensions.'
+        : 'Check 2 or more Objects to compare their dimensions.');
+  }
+  bar.classList.toggle('is-ready', n >= 2);
+  if (go) go.disabled = n < 2;
+}
+
+document.addEventListener('change', (e) => {
+  if (e.target.closest('.bim-compare-check')) syncCompareBar();
+});
+
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#bim-compare-clear')) return;
+  document.querySelectorAll('.bim-compare-check:checked').forEach((cb) => {
+    cb.checked = false;
+  });
+  syncCompareBar();
+});
+
+syncCompareBar();
+
 // Expose globally for inline editor scripts
 window.SchemaState = SchemaState;
 window.BimNavigate = navigate;

@@ -40,8 +40,21 @@ cds-side-nav-menu-item a.bim-nav-link {
 
 /* Active link indicator in sidebar (set client-side by bim.js's SPA
    navigation, alongside the server-rendered .active class used on the
-   initial page load — keep both in sync with the same tokens). */
-[aria-current="page"] {
+   initial page load — keep both in sync with the same tokens).
+   Scoped to the Carbon side-nav components declared just above (the only
+   sidebar-shaped elements this file knows about) — the bare
+   `[aria-current="page"]` selector this replaced was unscoped and matched
+   ANY element carrying aria-current="page" site-wide, including the plain
+   <a> tags in .bim-header__nav (shell.rs sets aria-current="page" there
+   server-side), stacking a border-left + fill on top of the masthead nav's
+   own clean underline treatment (bim-planroom.css). The sidebar tree these
+   rules were written for was removed 2026-07-03 (see bim-layout.css:136);
+   no `.bim-sidebar`-style container exists in current markup, and neither
+   `cds-side-nav-link`/`cds-side-nav-menu-item` are emitted by any route
+   today (2026-07-09 audit) — kept scoped rather than deleted in case the
+   editor's Carbon side-nav is wired up later. */
+cds-side-nav-link[aria-current="page"],
+cds-side-nav-menu-item[aria-current="page"] {
   border-left: 3px solid var(--bim-accent, #164679);
   background: var(--bim-accent-subtle, rgba(22, 70, 121, 0.08));
 }

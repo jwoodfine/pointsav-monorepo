@@ -63,6 +63,11 @@ pub fn render_kp_fraction_svg(display_name: &str) -> String {
     )
 }
 
+// obj_idx's final increment in each category branch below is legitimately
+// unread (nothing after the match block needs the running count) — not a
+// real bug, just how a running counter's last write always looks to this
+// lint.
+#[allow(unused_assignments)]
 pub fn render_kp_zone_svg(
     z1: f64,
     z2: f64,
@@ -76,15 +81,19 @@ pub fn render_kp_zone_svg(
         return String::new();
     }
 
-    let accent = match category {
-        "private-office" => "#1a3a5c",
-        "medical" => "#7a1a1a",
-        "laboratory" => "#1a4060",
-        "business" => "#7a4a00",
-        "academic" => "#4a4800",
-        "civic" => "#1a5430",
-        _ => "#303040",
-    };
+    // "The Plan Room" (2026-07-09 v3 redesign): one drawing language, one
+    // navy, for every category — retires the prior per-category hex accent
+    // (cream/tan/maroon/olive sub-palette the 2026-07 audit flagged as a
+    // second, uncoordinated design system). `accent` now always resolves to
+    // the same brand navy CSS variable regardless of `category`; every
+    // literal furniture-fill/stroke hex below is likewise replaced with the
+    // shared token palette (`--bim-accent` / `--bim-accent-active` /
+    // `--bim-accent-subtle`) so the diagram themes with the page for free —
+    // see BRIEF-bim-v3-hyperscaler-redesign.md `composition_detail_treatment`.
+    let accent = "var(--bim-accent)";
+    let accent_active = "var(--bim-accent-active)";
+    let accent_subtle = "var(--bim-accent-subtle)";
+    let caption = "var(--bim-fg-caption)";
 
     // Drawing area: x=22, y=10, max_w=153, h=94 within 180×112 viewBox.
     // Left 22px reserved for Z1/Z2/Z3 labels.
@@ -171,84 +180,109 @@ pub fn render_kp_zone_svg(
 
     let mut s = String::with_capacity(2400);
 
-    s.push_str("<svg class=\"bim-kp-diagram\" viewBox=\"0 0 180 112\" xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\">");
-    s.push_str("<rect width=\"180\" height=\"112\" fill=\"#f0f4f8\"/>");
-
+    // Explicit width/height (2x viewBox, crisp at typical card sizes) fixes
+    // the 2026-07 audit's 2px-collapse bug: inside a flex-column ancestor
+    // (`.bim-cat-modal__body`), an SVG with only a `viewBox` has no intrinsic
+    // size to resolve `height:auto` against. CSS `aspect-ratio: 180/112` on
+    // `.bim-kp-diagram` (bim-planroom.css) is the second, belt-and-suspenders
+    // layer — the diagram can no longer collapse under any container.
+    s.push_str("<svg class=\"bim-kp-diagram\" viewBox=\"0 0 180 112\" width=\"360\" height=\"224\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Key Plan footprint\">");
     s.push_str(&format!(
-        "<text x=\"108\" y=\"8.5\" font-size=\"5.5\" fill=\"{}\" font-family=\"sans-serif\" text-anchor=\"middle\" letter-spacing=\"1.2\">FACADE</text>",
-        accent
+        "<rect width=\"180\" height=\"112\" fill=\"{}\"/>",
+        "var(--bim-bg-surface)"
     ));
 
-    // Mullion ticks (4 evenly spaced along facade edge)
+    // FACADE label centered over the actual plan footprint (not a fixed
+    // viewBox x) with a reserved gap in the mullion-tick run underneath it —
+    // fixes the 2026-07 audit's label/tick collision by construction rather
+    // than by z-order.
+    let plan_center_x = x0 + plan_w / 2.0;
     let mull_step = plan_w / 5.0;
+    let gap_half = 13.0;
+    s.push_str(&format!(
+        "<rect x=\"{:.1}\" y=\"3\" width=\"26\" height=\"7\" fill=\"{}\"/>",
+        plan_center_x - 13.0, "var(--bim-bg-surface)"
+    ));
+    s.push_str(&format!(
+        "<text x=\"{:.1}\" y=\"8.5\" font-size=\"5.5\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"middle\" letter-spacing=\"1.2\">FACADE</text>",
+        plan_center_x, accent
+    ));
+
+    // Mullion ticks (4 evenly spaced along facade edge), skipping any that
+    // would fall inside the FACADE label's reserved gap.
     for i in 1u8..=4 {
         let mx = x0 + mull_step * i as f64;
+        if (mx - plan_center_x).abs() < gap_half {
+            continue;
+        }
         s.push_str(&format!(
             "<line x1=\"{:.1}\" y1=\"6\" x2=\"{:.1}\" y2=\"{:.0}\" stroke=\"{}\" stroke-width=\"0.8\"/>",
             mx, mx, y0, accent
         ));
     }
 
-    // Zone fills (blueprint paper tints)
+    // Zone fills — three opacity tiers of the same navy selection wash
+    // (`--bim-accent-subtle`), not three unrelated hues, so the plan themes
+    // with the page.
     s.push_str(&format!(
-        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"#fff9f4\"/>",
-        x0, y0, plan_w, h1
+        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"{}\" fill-opacity=\"0.9\"/>",
+        x0, y0, plan_w, h1, accent_subtle
     ));
     s.push_str(&format!(
-        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"#fafae8\"/>",
-        x0, y1, plan_w, h2
+        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"{}\" fill-opacity=\"0.55\"/>",
+        x0, y1, plan_w, h2, accent_subtle
     ));
     if h3 >= 1.0 {
         s.push_str(&format!(
-            "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"#f0f8f2\"/>",
-            x0, y2, plan_w, h3
+            "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"{}\" fill-opacity=\"0.25\"/>",
+            x0, y2, plan_w, h3, accent_subtle
         ));
     }
 
-    // Perimeter (accent colour)
+    // Perimeter (primary line weight)
     s.push_str(&format!(
         "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"none\" stroke=\"{}\" stroke-width=\"1.2\"/>",
         x0, y0, plan_w, dh, accent
     ));
 
-    // Zone boundary dashed lines
+    // Zone boundary dashed lines (secondary weight)
     s.push_str(&format!(
-        "<line x1=\"{:.1}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"#8a9aaa\" stroke-dasharray=\"3.5,2.5\" stroke-width=\"0.75\"/>",
-        x0, y1, xr, y1
+        "<line x1=\"{:.1}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\" stroke-dasharray=\"3.5,2.5\" stroke-width=\"0.75\"/>",
+        x0, y1, xr, y1, accent_active
     ));
     if h3 >= 1.0 {
         s.push_str(&format!(
-            "<line x1=\"{:.1}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"#8a9aaa\" stroke-dasharray=\"3.5,2.5\" stroke-width=\"0.75\"/>",
-            x0, y2, xr, y2
+            "<line x1=\"{:.1}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"{}\" stroke-dasharray=\"3.5,2.5\" stroke-width=\"0.75\"/>",
+            x0, y2, xr, y2, accent_active
         ));
     }
 
-    // Zone labels (left of plan)
+    // Zone labels (left of plan) — caption weight, uniform across zones.
     s.push_str(&format!(
-        "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"#6a4820\" font-family=\"sans-serif\" text-anchor=\"end\">Z1</text>",
-        lz1a
+        "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"end\">Z1</text>",
+        lz1a, caption
     ));
     s.push_str(&format!(
-        "<text x=\"21\" y=\"{:.1}\" font-size=\"4\" fill=\"#8a6840\" font-family=\"sans-serif\" text-anchor=\"end\">{:.1}m</text>",
-        lz1b, z1
+        "<text x=\"21\" y=\"{:.1}\" font-size=\"4\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"end\">{:.1}m</text>",
+        lz1b, caption, z1
     ));
     s.push_str(&format!(
-        "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"#4a5020\" font-family=\"sans-serif\" text-anchor=\"end\">Z2</text>",
-        lz2a
+        "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"end\">Z2</text>",
+        lz2a, caption
     ));
     s.push_str(&format!(
-        "<text x=\"21\" y=\"{:.1}\" font-size=\"4\" fill=\"#6a7040\" font-family=\"sans-serif\" text-anchor=\"end\">{:.1}m</text>",
-        lz2b, z2
+        "<text x=\"21\" y=\"{:.1}\" font-size=\"4\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"end\">{:.1}m</text>",
+        lz2b, caption, z2
     ));
     if h3 >= 8.0 {
         s.push_str(&format!(
-            "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"#205040\" font-family=\"sans-serif\" text-anchor=\"end\">Z3</text>",
-            lz3a
+            "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"end\">Z3</text>",
+            lz3a, caption
         ));
         if h3 >= 14.0 {
             s.push_str(&format!(
-                "<text x=\"21\" y=\"{:.1}\" font-size=\"4\" fill=\"#407060\" font-family=\"sans-serif\" text-anchor=\"end\">{:.1}m</text>",
-                lz3b, d3
+                "<text x=\"21\" y=\"{:.1}\" font-size=\"4\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"end\">{:.1}m</text>",
+                lz3b, caption, d3
             ));
         }
     }
@@ -257,11 +291,11 @@ pub fn render_kp_zone_svg(
     macro_rules! desk {
         ($s:expr, $dx:expr, $dy:expr) => {
             $s.push_str(&format!(
-                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"15\" height=\"9\" fill=\"#c8b48a\" stroke=\"#8b6a40\" stroke-width=\"0.5\" rx=\"0.5\"/>",
+                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"15\" height=\"9\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\" rx=\"0.5\"/>",
                 $dx, $dy
             ));
             $s.push_str(&format!(
-                "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"3\" fill=\"#b0a080\" stroke=\"#8b6a40\" stroke-width=\"0.4\"/>",
+                "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"3\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\"/>",
                 ($dx as f64) + 7.5,
                 ($dy as f64) + 13.0
             ));
@@ -271,14 +305,14 @@ pub fn render_kp_zone_svg(
         ($s:expr, $cx:expr, $cy:expr, $r:expr, $n:expr) => {{
             let (cx, cy, r) = ($cx as f64, $cy as f64, $r as f64);
             $s.push_str(&format!(
-                "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"{:.1}\" fill=\"#d4c4a0\" stroke=\"#8b6a40\" stroke-width=\"0.5\"/>",
+                "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\"/>",
                 cx, cy, r
             ));
             let offsets: &[(f64, f64)] =
                 &[(0.0, -(r + 3.5)), (r + 3.5, 0.0), (0.0, r + 3.5), (-(r + 3.5), 0.0)];
             for &(dx, dy) in offsets.iter().take($n) {
                 $s.push_str(&format!(
-                    "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"2.5\" fill=\"#b0a080\" stroke=\"#8b6a40\" stroke-width=\"0.4\"/>",
+                    "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"2.5\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\"/>",
                     cx + dx,
                     cy + dy
                 ));
@@ -289,13 +323,48 @@ pub fn render_kp_zone_svg(
         ($s:expr, $dx:expr, $dy:expr, $dh:expr) => {{
             let (dx, dy, dh) = ($dx as f64, $dy as f64, $dh as f64);
             $s.push_str(&format!(
-                "<line x1=\"{:.1}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"#556677\" stroke-width=\"0.75\"/>",
+                "<line x1=\"{:.1}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.75\"/>",
                 dx, dy, dx, dy + dh
             ));
             $s.push_str(&format!(
-                "<path d=\"M{:.1},{:.1} A{:.1},{:.1} 0 0,1 {:.1},{:.1}\" stroke=\"#556677\" stroke-width=\"0.75\" fill=\"none\" stroke-dasharray=\"2,1.5\"/>",
+                "<path d=\"M{:.1},{:.1} A{:.1},{:.1} 0 0,1 {:.1},{:.1}\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.75\" fill=\"none\" stroke-dasharray=\"2,1.5\"/>",
                 dx, dy, dh, dh, dx + dh * 0.87, dy + dh * 0.5
             ));
+        }};
+    }
+
+    // Plan <-> parts-list hover linkage (item 7b, 2026-07-09): every discrete
+    // furniture instance drawn below that plausibly corresponds to one
+    // "PARTS LIST" row is wrapped in `<g class="bim-plan-obj"
+    // data-plan-obj="{obj_idx}">`, with obj_idx incrementing once per item in
+    // the same draw order every time. render/catalog.rs's bill_html tags
+    // parts-list rows with the same ordinal (0, 1, 2, ...), capped to
+    // whichever list — SVG groups or bill rows — is shorter for that
+    // composition, and bim.js highlights both ends of a match on hover.
+    // This is a stable ORDINAL pairing, not a semantic per-SKU match: the
+    // plan is a procedurally-drawn category template (this function has no
+    // knowledge of which specific catalog Object a given desk/table symbol
+    // represents), not a literal trace of each linked Object's real
+    // footprint — only PO-1 carries a real per-item `furniture_refs` bill
+    // at all (see catalog.rs's module doc). Singular one-off fixtures
+    // (a single credenza, reception desk, or service riser per plan) are
+    // deliberately left unwrapped — a stated scope cut; the repeating
+    // desk/workstation/chair/bench/office groups that dominate each
+    // category template, and are the ones most analogous to real parts-list
+    // rows, are the ones wired up.
+    let mut obj_idx: usize = 0;
+    macro_rules! obj_open {
+        ($s:expr) => {
+            $s.push_str(&format!(
+                "<g class=\"bim-plan-obj\" data-plan-obj=\"{}\">",
+                obj_idx
+            ));
+        };
+    }
+    macro_rules! obj_close {
+        ($s:expr) => {{
+            $s.push_str("</g>");
+            obj_idx += 1;
         }};
     }
 
@@ -304,31 +373,41 @@ pub fn render_kp_zone_svg(
         "private-office" => {
             let desk_n = size_tier as usize + 1;
             for i in 0..desk_n {
+                obj_open!(s);
                 desk!(s, x0 + 3.0 + 19.0 * i as f64, y0 + 3.0);
+                obj_close!(s);
             }
             if h1 >= 25.0 {
                 let tbl_r = (h1 * 0.18).clamp(7.0, 10.0);
                 let tbl_x = (x0 + plan_w * 0.58).min(xr - tbl_r - 12.0);
+                obj_open!(s);
                 round_table!(s, tbl_x, y0 + h1 * 0.72, tbl_r, 3);
+                obj_close!(s);
             }
             let cred_x = (xr - 17.0).max(x0 + 3.0 + 19.0 * desk_n as f64 + 3.0);
+            obj_open!(s);
             s.push_str(&format!(
-                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"14\" height=\"5\" fill=\"#c8b48a\" stroke=\"#8b6a40\" stroke-width=\"0.4\" rx=\"0.3\"/>",
+                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"14\" height=\"5\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\" rx=\"0.3\"/>",
                 cred_x, y0 + 3.0
             ));
+            obj_close!(s);
             if h2 >= 10.0 {
                 let cw = (plan_w * 0.65).min(85.0);
+                obj_open!(s);
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"5\" fill=\"#c8b48a\" stroke=\"#8b6a40\" stroke-width=\"0.5\" rx=\"0.3\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"5\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\" rx=\"0.3\"/>",
                     x0 + 3.0, y1 + 3.0, cw
                 ));
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"9\" height=\"9\" fill=\"#b8c8d8\" stroke=\"#5a7898\" stroke-width=\"0.4\" rx=\"0.3\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"9\" height=\"9\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\" rx=\"0.3\"/>",
                     (x0 + cw + 5.0).min(xr - 12.0), y1 + 2.0
                 ));
+                obj_close!(s);
             }
             if h3 >= 10.0 {
+                obj_open!(s);
                 door!(s, x0 + 4.0, y2, (h3 * 0.85).min(13.0));
+                obj_close!(s);
             }
         }
 
@@ -342,14 +421,16 @@ pub fn render_kp_zone_svg(
             };
             for i in 0..doc_n {
                 let ox = x0 + 1.0 + 21.0 * i as f64;
+                obj_open!(s);
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"19\" height=\"{:.1}\" fill=\"#e8e0d0\" stroke=\"{}\" stroke-width=\"0.6\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"19\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"{}\" stroke-width=\"0.6\"/>",
                     ox, y0, h1, accent
                 ));
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"10\" height=\"6\" fill=\"#c8b48a\" stroke=\"#8b6a40\" stroke-width=\"0.4\" rx=\"0.3\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"10\" height=\"6\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\" rx=\"0.3\"/>",
                     ox + 2.0, y0 + h1 - 9.0
                 ));
+                obj_close!(s);
             }
             let ch_x0 = x0 + 2.0 + 21.0 * doc_n as f64;
             let ch_area = (xr - 28.0) - ch_x0;
@@ -361,42 +442,44 @@ pub fn render_kp_zone_svg(
                     if cx + 10.0 > xr - 28.0 {
                         break;
                     }
+                    obj_open!(s);
                     s.push_str(&format!(
-                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"10\" height=\"7\" fill=\"#d0e4d0\" stroke=\"#5a8a6a\" stroke-width=\"0.5\" rx=\"1.5\"/>",
+                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"10\" height=\"7\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\" rx=\"1.5\"/>",
                         cx, cy
                     ));
                     s.push_str(&format!(
-                        "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"3.5\" fill=\"#e4f0e4\" stroke=\"#5a8a6a\" stroke-width=\"0.4\"/>",
+                        "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"3.5\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\"/>",
                         cx + 5.0, cy - 4.0
                     ));
+                    obj_close!(s);
                 }
             }
             s.push_str(&format!(
-                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"22\" height=\"7\" fill=\"#c8b48a\" stroke=\"#8b6a40\" stroke-width=\"0.5\" rx=\"0.5\"/>",
+                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"22\" height=\"7\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\" rx=\"0.5\"/>",
                 xr - 26.0, y0 + 4.0
             ));
             if h2 >= 10.0 {
                 let bw = (plan_w * 0.60).min(100.0);
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"6\" fill=\"#c0d8c0\" stroke=\"#5a8a6a\" stroke-width=\"0.5\" rx=\"0.5\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"6\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\" rx=\"0.5\"/>",
                     x0 + 4.0, y1 + 3.0, bw
                 ));
                 let sects = (bw / 18.0) as usize;
                 for i in 1..sects {
                     let bx = x0 + 4.0 + 18.0 * i as f64;
                     s.push_str(&format!(
-                        "<line x1=\"{:.1}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"#5a8a6a\" stroke-width=\"0.3\"/>",
+                        "<line x1=\"{:.1}\" y1=\"{:.1}\" x2=\"{:.1}\" y2=\"{:.1}\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.3\"/>",
                         bx, y1 + 3.0, bx, y1 + 9.0
                     ));
                 }
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"11\" height=\"11\" fill=\"#c8d8e0\" stroke=\"#5a7898\" stroke-width=\"0.5\" rx=\"1\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"11\" height=\"11\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\" rx=\"1\"/>",
                     xr - 15.0, y1 + 2.0
                 ));
             }
             if h3 >= 8.0 {
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"16\" height=\"{:.1}\" fill=\"#e8f0f8\" stroke=\"#7090a8\" stroke-width=\"0.5\" rx=\"0.5\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"16\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\" rx=\"0.5\"/>",
                     xr - 20.0, y2 + 2.0, (h3 - 4.0).max(5.0)
                 ));
             }
@@ -412,19 +495,21 @@ pub fn render_kp_zone_svg(
             };
             let rec_h = (h1 * 0.55).max(15.0).min(h1);
             s.push_str(&format!(
-                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"16\" height=\"{:.1}\" fill=\"#e8e0d0\" stroke=\"{}\" stroke-width=\"0.5\"/>",
+                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"16\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"{}\" stroke-width=\"0.5\"/>",
                 x0 + 1.0, y0, rec_h, accent
             ));
             for i in 0..office_n {
                 let ox = x0 + 19.0 + 20.0 * i as f64;
                 let off_h = (h1 * 0.65).min(h1);
+                obj_open!(s);
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"18\" height=\"{:.1}\" fill=\"#e8e0d0\" stroke=\"{}\" stroke-width=\"0.5\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"18\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"{}\" stroke-width=\"0.5\"/>",
                     ox, y0, off_h, accent
                 ));
                 if off_h >= 16.0 {
                     desk!(s, ox + 2.0, y0 + off_h - 13.0);
                 }
+                obj_close!(s);
             }
             let bx0 = x0 + 20.0 + 20.0 * office_n as f64;
             let b_area = xr - 4.0 - bx0;
@@ -435,34 +520,36 @@ pub fn render_kp_zone_svg(
                     if bx + 11.0 > xr - 2.0 {
                         break;
                     }
+                    obj_open!(s);
                     s.push_str(&format!(
-                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"11\" height=\"6\" fill=\"#c0d0c8\" stroke=\"#5a8a6a\" stroke-width=\"0.5\" rx=\"0.3\"/>",
+                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"11\" height=\"6\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\" rx=\"0.3\"/>",
                         bx, y0 + 4.0
                     ));
                     s.push_str(&format!(
-                        "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"2.5\" fill=\"#a0a8b0\" stroke=\"#607080\" stroke-width=\"0.4\"/>",
+                        "<circle cx=\"{:.1}\" cy=\"{:.1}\" r=\"2.5\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\"/>",
                         bx + 5.5, y0 + 14.0
                     ));
+                    obj_close!(s);
                 }
             }
             if h2 >= 10.0 {
                 let sr_w = 30.0f64;
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"#e0e8e0\" stroke=\"{}\" stroke-width=\"0.5\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"{}\" stroke-width=\"0.5\"/>",
                     x0 + 1.0, y1, sr_w, h2 * 0.85, accent
                 ));
                 round_table!(s, x0 + 1.0 + sr_w / 2.0, y1 + h2 * 0.42, 6.0, 4);
                 let sb_w = (plan_w - sr_w - 10.0).clamp(0.0, 100.0);
                 if sb_w > 0.0 {
                     s.push_str(&format!(
-                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"6\" fill=\"#c8d8c0\" stroke=\"#5a8a6a\" stroke-width=\"0.4\" rx=\"0.3\"/>",
+                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"6\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\" rx=\"0.3\"/>",
                         x0 + sr_w + 5.0, y1 + 3.0, sb_w
                     ));
                 }
             }
             if h3 >= 8.0 {
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"32\" height=\"5\" fill=\"#d0e0d8\" stroke=\"#5a8a6a\" stroke-width=\"0.5\" rx=\"0.3\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"32\" height=\"5\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\" rx=\"0.3\"/>",
                     x0 + 4.0, y2 + 2.0
                 ));
             }
@@ -490,7 +577,7 @@ pub fn render_kp_zone_svg(
             let per_col = office_n.div_ceil(col_n);
             let oh = ((h1 - 6.0) / per_col as f64).min(13.0);
             s.push_str(&format!(
-                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"3\" fill=\"#c8b48a\" stroke=\"#8b6a40\" stroke-width=\"0.3\" rx=\"0.3\"/>",
+                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"3\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.3\" rx=\"0.3\"/>",
                 x0 + 1.0, y0, 16.0 * col_n as f64 + 2.0 * (col_n - 1) as f64
             ));
             for i in 0..per_col {
@@ -498,10 +585,12 @@ pub fn render_kp_zone_svg(
                 if oy + oh > y0 + h1 - 1.0 {
                     break;
                 }
+                obj_open!(s);
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"16\" height=\"{:.1}\" fill=\"#e8e0d0\" stroke=\"{}\" stroke-width=\"0.5\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"16\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"{}\" stroke-width=\"0.5\"/>",
                     x0 + 1.0, oy, oh - 0.5, accent
                 ));
+                obj_close!(s);
             }
             if col_n == 2 {
                 for i in 0..(office_n - per_col) {
@@ -509,10 +598,12 @@ pub fn render_kp_zone_svg(
                     if oy + oh > y0 + h1 - 1.0 {
                         break;
                     }
+                    obj_open!(s);
                     s.push_str(&format!(
-                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"16\" height=\"{:.1}\" fill=\"#e8e0d0\" stroke=\"{}\" stroke-width=\"0.5\"/>",
+                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"16\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"{}\" stroke-width=\"0.5\"/>",
                         x0 + 19.0, oy, oh - 0.5, accent
                     ));
+                    obj_close!(s);
                 }
             }
             let ws_x0 = x0 + 2.0 + 18.0 * col_n as f64;
@@ -528,10 +619,12 @@ pub fn render_kp_zone_svg(
                     if wx + ww > xr - 2.0 {
                         break;
                     }
+                    obj_open!(s);
                     s.push_str(&format!(
-                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"#d0c8e0\" stroke=\"#7060a0\" stroke-width=\"0.4\" rx=\"0.3\"/>",
+                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\" rx=\"0.3\"/>",
                         wx, wy, ww, wh
                     ));
+                    obj_close!(s);
                 }
             }
             if h2 >= 12.0 {
@@ -544,30 +637,30 @@ pub fn render_kp_zone_svg(
                     }
                     let cy_t = y1 + (h2 - ch) / 2.0;
                     s.push_str(&format!(
-                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"#d4c8a0\" stroke=\"#8b7a40\" stroke-width=\"0.5\" rx=\"1\"/>",
+                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\" rx=\"1\"/>",
                         cx_t, cy_t, cw, ch
                     ));
                     let cc = ((cw / 10.0) as usize).max(2);
                     for j in 0..cc {
                         let chair_x = cx_t + (cw / cc as f64) * (j as f64 + 0.5) - 3.0;
                         s.push_str(&format!(
-                            "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"6\" height=\"3.5\" fill=\"#b0a880\" stroke=\"#8b7a40\" stroke-width=\"0.3\" rx=\"0.5\"/>",
+                            "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"6\" height=\"3.5\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.3\" rx=\"0.5\"/>",
                             chair_x, cy_t - 4.5
                         ));
                         s.push_str(&format!(
-                            "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"6\" height=\"3.5\" fill=\"#b0a880\" stroke=\"#8b7a40\" stroke-width=\"0.3\" rx=\"0.5\"/>",
+                            "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"6\" height=\"3.5\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.3\" rx=\"0.5\"/>",
                             chair_x, cy_t + ch + 1.0
                         ));
                     }
                 }
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"22\" height=\"{:.1}\" fill=\"#e0e8e0\" stroke=\"{}\" stroke-width=\"0.4\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"22\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"{}\" stroke-width=\"0.4\"/>",
                     xr - 24.0, y1, h2 * 0.75, accent
                 ));
             }
             if h3 >= 8.0 {
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"16\" height=\"{:.1}\" fill=\"#e8f0f8\" stroke=\"#7090a8\" stroke-width=\"0.5\" rx=\"0.3\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"16\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\" rx=\"0.3\"/>",
                     xr - 20.0, y2 + 1.0, (h3 - 3.0).max(4.0)
                 ));
             }
@@ -579,35 +672,45 @@ pub fn render_kp_zone_svg(
                 0 => {
                     for row in 0..4usize {
                         for col in 0..2usize {
+                            obj_open!(s);
                             s.push_str(&format!(
-                                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"10\" height=\"7\" fill=\"#d0c8e0\" stroke=\"#7060a0\" stroke-width=\"0.4\" rx=\"0.3\"/>",
+                                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"10\" height=\"7\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\" rx=\"0.3\"/>",
                                 x0 + 3.0 + col as f64 * 12.0, y0 + 5.0 + row as f64 * 12.0
                             ));
+                            obj_close!(s);
                         }
                     }
                     let ctw = 42.0f64;
                     let cth = (h1 * 0.45).clamp(14.0, 22.0);
                     let cty = y0 + (h1 - cth) / 2.0;
                     s.push_str(&format!(
-                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"#d4c8a0\" stroke=\"#8b7a40\" stroke-width=\"0.5\" rx=\"1\"/>",
+                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\" rx=\"1\"/>",
                         x0 + 29.0, cty, ctw, cth
                     ));
+                    obj_open!(s);
                     round_table!(s, x0 + 86.0, y0 + h1 * 0.28, 8.0, 4);
+                    obj_close!(s);
+                    obj_open!(s);
                     round_table!(s, x0 + 86.0, y0 + h1 * 0.72, 8.0, 4);
+                    obj_close!(s);
                 }
                 1 => {
                     for row in 0..4usize {
                         for col in 0..2usize {
+                            obj_open!(s);
                             s.push_str(&format!(
-                                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"10\" height=\"7\" fill=\"#d0c8e0\" stroke=\"#7060a0\" stroke-width=\"0.4\" rx=\"0.3\"/>",
+                                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"10\" height=\"7\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\" rx=\"0.3\"/>",
                                 x0 + 3.0 + col as f64 * 12.0, y0 + 5.0 + row as f64 * 12.0
                             ));
+                            obj_close!(s);
                             let rx2 = xr - 25.0 + col as f64 * 12.0;
                             if rx2 + 10.0 < xr - 2.0 {
+                                obj_open!(s);
                                 s.push_str(&format!(
-                                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"10\" height=\"7\" fill=\"#d0c8e0\" stroke=\"#7060a0\" stroke-width=\"0.4\" rx=\"0.3\"/>",
+                                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"10\" height=\"7\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\" rx=\"0.3\"/>",
                                     rx2, y0 + 5.0 + row as f64 * 12.0
                                 ));
+                                obj_close!(s);
                             }
                         }
                     }
@@ -615,42 +718,58 @@ pub fn render_kp_zone_svg(
                     let cth = (h1 * 0.50).clamp(18.0, 26.0);
                     let cty = y0 + (h1 - cth) / 2.0;
                     s.push_str(&format!(
-                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"#d4c8a0\" stroke=\"#8b7a40\" stroke-width=\"0.5\" rx=\"{:.1}\"/>",
+                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\" rx=\"{:.1}\"/>",
                         x0 + 29.0, cty, ctw, cth, cth / 2.0
                     ));
+                    obj_open!(s);
                     round_table!(s, x0 + 104.0, y0 + h1 * 0.5, 8.0, 4);
+                    obj_close!(s);
                 }
                 _ => {
                     let t_rows = ((h1 - 8.0) / 8.0) as usize;
                     for row in 0..t_rows.min(6) {
                         for col in 0..5usize {
+                            obj_open!(s);
                             s.push_str(&format!(
-                                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"7\" height=\"5\" fill=\"#b8c8d8\" stroke=\"#5a7898\" stroke-width=\"0.3\" rx=\"0.5\"/>",
+                                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"7\" height=\"5\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.3\" rx=\"0.5\"/>",
                                 x0 + 3.0 + col as f64 * 9.0, y0 + 5.0 + row as f64 * 8.0
                             ));
+                            obj_close!(s);
                         }
                     }
                     for row in 0..4usize {
                         for col in 0..2usize {
+                            obj_open!(s);
                             s.push_str(&format!(
-                                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"10\" height=\"7\" fill=\"#d0c8e0\" stroke=\"#7060a0\" stroke-width=\"0.4\" rx=\"0.3\"/>",
+                                "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"10\" height=\"7\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\" rx=\"0.3\"/>",
                                 x0 + 52.0 + col as f64 * 12.0, y0 + 5.0 + row as f64 * 12.0
                             ));
+                            obj_close!(s);
                         }
                     }
+                    obj_open!(s);
                     round_table!(s, x0 + 98.0, y0 + h1 * 0.28, 9.0, 4);
+                    obj_close!(s);
+                    obj_open!(s);
                     round_table!(s, x0 + 98.0, y0 + h1 * 0.72, 9.0, 4);
+                    obj_close!(s);
+                    obj_open!(s);
                     round_table!(s, x0 + 128.0, y0 + h1 * 0.5, 9.0, 4);
+                    obj_close!(s);
                 }
             }
             if h2 >= 12.0 {
+                obj_open!(s);
                 desk!(s, x0 + 4.0, y1 + 3.0);
+                obj_close!(s);
                 if size_tier >= 1 {
+                    obj_open!(s);
                     desk!(s, x0 + 24.0, y1 + 3.0);
+                    obj_close!(s);
                 }
                 let sw = (plan_w * 0.32).min(48.0);
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"5\" fill=\"#c8d8b8\" stroke=\"#5a7050\" stroke-width=\"0.4\" rx=\"0.3\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"5\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\" rx=\"0.3\"/>",
                     xr - sw - 4.0, y1 + 4.0, sw
                 ));
             }
@@ -675,10 +794,12 @@ pub fn render_kp_zone_svg(
                 if oy + oh > y0 + h1 - 1.0 {
                     break;
                 }
+                obj_open!(s);
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"13\" height=\"{:.1}\" fill=\"#e8e0d0\" stroke=\"{}\" stroke-width=\"0.4\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"13\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"{}\" stroke-width=\"0.4\"/>",
                     x0 + 1.0, oy, oh - 0.5, accent
                 ));
+                obj_close!(s);
             }
             if ocols == 2 {
                 for i in 0..(office_n - oper_col) {
@@ -686,10 +807,12 @@ pub fn render_kp_zone_svg(
                     if oy + oh > y0 + h1 - 1.0 {
                         break;
                     }
+                    obj_open!(s);
                     s.push_str(&format!(
-                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"13\" height=\"{:.1}\" fill=\"#e8e0d0\" stroke=\"{}\" stroke-width=\"0.4\"/>",
+                        "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"13\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"{}\" stroke-width=\"0.4\"/>",
                         x0 + 16.0, oy, oh - 0.5, accent
                     ));
+                    obj_close!(s);
                 }
             }
             let court_w = if size_tier == 2 { 36.0f64 } else { 0.0 };
@@ -699,21 +822,23 @@ pub fn render_kp_zone_svg(
                 if cx < x0 + 34.0 {
                     continue;
                 }
+                obj_open!(s);
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"28\" height=\"{:.1}\" fill=\"#e8e0d0\" stroke=\"{}\" stroke-width=\"0.5\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"28\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"{}\" stroke-width=\"0.5\"/>",
                     cx, y0 + 1.0, h1 - 2.0, accent
                 ));
                 let cth = ((h1 - 2.0) * 0.48).min(12.0);
                 let cty = y0 + 1.0 + ((h1 - 2.0) - cth) / 2.0;
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"18\" height=\"{:.1}\" fill=\"#d4c8a0\" stroke=\"#8b7a40\" stroke-width=\"0.4\" rx=\"0.5\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"18\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\" rx=\"0.5\"/>",
                     cx + 4.0, cty, cth
                 ));
+                obj_close!(s);
             }
             if size_tier == 2 {
                 let crx = xr - 34.0;
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"30\" height=\"{:.1}\" fill=\"#f0e8d8\" stroke=\"{}\" stroke-width=\"0.6\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"30\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"{}\" stroke-width=\"0.6\"/>",
                     crx, y0 + 1.0, h1 - 2.0, accent
                 ));
                 let cr_rows = ((h1 - 8.0) / 7.0) as usize;
@@ -724,7 +849,7 @@ pub fn render_kp_zone_svg(
                             break;
                         }
                         s.push_str(&format!(
-                            "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"7\" height=\"4\" fill=\"#b8c8d8\" stroke=\"#5a7898\" stroke-width=\"0.3\" rx=\"0.3\"/>",
+                            "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"7\" height=\"4\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.3\" rx=\"0.3\"/>",
                             crx + 2.0 + col as f64 * 9.0, sy
                         ));
                     }
@@ -734,26 +859,28 @@ pub fn render_kp_zone_svg(
             let rec_end = conf_zone_x - 2.0;
             if rec_end - rec_start >= 8.0 {
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"4\" fill=\"#c8b48a\" stroke=\"#8b6a40\" stroke-width=\"0.4\" rx=\"0.3\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"4\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.4\" rx=\"0.3\"/>",
                     rec_start, y0 + 2.0, (rec_end - rec_start).min(28.0)
                 ));
             }
             if h2 >= 12.0 {
                 let sr_w = (plan_w * 0.38).min(58.0);
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"#e0e8e0\" stroke=\"{}\" stroke-width=\"0.5\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"{:.1}\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"{}\" stroke-width=\"0.5\"/>",
                     x0 + 1.0, y1, sr_w, h2 * 0.82, accent
                 ));
                 round_table!(s, x0 + 1.0 + sr_w / 2.0, y1 + h2 * 0.40, 8.0, 4);
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"16\" height=\"{:.1}\" fill=\"#e8f0f8\" stroke=\"#7090a8\" stroke-width=\"0.5\" rx=\"0.3\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"16\" height=\"{:.1}\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\" rx=\"0.3\"/>",
                     xr - 20.0, y1 + 1.0, (h2 * 0.65).min(h2 - 2.0)
                 ));
             }
             if h3 >= 8.0 {
+                obj_open!(s);
                 door!(s, x0 + 4.0, y2, (h3 * 0.80).min(14.0));
+                obj_close!(s);
                 s.push_str(&format!(
-                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"32\" height=\"4\" fill=\"#c8b48a\" stroke=\"#8b6a40\" stroke-width=\"0.3\" rx=\"0.3\"/>",
+                    "<rect x=\"{:.1}\" y=\"{:.1}\" width=\"32\" height=\"4\" fill=\"var(--bim-accent-subtle)\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.3\" rx=\"0.3\"/>",
                     x0 + 22.0, y2 + 2.0
                 ));
             }
@@ -763,10 +890,45 @@ pub fn render_kp_zone_svg(
     }
 
     s.push_str(&format!(
-        "<text x=\"108\" y=\"110\" font-size=\"5.5\" fill=\"{}\" font-family=\"sans-serif\" text-anchor=\"middle\" letter-spacing=\"1.2\">CORE</text>",
-        accent
+        "<text x=\"{:.1}\" y=\"110\" font-size=\"5.5\" fill=\"{}\" class=\"bim-plan-mono\" text-anchor=\"middle\" letter-spacing=\"1.2\">CORE</text>",
+        plan_center_x, accent
     ));
 
+    s.push_str("</svg>");
+    s
+}
+
+/// Deliberate "not modeled" drawing-set note for floor-scale Compositions
+/// (`has_zone_data == false` — no three-zone cross-section on record) — a
+/// small-scale floor outline with a hatched core inside a dashed frame,
+/// labeled plainly, so an empty plan reads as an intentional drawing-set
+/// convention rather than a broken/blank card. See
+/// BRIEF-bim-v3-hyperscaler-redesign.md `composition_detail_treatment`.
+pub fn render_floor_scale_svg() -> String {
+    let mut s = String::with_capacity(900);
+    s.push_str("<svg class=\"bim-kp-diagram bim-kp-diagram--floorscale\" viewBox=\"0 0 180 112\" width=\"360\" height=\"224\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Floor-scale entry — zone layout not modeled\">");
+    s.push_str("<rect width=\"180\" height=\"112\" fill=\"var(--bim-bg-surface)\"/>");
+    s.push_str("<rect x=\"16\" y=\"14\" width=\"148\" height=\"78\" fill=\"none\" stroke=\"var(--bim-accent-active)\" stroke-width=\"1\" stroke-dasharray=\"4,3\"/>");
+    // Hatched core, centered.
+    let (cx0, cy0, cw, ch): (f64, f64, f64, f64) = (74.0, 40.0, 32.0, 26.0);
+    s.push_str(&format!(
+        "<rect x=\"{cx0}\" y=\"{cy0}\" width=\"{cw}\" height=\"{ch}\" fill=\"none\" stroke=\"var(--bim-accent)\" stroke-width=\"0.9\"/>"
+    ));
+    let mut hx: f64 = cx0 - ch;
+    while hx < cx0 + cw {
+        let x1 = hx.max(cx0);
+        let x2 = (hx + ch).min(cx0 + cw);
+        if x2 > x1 {
+            s.push_str(&format!(
+                "<line x1=\"{x1:.1}\" y1=\"{y1:.1}\" x2=\"{x2:.1}\" y2=\"{y2:.1}\" stroke=\"var(--bim-accent-active)\" stroke-width=\"0.5\"/>",
+                y1 = cy0 + (x1 - hx),
+                y2 = cy0 + (x2 - hx),
+            ));
+        }
+        hx += 6.0;
+    }
+    s.push_str("<text x=\"90\" y=\"9\" font-size=\"5\" fill=\"var(--bim-fg-caption)\" class=\"bim-plan-mono\" text-anchor=\"middle\" letter-spacing=\"1.1\">FLOOR-SCALE — ZONE LAYOUT NOT MODELED</text>");
+    s.push_str("<text x=\"90\" y=\"104\" font-size=\"4.5\" fill=\"var(--bim-fg-caption)\" class=\"bim-plan-mono\" text-anchor=\"middle\">CORE (illustrative)</text>");
     s.push_str("</svg>");
     s
 }

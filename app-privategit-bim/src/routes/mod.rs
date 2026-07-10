@@ -3,11 +3,13 @@
 
 pub mod about;
 pub mod api;
+pub mod compositions;
 pub mod disclaimers;
 pub mod editor;
 pub mod furniture;
 pub mod home;
 pub mod key_plans;
+pub mod objects;
 pub mod research;
 pub mod search;
 pub mod tokens;

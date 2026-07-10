@@ -16,6 +16,7 @@ pub struct AppState {
     pub components_count: usize,
     pub research_count: usize,
     pub categories: Arc<Vec<CategoryMeta>>,
+    pub home_page: Arc<PageContent>,
     pub about_page: Arc<PageContent>,
     pub disclaimers_page: Arc<PageContent>,
     /// Counsel-owned "Important Information" band content — a short,
@@ -35,6 +36,8 @@ impl AppState {
 
         let site_content_dir = config.library_dir.join("site-content");
         let categories = content::load_categories(&tokens, &site_content_dir);
+        let home_page = content::load_page(&site_content_dir, "home")
+            .ok_or("site-content/pages/home.md not found")?;
         let about_page = content::load_page(&site_content_dir, "about")
             .ok_or("site-content/pages/about.md not found")?;
         let disclaimers_page = content::load_page(&site_content_dir, "disclaimers")
@@ -51,6 +54,7 @@ impl AppState {
             components_count,
             research_count,
             categories: Arc::new(categories),
+            home_page: Arc::new(home_page),
             about_page: Arc::new(about_page),
             disclaimers_page: Arc::new(disclaimers_page),
             important_information,

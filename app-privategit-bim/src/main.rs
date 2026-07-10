@@ -23,11 +23,31 @@ fn build_app(app_state: state::AppState, static_dir: PathBuf) -> Router {
     Router::new()
         // Full-page routes
         .route("/", get(routes::home::home_handler))
-        .route("/about", get(routes::about::about_handler))
+        // "The Plan Room" (2026-07-09 v3 redesign) — Objects/Compositions are
+        // real server-rendered routes, not client-only modal state. Search
+        // and facet filters are GET query params (?q=, ?uni=, ?mfr=, ?use=,
+        // ?layout=), so Back/reload/link-sharing all work by construction.
+        .route("/objects", get(routes::objects::objects_index_handler))
+        // Registered ahead of the `/objects/{slug}` wildcard for clarity —
+        // axum/matchit already disambiguates a literal static segment over a
+        // param segment at the same position regardless of registration
+        // order, but this reads correctly either way.
+        .route("/objects/compare", get(routes::objects::objects_compare_handler))
+        .route("/objects/{slug}", get(routes::objects::object_detail_handler))
         .route(
-            "/disclaimers",
-            get(routes::disclaimers::disclaimers_handler),
+            "/compositions",
+            get(routes::compositions::compositions_index_handler),
         )
+        .route(
+            "/compositions/{slug}",
+            get(routes::compositions::composition_detail_handler),
+        )
+        .route(
+            "/compositions/{slug}/o/{object}",
+            get(routes::compositions::composition_object_handler),
+        )
+        .route("/discipline", get(routes::about::about_handler))
+        .route("/disclaimers", get(routes::disclaimers::disclaimers_handler))
         .route("/tokens", get(routes::tokens::tokens_index_handler))
         .route(
             "/tokens/{name}",
@@ -78,7 +98,21 @@ fn build_app(app_state: state::AppState, static_dir: PathBuf) -> Router {
         .route("/mcp", post(mcp::mcp_handler))
         // Static assets
         .nest_service("/static", ServeDir::new(static_dir))
+        // Branded 404 — full site chrome, search, section links. Replaces
+        // Chrome's raw error screen (2026-07 audit's "/research
+        // undiscoverability and bare 404" finding).
+        .fallback(not_found_handler)
         .with_state(app_state)
+}
+
+async fn not_found_handler(
+    axum::extract::State(state): axum::extract::State<state::AppState>,
+) -> (axum::http::StatusCode, axum::response::Html<String>) {
+    let content = render::catalog::render_not_found();
+    (
+        axum::http::StatusCode::NOT_FOUND,
+        axum::response::Html(render::shell::page_shell("Not found", "", &content, &state)),
+    )
 }
 
 #[tokio::main]
@@ -150,7 +184,12 @@ mod route_tests {
     }
 
     #[tokio::test]
-    async fn home_ssr_has_both_tabs_with_real_data() {
+    async fn home_ssr_renders_registry_front_door() {
+        // Replaces the pre-"Plan Room" home_ssr_has_both_tabs_with_real_data test, which
+        // asserted the old tabbed-panel home layout (id="bim-panel-objects"/"bim-panel-compositions"
+        // with embedded item listings). The v3 redesign (2026-07-09) replaced that with a compact
+        // front door linking out to /objects and /compositions — those routes have their own
+        // coverage; this test only needs to confirm the home page itself renders correctly.
         let app = test_app().await;
         let resp = app
             .oneshot(Request::get("/").body(Body::empty()).unwrap())
@@ -158,19 +197,10 @@ mod route_tests {
             .unwrap();
         assert_eq!(resp.status(), StatusCode::OK);
         let html = body_string(resp).await;
-        // Both panels present in the initial HTML (SSR-first).
-        assert!(html.contains(r#"id="bim-panel-objects""#));
-        assert!(html.contains(r#"id="bim-panel-compositions""#));
-        // Real Objects-tab data.
-        assert!(html.contains("Leap V2"));
-        assert!(html.contains("Migration SE"));
-        assert!(html.contains(r#"data-kind="object""#));
-        // Real Compositions-tab data.
-        assert!(html.contains("Private Office — Small"));
-        assert!(html.contains("Medical — Dentist"));
-        assert!(html.contains(r#"data-kind="composition""#));
-        // Reused zone SVG generator renders on comp cards.
-        assert!(html.contains("bim-kp-diagram"));
+        assert!(html.contains("Objects"));
+        assert!(html.contains("Compositions"));
+        assert!(html.contains("/objects"));
+        assert!(html.contains("/compositions"));
     }
 
     #[tokio::test]
@@ -327,7 +357,7 @@ mod route_tests {
         let (state, app) = test_state_and_app().await;
 
         for (path, page) in [
-            ("/about", state.about_page.as_ref()),
+            ("/discipline", state.about_page.as_ref()),
             ("/disclaimers", state.disclaimers_page.as_ref()),
         ] {
             let html = get_html(&app, path).await;

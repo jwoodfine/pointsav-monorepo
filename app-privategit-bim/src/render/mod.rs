@@ -4,6 +4,7 @@
 pub mod card;
 pub mod catalog;
 pub mod editor;
+pub mod plan_symbols;
 pub mod search;
 pub mod shell;
 pub mod svg;
