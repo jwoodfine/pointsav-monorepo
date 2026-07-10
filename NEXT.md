@@ -3,7 +3,7 @@
 > Hot open items. ≤200 lines. Backlog at `.agent/next-backlog.md` (not yet created).
 > **Scope: this archive only.** Cross-repo and workspace-level items live at `~/Foundry/NEXT.md`.
 
-Last updated: 2026-07-08
+Last updated: 2026-07-09
 
 ---
 
@@ -25,6 +25,10 @@ Last updated: 2026-07-08
       `project-workplace-20260708-stage-6-pending-20-commits-2-new-structu` — that message was
       never actually written (verified by grep against outbox.md + inbox-archive.md, no match).
       Actually sent 2026-07-08 as `project-workplace-20260709-stage-6-pending-20-commits-2-new-structu`.
+      **2026-07-09 note:** count is now 18, not 20 — cause not investigated this session (no
+      new commits made here since 2026-07-08; possibly an interim Command-side action or a
+      branch-ref reconciliation, see the sub-clone-branch item below). Reconcile before relying
+      on either figure.
 - [ ] **briefs/state versioning gap** — after the "Option A" gitignore change, BRIEFs + NEXT.md +
       session-context.md durability/versioning story is still unverified (NEXT.md and briefs/ are
       tracked; session-context.md is gitignored/untracked) — confirm this is the intended final
@@ -48,6 +52,19 @@ Last updated: 2026-07-08
 
 - [ ] **app-workplace-aibridge Phase 3** — deeper docengine + crdt cross-crate composition layers
 - [ ] **moonshot crates Phase 3** — parser incremental retokenize; crdt undo/redo hardening; bim-engine full STEP grammar
+- [ ] **NEW (2026-07-09) — session-start.md stale sub-clone-branch note** — says the
+      `pointsav-monorepo` sub-clone "tracks main... not a cluster branch," but it is actually on
+      `cluster/project-workplace` (confirmed 2026-07-09, 18 commits ahead of origin/main),
+      consistent with the newer workspace-wide cluster-branch policy. A recent sub-clone commit
+      (`5b95ecb3`) fixed an adjacent copy-paste bug in the same doc but left this line stale.
+      Update to match current policy.
+- [ ] **NEW (2026-07-09) — 2 unactioned inbox reclaim requests from Command:** (1) 3 drafts
+      misrouted to project-editorial's drafts-outbound
+      (`DESIGN-TOKEN-CHANGE-wp-tokens-20260602.draft.md`, `JOURNAL-NOTES-j3-20260602.draft.md`,
+      `JOURNAL-NOTES-j6-20260602.draft.md`); (2) 3 BRIEF files misfiled in project-editorial's
+      briefs dir (`BRIEF-workplace-workbench.md`, `BRIEF-workplace-architecture.md` [superseded],
+      `BRIEF-workplace-roadmap.md` [superseded]). Both need reclaiming/relocating into this
+      archive next substantive session.
 
 ## Completed (2026-07-07 — automode cleanup pass, plan `can-we-make-a-validated-cloud`)
 
