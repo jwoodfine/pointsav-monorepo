@@ -173,6 +173,43 @@ fn dims_summary(dims: &Value) -> String {
     }
 }
 
+/// Round 5 (2026-07-10): groups a flat spec-row array under real IFC
+/// property-set headers where a genuine Pset name applies (currently just
+/// `Pset_ManufacturerTypeInformation`, which real IFC deployments use for
+/// manufacturer/model/SKU-class facts) and a plain, honestly-labelled
+/// group for everything else — never inventing a Pset name for a grouping
+/// IFC itself doesn't define one for. Addresses the "spec tables are flat"
+/// gap flagged in the Round 5 hyperscaler-provider audit: even one grouped
+/// header referencing real IFC property-set naming is enough to read as
+/// IFC-literate to a specifier already looking for that pattern.
+fn spec_rows_grouped(rows: &[Value]) -> String {
+    const MFR_KEYS: &[&str] = &["Manufacturer", "Product line", "Model", "SKU"];
+    const CLASS_KEYS: &[&str] = &["IFC 4.3 entity class", "Uniclass 2015 (Pr)", "Uniclass 2015 — Pr"];
+    let mut out = String::new();
+    let mut last_group: Option<&'static str> = None;
+    for r in rows {
+        let arr = r.as_array().cloned().unwrap_or_default();
+        let k = arr.first().and_then(Value::as_str).unwrap_or("").to_string();
+        let v = arr.get(1).and_then(Value::as_str).unwrap_or("").to_string();
+        let group = if MFR_KEYS.contains(&k.as_str()) {
+            "Pset_ManufacturerTypeInformation"
+        } else if CLASS_KEYS.iter().any(|c| k.starts_with(c)) {
+            "Classification"
+        } else {
+            "Dimensional & physical properties"
+        };
+        if last_group != Some(group) {
+            out.push_str(&format!(
+                r#"<tr class="bim-cat-spectable__grouprow"><th colspan="2">{}</th></tr>"#,
+                esc(group)
+            ));
+            last_group = Some(group);
+        }
+        out.push_str(&format!("<tr><th>{}</th><td>{}</td></tr>", esc(&k), esc(&v)));
+    }
+    out
+}
+
 /// URL-safe slug for a Composition's `internal_code` (e.g. "CO-1/2" →
 /// "co-1-2") — internal codes carry a literal `/` for some categories
 /// (Corporate Office fractional floors), which would otherwise split into
@@ -735,9 +772,29 @@ pub(crate) fn render_composition_card(c: &Value) -> String {
         })
         .unwrap_or(0);
 
+    // Round 5 (2026-07-10): the three honest-pending states below were
+    // previously one generic wording ("Object linking: 0 of 0 — pending"
+    // covered both a genuinely floor-scale entry and a room-program-only
+    // entry alike), which reads as "we haven't gotten to this yet" even
+    // where the state is correct by design. Each now says specifically why,
+    // grounded in a direct check of the underlying token data (not
+    // inferred): Corporate Office has no furniture-level data anywhere,
+    // by design — the tenant designs their own interior against a
+    // floor-scale leasehold fraction. The 14 Medical/Business/Laboratory/
+    // Academic/Civic entries have only a bare room programme (`key_rooms`)
+    // authored, with no furniture layout on record yet. See
+    // BRIEF-bim-v3-hyperscaler-redesign.md for the token-file-level
+    // verification this distinction is based on.
+    let has_room_program = c
+        .get("key_rooms")
+        .and_then(Value::as_array)
+        .map(|a| !a.is_empty())
+        .unwrap_or(false);
     let (thumb, note) = if has_zone {
         let svg = s(c, "svg");
-        let note = if bill_len == 0 {
+        let note = if bill_len == 0 && has_room_program {
+            r#"<span class="bim-cat-card__note">Room programme only — furniture layout not yet authored</span>"#.to_string()
+        } else if bill_len == 0 {
             r#"<span class="bim-cat-card__note">Object linking: 0 of 0 — pending</span>"#.to_string()
         } else if linked_len < bill_len {
             format!(
@@ -756,7 +813,7 @@ pub(crate) fn render_composition_card(c: &Value) -> String {
                 r#"<span class="bim-cat-thumb bim-cat-thumb--comp bim-cat-thumb--floorscale">{}</span>"#,
                 super::svg::render_floor_scale_svg()
             ),
-            r#"<span class="bim-cat-card__note">Floor-scale entry — zone layout not modeled</span>"#.to_string(),
+            r#"<span class="bim-cat-card__note">Leasehold sized as a fraction of the Floor Plate — tenant designs interior layout</span>"#.to_string(),
         )
     };
 
@@ -1182,16 +1239,7 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<String> {
     let spec_rows: String = o
         .get("spec")
         .and_then(Value::as_array)
-        .map(|rows| {
-            rows.iter()
-                .map(|r| {
-                    let arr = r.as_array().cloned().unwrap_or_default();
-                    let k = arr.first().and_then(Value::as_str).unwrap_or("");
-                    let v = arr.get(1).and_then(Value::as_str).unwrap_or("");
-                    format!("<tr><th>{}</th><td>{}</td></tr>", esc(k), esc(v))
-                })
-                .collect::<String>()
-        })
+        .map(|rows| spec_rows_grouped(rows))
         .unwrap_or_default();
 
     let dl = match o.get("ifc_file").and_then(Value::as_str) {
@@ -1247,6 +1295,7 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<String> {
       <div class="bim-chip-row">
         <span class="bim-cat-chip bim-cat-chip--pr"><span class="bim-cat-chip__lv">Pr</span>{uni_pr}</span>
         <span class="bim-cat-chip bim-cat-chip--plain">{ifc_class}</span>
+        <span class="bim-cat-chip bim-cat-chip--machine" title="Real, downloadable machine-readable data — see Download below">IFC 4.3 &middot; DTCG</span>
       </div>
       <h1>{name}</h1>
       <p class="bim-detail-head__prov">{mfr} &middot; verified BIM Object</p>
@@ -1420,16 +1469,7 @@ pub fn render_composition_detail(state: &AppState, slug: &str, highlight_object:
         let spec_rows: String = o
             .get("spec")
             .and_then(Value::as_array)
-            .map(|rows| {
-                rows.iter()
-                    .map(|r| {
-                        let arr = r.as_array().cloned().unwrap_or_default();
-                        let k = arr.first().and_then(Value::as_str).unwrap_or("");
-                        let v = arr.get(1).and_then(Value::as_str).unwrap_or("");
-                        format!("<tr><th>{}</th><td>{}</td></tr>", esc(k), esc(v))
-                    })
-                    .collect::<String>()
-            })
+            .map(|rows| spec_rows_grouped(rows))
             .unwrap_or_default();
         let dl = match o.get("ifc_file").and_then(Value::as_str) {
             Some(f) => format!(r#"<a class="bim-cat-btn" href="/furniture/download/{}">Download IFC (.ifc)</a>"#, esc(f)),
@@ -1441,6 +1481,7 @@ pub fn render_composition_detail(state: &AppState, slug: &str, highlight_object:
     <div class="bim-chip-row">
       <span class="bim-cat-chip bim-cat-chip--pr"><span class="bim-cat-chip__lv">Pr</span>{uni_pr}</span>
       <span class="bim-cat-chip bim-cat-chip--plain">{ifc_class}</span>
+      <span class="bim-cat-chip bim-cat-chip--machine">IFC 4.3 &middot; DTCG</span>
     </div>
     <h2 class="bim-inspector__title">{o_name}</h2>
     <p class="bim-detail-head__prov">{manufacturer} &middot; verified BIM Object</p>
@@ -1468,16 +1509,7 @@ pub fn render_composition_detail(state: &AppState, slug: &str, highlight_object:
         let spec_rows: String = c
             .get("spec")
             .and_then(Value::as_array)
-            .map(|rows| {
-                rows.iter()
-                    .map(|r| {
-                        let arr = r.as_array().cloned().unwrap_or_default();
-                        let k = arr.first().and_then(Value::as_str).unwrap_or("");
-                        let v = arr.get(1).and_then(Value::as_str).unwrap_or("");
-                        format!("<tr><th>{}</th><td>{}</td></tr>", esc(k), esc(v))
-                    })
-                    .collect::<String>()
-            })
+            .map(|rows| spec_rows_grouped(rows))
             .unwrap_or_default();
         format!(
             r#"{breadcrumb}
@@ -1544,7 +1576,7 @@ pub fn render_not_found() -> String {
     <a href="/objects">Objects</a>
     <a href="/compositions">Compositions</a>
     <a href="/research">Research</a>
-    <a href="/discipline">Discipline</a>
+    <a href="/method">Method</a>
   </nav>
 </div>"#
         .to_string()

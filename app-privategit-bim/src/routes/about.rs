@@ -15,21 +15,23 @@ pub async fn about_handler(State(state): State<AppState>) -> Html<String> {
         ));
     }
 
-    // Renamed from "About BIM Objects" to the bare noun "Discipline"
-    // (2026-07-09 operator decision — matches the grammatical pattern of
-    // the other primary nav items: Objects, Compositions, Research; no
-    // article, not "The Discipline"). Page content below is unchanged from
-    // before the rename — only the kicker/h1/title change, per scope. The
-    // kicker keeps the "The <phrase>" lead-in pattern the Objects/
-    // Compositions pages use ("The parts" / "The assemblies") ahead of
-    // their own bare-noun h1.
+    // Renamed from "Discipline" to the bare noun "Method" (Round 5,
+    // 2026-07-10 — Discipline collided with the established BIM-coordination
+    // meaning of "discipline models"/discipline-based clash detection, which
+    // is confusing for exactly the AEC-literate audience this site targets;
+    // "Method" carries no competing meaning and matches the site's own live
+    // kicker pattern — "The parts" / "The assemblies" / "The method" — as a
+    // single plain noun like Objects/Compositions/Research). Page content
+    // itself was also rewritten this round to correct a real ontology error
+    // (see woodfine-bim-library/site-content/pages/about.md) — this route
+    // handler's structure is otherwise unchanged.
     let content = format!(
         r#"<div class="bim-breadcrumbs">
   <a href="/" data-path="/" class="bim-nav-link">Home</a>
 </div>
 <header class="bim-cat-pagehead">
-  <span class="bim-cat-kicker">The discipline</span>
-  <h1>Discipline</h1>
+  <span class="bim-cat-kicker">The method</span>
+  <h1>Method</h1>
 </header>
 <article class="bim-article">
   {sections}
@@ -37,8 +39,8 @@ pub async fn about_handler(State(state): State<AppState>) -> Html<String> {
     );
 
     Html(render::shell::page_shell(
-        "Discipline",
-        "/discipline",
+        "Method",
+        "/method",
         &content,
         &state,
     ))
