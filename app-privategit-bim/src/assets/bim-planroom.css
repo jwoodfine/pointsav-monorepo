@@ -1,0 +1,996 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ * SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
+ */
+
+/* bim-planroom.css — "The Plan Room" (2026-07-09 v3 redesign).
+   New page structures introduced this pass: masthead nav, the compact home
+   front door, /objects + /compositions catalog pages (chips, section
+   headers), the plan-anchored composition inspector, plan-symbol object
+   cards, and the branded 404. Loads after tokens.css/bim-layout.css/
+   bim-components.css and only ADDS classes or narrowly overrides selectors
+   those files also define (masthead, footer machine-links) — it does not
+   restyle /edit/*, /tokens/*, or /research, which are out of this pass's
+   scope. See BRIEF-bim-v3-hyperscaler-redesign.md. */
+
+/* ============================================================================
+   MASTHEAD NAV — persistent Objects / Compositions / Research + search
+   ============================================================================ */
+.bim-header {
+  height: var(--bim-header-height, 56px);
+}
+.bim-header__inner {
+  gap: 1.25rem;
+}
+.bim-header__brand {
+  font-family: var(--bim-font-display);
+  font-weight: 700;
+  font-size: 1.0625rem;
+  color: var(--bim-fg, #111827);
+  letter-spacing: -0.01em;
+}
+.bim-header__brand-sub {
+  font-weight: 400;
+  color: var(--bim-accent, #164679);
+  margin-left: 0.35em;
+}
+.bim-header__nav {
+  display: flex;
+  align-items: center;
+  gap: 1.125rem;
+  /* Was `flex: 1 1 auto` — grew the nav's own box to fill all remaining
+     header width while its links stayed left-anchored inside it, which is
+     what created the dead-middle gap fixed in bim-layout.css's
+     .bim-header__inner (2026-07-09). The nav now takes only the width its
+     links need, so it sits directly next to the brand instead of stretching
+     toward the search box. */
+  flex: 0 0 auto;
+  margin-left: 1.75rem;
+}
+.bim-header__nav a {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--bim-fg-secondary, #54595D);
+  text-decoration: none;
+  padding: 0.375rem 0.1875rem;
+  margin: 0 -0.1875rem;
+  border-bottom: 2px solid transparent;
+}
+.bim-header__nav a:hover { color: var(--bim-accent, #164679); }
+.bim-header__nav a[aria-current="page"] {
+  color: var(--bim-accent, #164679);
+  border-bottom-color: var(--bim-accent, #164679);
+  font-weight: 600;
+}
+.bim-header__search {
+  flex: 0 1 220px;
+  min-width: 0;
+}
+.bim-header__search input {
+  width: 100%;
+  border: 1px solid var(--bim-border-strong, #C8CCD1);
+  border-radius: var(--bim-radius-control, 6px);
+  background: var(--bim-bg-page, #F7F9FA);
+  color: var(--bim-fg, #111827);
+  font-size: 0.8125rem;
+  padding: 0.4375rem 0.6875rem;
+  font-family: inherit;
+}
+.bim-header__search input:focus {
+  outline: 2px solid var(--bim-accent-hover, #1D5795);
+  outline-offset: 1px;
+}
+/* ============================================================================
+   MOBILE NAV DRAWER — hamburger + off-canvas panel, <=900px
+   The <=900px rule below used to hide .bim-header__nav/.bim-header__search
+   with ZERO replacement affordance — no hamburger, no menu button existed in
+   the markup at all, so Objects/Compositions/Research/Discipline + search
+   were completely unreachable on mobile (2026-07-09 audit finding — the
+   single highest-priority item in that pass). Built as a native
+   <details class="bim-drawer"> so the open/close mechanic works with zero
+   JavaScript (the <summary> is the hamburger button — click, Enter, or
+   Space all toggle it per native HTML semantics, same JS-optional ethos as
+   the rest of this catalog); bim.js only adds the backdrop-click/close-
+   button/Escape affordances on top. */
+.bim-header__hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  color: var(--bim-fg-secondary, #374151);
+  background: transparent;
+  border: 1px solid var(--bim-border, #E6E7E8);
+  border-radius: var(--bim-radius-md, 4px);
+  cursor: pointer;
+  list-style: none;
+}
+.bim-header__hamburger::-webkit-details-marker { display: none; }
+.bim-header__hamburger:hover { border-color: var(--bim-accent, #164679); color: var(--bim-accent, #164679); }
+.bim-header__hamburger-icon { width: 1.125rem; height: 1.125rem; }
+
+.bim-drawer__backdrop,
+.bim-drawer__panel { display: none; }
+
+@media (max-width: 900px) {
+  .bim-header__nav, .bim-header__search { display: none; }
+  .bim-header__hamburger { display: inline-flex; }
+
+  /* Only render the backdrop/panel boxes when the <details> is open — a
+     closed <details>'s non-<summary> children are already display:none per
+     the UA stylesheet, but that default is easy to accidentally beat with
+     an author rule (the exact bug item 1 fixed elsewhere in this file), so
+     it is restated explicitly and scoped to :open here rather than relied
+     on implicitly. */
+  .bim-drawer[open] .bim-drawer__backdrop,
+  .bim-drawer[open] .bim-drawer__panel {
+    display: block;
+  }
+  .bim-drawer__backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 210;
+    background: rgba(6, 16, 32, 0.55);
+  }
+  .bim-drawer__panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 211;
+    width: min(320px, 84vw);
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding: 1.25rem 1.25rem 2rem;
+    background: var(--bim-bg-surface, #fff);
+    border-left: 1px solid var(--bim-border, #E6E7E8);
+    box-shadow: -30px 0 70px -26px rgba(6, 20, 40, 0.45);
+    overflow-y: auto;
+    animation: bim-drawer-slidein 0.2s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bim-drawer__panel { animation: none; }
+  }
+}
+@keyframes bim-drawer-slidein {
+  from { transform: translateX(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+.bim-drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.bim-drawer__brand {
+  font-family: var(--bim-font-display);
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--bim-fg, #111827);
+}
+.bim-drawer__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  flex-shrink: 0;
+  border: 1px solid var(--bim-border-strong, #98A2B3);
+  border-radius: var(--bim-radius-md, 4px);
+  background: var(--bim-bg-surface, #fff);
+  color: var(--bim-fg-secondary, #374151);
+  cursor: pointer;
+}
+.bim-drawer__close:hover { background: var(--bim-bg-subtle, #EEF1F5); color: var(--bim-fg, #111827); }
+.bim-drawer__search {
+  display: flex;
+  align-items: center;
+}
+.bim-drawer__search input {
+  width: 100%;
+  border: 1px solid var(--bim-border-strong, #C8CCD1);
+  border-radius: var(--bim-radius-control, 6px);
+  background: var(--bim-bg-page, #F7F9FA);
+  color: var(--bim-fg, #111827);
+  font-size: 0.9375rem;
+  padding: 0.625rem 0.75rem;
+  font-family: inherit;
+}
+.bim-drawer__search input:focus {
+  outline: 2px solid var(--bim-accent-hover, #1D5795);
+  outline-offset: 1px;
+}
+.bim-drawer__nav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  border-top: 1px solid var(--bim-hairline, #E6E7E8);
+  padding-top: 0.75rem;
+}
+.bim-drawer__nav a {
+  padding: 0.75rem 0.5rem;
+  margin: 0 -0.5rem;
+  border-radius: var(--bim-radius-sm, 4px);
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--bim-fg, #111827);
+  text-decoration: none;
+  border-left: 3px solid transparent;
+}
+.bim-drawer__nav a:hover { background: var(--bim-bg-subtle, #EEF1F5); }
+.bim-drawer__nav a[aria-current="page"] {
+  color: var(--bim-accent, #164679);
+  font-weight: 600;
+  border-left-color: var(--bim-accent, #164679);
+  background: var(--bim-accent-subtle, #E8EEF5);
+}
+
+/* Lock page scroll behind the open drawer (bim.js toggles this class on
+   the <details>'s native `toggle` event). */
+body.bim-drawer-open { overflow: hidden; }
+
+@media (min-width: 901px) {
+  /* The <details> element only matters below 900px — above that, the real
+     header nav/search are visible and the drawer must never render even if
+     left open from a previous narrower viewport. */
+  .bim-drawer__backdrop, .bim-drawer__panel { display: none !important; }
+}
+
+/* ============================================================================
+   PLAN-SYMBOL OBJECT CARDS — replaces the letter-monogram thumbnail
+   ============================================================================ */
+.bim-plan-symbol {
+  width: 100%;
+  height: 100%;
+  display: block;
+  color: var(--bim-accent, #164679);
+}
+.bim-plan-primary { stroke: var(--bim-accent, #164679); fill: none; stroke-width: 1.4; }
+.bim-plan-secondary { stroke: var(--bim-accent-active, #10365C); fill: none; stroke-width: 0.9; }
+.bim-plan-frame { stroke: var(--bim-hairline, #E6E7E8); stroke-width: 1; }
+.bim-plan-dim {
+  font-family: var(--bim-font-mono);
+  font-size: 6.5px;
+  letter-spacing: 0.02em;
+  fill: var(--bim-fg-caption, #54595D);
+}
+.bim-plan-mono { font-family: var(--bim-font-mono); }
+
+/* ============================================================================
+   CATALOG CARDS — square Object module vs. broad 2:1 Composition sheet
+   ============================================================================ */
+.bim-cat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; }
+.bim-cat-grid--obj { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+.bim-cat-grid--comp { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+
+.bim-cat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid var(--bim-hairline, #E6E7E8);
+  border-radius: var(--bim-radius-card, 10px);
+  background: var(--bim-bg-surface, #fff);
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.14s ease, transform 0.14s ease;
+}
+.bim-cat-card:hover { border-color: var(--bim-accent, #164679); transform: translateY(-2px); }
+.bim-cat-card:focus-visible { outline: 2px solid var(--bim-accent-hover, #1D5795); outline-offset: 2px; }
+
+.bim-cat-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bim-bg-page, #F7F9FA);
+  position: relative;
+}
+/* Object module: square (atom). */
+.bim-cat-card--obj .bim-cat-thumb { aspect-ratio: 1 / 1; padding: 0.75rem; }
+/* Composition sheet: broad 2:1 (assembly) — card geometry carries the
+   atom-vs-assembly distinction, not a badge pill (2026-07-09 spec). */
+.bim-cat-card--comp .bim-cat-thumb { aspect-ratio: 16 / 9; }
+.bim-cat-thumb .bim-kp-diagram { width: 100%; height: 100%; display: block; aspect-ratio: 180 / 112; }
+.bim-cat-thumb__fmt {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  font-family: var(--bim-font-mono);
+  font-size: 0.625rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 0.125rem 0.4375rem;
+  border-radius: var(--bim-radius-chip, 999px);
+  background: var(--bim-machine-accent-bg, #E8EEF5);
+  color: var(--bim-machine-accent, #234ED8);
+}
+
+.bim-cat-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem 0.875rem 0.875rem;
+  border-top: 1px solid var(--bim-hairline, #E6E7E8);
+}
+.bim-cat-card__name {
+  font-family: var(--bim-font-sans);
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: var(--bim-fg, #111827);
+  line-height: 1.3;
+}
+.bim-cat-card__meta {
+  font-size: 0.75rem;
+  color: var(--bim-fg-secondary, #54595D);
+}
+.bim-cat-card__em { font-weight: 500; }
+.bim-cat-card__prov, .bim-cat-card__dims {
+  font-family: var(--bim-font-mono);
+  font-size: 0.6875rem;
+  color: var(--bim-fg-caption, #54595D);
+}
+.bim-cat-card__note {
+  font-family: var(--bim-font-mono);
+  font-size: 0.6875rem;
+  color: var(--bim-fg-caption, #54595D);
+  margin-top: 0.125rem;
+}
+
+.bim-cat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3em;
+  font-family: var(--bim-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.1875rem 0.5625rem;
+  border-radius: var(--bim-radius-chip, 999px);
+  border: 1px solid var(--bim-border, #E6E7E8);
+  color: var(--bim-fg-secondary, #54595D);
+  white-space: nowrap;
+  width: fit-content;
+}
+.bim-cat-chip--pr, .bim-cat-chip--ef {
+  background: var(--bim-accent-subtle, #E8EEF5);
+  color: var(--bim-accent, #164679);
+  border-color: transparent;
+}
+.bim-cat-chip__lv { opacity: 0.75; }
+.bim-cat-chip--plain { background: var(--bim-bg-page, #F7F9FA); }
+.bim-cat-chip--machine {
+  background: var(--bim-machine-accent-bg, #E8EEF5);
+  color: var(--bim-machine-accent, #234ED8);
+  border-color: transparent;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.625rem;
+}
+.bim-cat-chip--inline { display: inline-flex; }
+
+.bim-empty {
+  padding: 2.5rem 1rem;
+  text-align: center;
+  color: var(--bim-fg-secondary, #54595D);
+  border: 1px dashed var(--bim-border-strong, #C8CCD1);
+  border-radius: var(--bim-radius-card, 10px);
+}
+
+/* ============================================================================
+   OBJECTS COMPARE — checkbox-on-card + persistent bar + /objects/compare
+   table (item 8, 2026-07-09). Real <form method="get"> submission (repeated
+   `ids=` params) so the feature works with JavaScript disabled; bim.js only
+   adds the live count / enable-once-2-selected polish on top.
+   ============================================================================ */
+.bim-cat-card--obj { position: relative; }
+.bim-cat-card--obj .bim-cat-card__link {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  text-decoration: none;
+  color: inherit;
+}
+.bim-cat-card__comparetoggle {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 2;
+  display: inline-flex;
+  cursor: pointer;
+}
+.bim-cat-card__comparetoggle input {
+  position: absolute;
+  opacity: 0;
+  width: 1.375rem;
+  height: 1.375rem;
+  margin: 0;
+  cursor: pointer;
+}
+.bim-cat-card__checkbox {
+  position: relative;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: var(--bim-radius-sm, 4px);
+  border: 1.5px solid var(--bim-border-strong, #C8CCD1);
+  background: var(--bim-bg-surface, #fff);
+  box-shadow: 0 1px 3px rgba(11, 35, 64, 0.18);
+}
+.bim-cat-card__comparetoggle input:checked + .bim-cat-card__checkbox {
+  background: var(--bim-accent, #164679);
+  border-color: var(--bim-accent, #164679);
+}
+.bim-cat-card__comparetoggle input:checked + .bim-cat-card__checkbox::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 6px;
+  height: 10px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.bim-cat-card__comparetoggle input:focus-visible + .bim-cat-card__checkbox {
+  outline: 2px solid var(--bim-accent-hover, #1D5795);
+  outline-offset: 2px;
+}
+
+.bim-compare-bar {
+  position: sticky;
+  bottom: 1rem;
+  margin-top: 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding: 0.875rem 1.125rem;
+  border: 1px solid var(--bim-border-strong, #98A2B3);
+  border-radius: var(--bim-radius-card, 10px);
+  background: var(--bim-bg-surface, #fff);
+  box-shadow: 0 4px 10px rgba(11, 35, 64, 0.08), 0 16px 32px -20px rgba(11, 35, 64, 0.32);
+}
+.bim-compare-bar__label {
+  flex: 1 1 auto;
+  min-width: 200px;
+  font-size: 0.8125rem;
+  color: var(--bim-fg-secondary, #54595D);
+}
+.bim-compare-bar__label b { color: var(--bim-fg, #111827); }
+.bim-compare-bar.is-ready .bim-compare-bar__label { color: var(--bim-fg, #111827); font-weight: 600; }
+.bim-compare-bar__go {
+  border: 1px solid var(--bim-accent, #164679);
+  background: var(--bim-accent, #164679);
+  color: #fff;
+  border-radius: var(--bim-radius-control, 6px);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.5625rem 1rem;
+  cursor: pointer;
+}
+.bim-compare-bar__go:hover { background: var(--bim-accent-hover, #1D5795); border-color: var(--bim-accent-hover, #1D5795); }
+.bim-compare-bar__go:disabled {
+  background: var(--bim-bg-subtle, #EEF1F5);
+  border-color: var(--bim-border, #E6E7E8);
+  color: var(--bim-fg-muted, #6B7280);
+  cursor: not-allowed;
+}
+.bim-compare-bar__clear {
+  border: 1px solid var(--bim-border-strong, #98A2B3);
+  background: none;
+  color: var(--bim-fg-secondary, #54595D);
+  border-radius: var(--bim-radius-control, 6px);
+  font-size: 0.8125rem;
+  padding: 0.5625rem 0.875rem;
+  cursor: pointer;
+}
+.bim-compare-bar__clear:hover { border-color: var(--bim-accent, #164679); color: var(--bim-accent, #164679); }
+
+.bim-compare-table th, .bim-compare-table td { white-space: nowrap; }
+.bim-compare-table thead th { font-weight: 600; padding-right: 1.5rem; }
+.bim-compare-table thead th a { color: var(--bim-accent, #164679); text-decoration: none; }
+.bim-compare-table thead th a:hover { text-decoration: underline; }
+.bim-compare-table tbody th { width: auto; white-space: nowrap; padding-right: 1.5rem; color: var(--bim-fg-muted, #6B7280); font-weight: 500; }
+.bim-compare-table td small { display: block; color: var(--bim-fg-muted, #6B7280); font-family: var(--bim-font-sans); }
+
+/* ============================================================================
+   HOME (`/`) — compact registry front door
+   ============================================================================ */
+.bim-main:has(.bim-home) { max-width: 1180px; }
+.bim-home { display: flex; flex-direction: column; gap: clamp(2rem, 4vw, 3rem); }
+
+.bim-home-masthead {
+  position: relative;
+  padding: clamp(2rem, 5vw, 3.25rem) 0 clamp(1.25rem, 3vw, 2rem);
+  border-bottom: 1px solid var(--bim-hairline, #E6E7E8);
+}
+/* Faint drafting-grid texture on the masthead band only — legitimate here
+   (the product's own drawing convention), kept at ~6% line opacity so it
+   reads as paper texture, not a foreground layer competing with the
+   headline/lede. 2026-07-09 WCAG fix: the grid + its fade-to-transparent
+   mask used to live directly on .bim-home-masthead, which paints the real
+   h1/lede text too — CSS `mask-image` masks an element's ENTIRE composited
+   render, including descendants, regardless of what mask-image value those
+   descendants declare on themselves (`.bim-home-masthead * { mask-image:
+   none }` looked like a fix but is a no-op: a child's own mask-image never
+   cancels an ancestor's masking of that child's painted output — the two
+   compose, they don't override). Two independent audits measured the
+   lede's *effective* contrast at ~2.7:1 as a result, even though its
+   --bim-fg-secondary color alone is ~7:1 against the page background. Fix:
+   move the grid + its mask onto an absolutely-positioned ::before layer
+   behind the text, so the fade only ever touches decorative pixels — real
+   copy is never masked and needs no color change to pass AA. */
+.bim-home-masthead::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(22, 70, 121, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(22, 70, 121, 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-position: -1px -1px;
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 0%, transparent 100%);
+}
+:root[data-theme="dark"] .bim-home-masthead::before { background-image:
+    linear-gradient(rgba(180,197,213,0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(180,197,213,0.06) 1px, transparent 1px);
+}
+.bim-home-masthead h1 {
+  position: relative;
+  font-family: var(--bim-font-display);
+  font-weight: 700;
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  color: var(--bim-heading, var(--bim-fg));
+  margin: 0 0 0.875rem;
+}
+.bim-home-masthead__lede {
+  position: relative;
+  max-width: 62ch;
+  font-family: var(--bim-font-serif);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  /* Full-strength secondary ink (not the page's default --bim-fg-secondary
+     alone — set explicitly here so this rule's intent survives independent
+     of any future retuning of that shared token) measures ~7.2:1 against
+     --bim-bg-page in light mode and ~10.7:1 in dark mode; still reads as
+     secondary to the headline via weight (400 vs 700) and serif face, not
+     opacity. */
+  color: var(--bim-fg-secondary, #54595D);
+}
+.bim-home-masthead__lede p { margin: 0 0 0.75rem; }
+.bim-home-registry-line {
+  margin-top: 1.25rem;
+  font-family: var(--bim-font-mono);
+  font-size: 0.8125rem;
+  color: var(--bim-fg-caption, #54595D);
+}
+
+.bim-home-shelves {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.25rem;
+}
+.bim-home-shelf {
+  display: block;
+  padding: 1.75rem 1.75rem 1.5rem;
+  border: 1px solid var(--bim-hairline, #E6E7E8);
+  border-radius: var(--bim-radius-card, 10px);
+  background: var(--bim-bg-surface, #fff);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.14s ease, transform 0.14s ease;
+}
+.bim-home-shelf:hover { border-color: var(--bim-accent, #164679); transform: translateY(-2px); }
+.bim-home-shelf__kicker {
+  display: block;
+  font-family: var(--bim-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bim-accent, #164679);
+  margin-bottom: 0.625rem;
+}
+.bim-home-shelf h2 {
+  font-family: var(--bim-font-display);
+  font-size: 1.5rem;
+  margin: 0 0 0.625rem;
+  color: var(--bim-fg, #111827);
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+.bim-home-shelf p {
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--bim-fg-secondary, #54595D);
+  margin: 0 0 1rem;
+}
+.bim-home-shelf__cta {
+  font-family: var(--bim-font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--bim-accent, #164679);
+}
+
+.bim-home-block {
+  max-width: 72ch;
+}
+.bim-home-block h2 {
+  font-family: var(--bim-font-display);
+  font-size: 1.375rem;
+  color: var(--bim-fg, #111827);
+  margin: 0 0 0.75rem;
+}
+.bim-home-block p {
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  color: var(--bim-fg-secondary, #54595D);
+  margin: 0 0 0.875rem;
+}
+.bim-home-block strong { color: var(--bim-fg, #111827); }
+
+@media (max-width: 720px) {
+  .bim-home-shelves { grid-template-columns: 1fr; }
+}
+
+/* ============================================================================
+   /objects, /compositions — catalog pages
+   ============================================================================ */
+.bim-catalog-page { display: flex; flex-direction: column; gap: 1.25rem; }
+.bim-cat-pagehead .bim-cat-pagehead__lede { max-width: 68ch; }
+
+.bim-cat-searchform {
+  display: flex;
+  gap: 0.625rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.bim-cat-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid var(--bim-border-strong, #C8CCD1);
+  border-radius: var(--bim-radius-control, 6px);
+  background: var(--bim-bg-surface, #fff);
+  padding: 0 0.75rem;
+  flex: 1 1 320px;
+  max-width: 420px;
+}
+.bim-cat-search__ico { color: var(--bim-fg-muted, #6B7280); font-size: 1rem; }
+.bim-cat-search input {
+  border: 0;
+  background: none;
+  outline: none;
+  color: var(--bim-fg, #111827);
+  font-family: inherit;
+  font-size: 0.875rem;
+  padding: 0.625rem 0;
+  width: 100%;
+}
+.bim-cat-searchform__submit {
+  border: 1px solid var(--bim-accent, #164679);
+  background: var(--bim-accent, #164679);
+  color: #fff;
+  border-radius: var(--bim-radius-control, 6px);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.5625rem 1rem;
+  cursor: pointer;
+}
+.bim-cat-searchform__submit:hover { background: var(--bim-accent-hover, #1D5795); border-color: var(--bim-accent-hover, #1D5795); }
+
+.bim-cat-filters { display: flex; flex-direction: column; gap: 0.625rem; }
+.bim-chip-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  overflow-x: auto;
+  padding-bottom: 0.125rem;
+}
+.bim-chip-row__label {
+  font-family: var(--bim-font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bim-fg-caption, #54595D);
+  margin-right: 0.25rem;
+  flex-shrink: 0;
+}
+.bim-chip-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  padding: 0.3125rem 0.75rem;
+  border-radius: var(--bim-radius-chip, 999px);
+  border: 1px solid var(--bim-border-strong, #C8CCD1);
+  color: var(--bim-fg-secondary, #54595D);
+  text-decoration: none;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.bim-chip-toggle:hover { border-color: var(--bim-accent, #164679); color: var(--bim-accent, #164679); }
+.bim-chip-toggle.is-active {
+  background: var(--bim-accent, #164679);
+  border-color: var(--bim-accent, #164679);
+  color: #fff;
+}
+.bim-chip-toggle__n { font-family: var(--bim-font-mono); font-size: 0.6875rem; opacity: 0.75; }
+
+.bim-cat-gridhead { display: flex; align-items: baseline; gap: 0.75rem; }
+.bim-cat-res { font-family: var(--bim-font-mono); font-size: 0.8125rem; color: var(--bim-fg-caption, #54595D); }
+.bim-cat-res b { color: var(--bim-fg, #111827); font-weight: 600; }
+
+.bim-cat-usesection { display: flex; flex-direction: column; gap: 0.875rem; margin-top: 0.5rem; }
+.bim-cat-usesection__h {
+  font-family: var(--bim-font-display);
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--bim-fg, #111827);
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--bim-hairline, #E6E7E8);
+}
+
+/* ============================================================================
+   PLAN-ANCHORED INSPECTOR — /compositions/{slug} and .../o/{object}
+   ============================================================================ */
+.bim-main:has(.bim-inspector-page) { max-width: 1240px; }
+.bim-inspector-page {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: clamp(1.5rem, 3vw, 2.5rem);
+  align-items: start;
+}
+.bim-inspector-page__plan {
+  position: sticky;
+  top: calc(var(--bim-header-height, 56px) + 1.5rem);
+}
+.bim-cat-preview {
+  border: 1px solid var(--bim-hairline, #E6E7E8);
+  border-radius: var(--bim-radius-card, 10px);
+  overflow: hidden;
+  background: var(--bim-bg-surface, #fff);
+}
+.bim-cat-preview .bim-kp-diagram,
+.bim-cat-preview .bim-kp-diagram--floorscale {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 180 / 112;
+  display: block;
+}
+.bim-cat-preview--floorscale { border-style: dashed; border-color: var(--bim-border-strong, #C8CCD1); }
+.bim-inspector-page__rail { min-width: 0; }
+.bim-inspector__title {
+  font-family: var(--bim-font-display);
+  font-size: 1.625rem;
+  margin: 0.625rem 0 0.25rem;
+  color: var(--bim-fg, #111827);
+}
+.bim-detail-head__prov {
+  font-family: var(--bim-font-mono);
+  font-size: 0.75rem;
+  color: var(--bim-fg-caption, #54595D);
+  margin: 0 0 1rem;
+}
+.bim-detail-backlink { margin: 0.5rem 0 1rem; }
+.bim-detail-backlink a, .bim-usedin-row {
+  color: var(--bim-accent, #164679);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+.bim-detail-backlink a:hover, .bim-usedin-row:hover { text-decoration: underline; }
+
+.bim-cat-secth {
+  font-family: var(--bim-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--bim-fg-caption, #54595D);
+  margin: 1.5rem 0 0.75rem;
+  padding-bottom: 0.375rem;
+  border-bottom: 1px solid var(--bim-hairline, #E6E7E8);
+}
+.bim-cat-secth__sub {
+  text-transform: none;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--bim-fg-muted, #6B7280);
+  margin-left: 0.5rem;
+}
+
+.bim-cat-desc { font-size: 0.9375rem; line-height: 1.65; color: var(--bim-fg-secondary, #54595D); }
+.bim-cat-note { font-size: 0.8125rem; color: var(--bim-fg-caption, #54595D); }
+
+.bim-cat-areabox {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+  border: 1px solid var(--bim-hairline, #E6E7E8);
+  border-radius: var(--bim-radius-control, 6px);
+  padding: 0.875rem 1.125rem;
+  margin: 0.75rem 0;
+  width: fit-content;
+}
+.bim-cat-areabox__kicker {
+  font-family: var(--bim-font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--bim-fg-caption, #54595D);
+}
+.bim-cat-areabox__n {
+  font-family: var(--bim-font-mono);
+  font-size: 1.75rem;
+  font-weight: 600;
+  color: var(--bim-accent, #164679);
+}
+.bim-cat-areabox__n small { font-size: 0.55em; color: var(--bim-fg-muted, #6B7280); font-weight: 500; }
+.bim-cat-areabox__l { font-size: 0.75rem; color: var(--bim-fg-caption, #54595D); }
+
+.bim-cat-zones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.625rem; }
+.bim-cat-zone { border: 1px solid var(--bim-hairline, #E6E7E8); border-radius: var(--bim-radius-control, 6px); padding: 0.75rem; background: var(--bim-bg-surface, #fff); }
+.bim-cat-zone__k { font-family: var(--bim-font-mono); font-size: 0.6875rem; font-weight: 700; color: var(--bim-accent, #164679); }
+.bim-cat-zone__t { font-size: 0.75rem; color: var(--bim-fg-secondary, #54595D); margin-top: 2px; }
+.bim-cat-zone__n { font-family: var(--bim-font-mono); font-size: 1rem; font-weight: 600; color: var(--bim-fg, #111827); margin-top: 4px; }
+.bim-cat-zone__n small { color: var(--bim-fg-muted, #6B7280); font-weight: 400; }
+.bim-cat-zone__bar { margin-top: 0.5rem; height: 4px; background: var(--bim-hairline, #E6E7E8); border-radius: 2px; overflow: hidden; }
+.bim-cat-zone__bar i { display: block; height: 100%; background: var(--bim-accent, #164679); }
+@media (max-width: 560px) { .bim-cat-zones { grid-template-columns: 1fr; } }
+
+.bim-bill-status { margin-bottom: 0.625rem; }
+.bim-bill-status__chip {
+  display: inline-block;
+  font-family: var(--bim-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--bim-radius-chip, 999px);
+  background: var(--bim-warning-bg, #FFF8ED);
+  color: var(--bim-warning, #B54708);
+}
+.bim-bill-rows { display: flex; flex-direction: column; gap: 0.375rem; }
+.bim-bill-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.625rem 0.875rem;
+  border: 1px solid var(--bim-hairline, #E6E7E8);
+  border-radius: var(--bim-radius-control, 6px);
+  font-size: 0.8125rem;
+}
+a.bim-bill-row--linked { text-decoration: none; color: inherit; background: var(--bim-bg-surface, #fff); }
+a.bim-bill-row--linked:hover { border-color: var(--bim-accent, #164679); }
+.bim-bill-row__name { color: var(--bim-fg, #111827); font-weight: 500; }
+.bim-bill-row__code {
+  font-family: var(--bim-font-mono);
+  font-size: 0.75rem;
+  color: var(--bim-accent, #164679);
+  white-space: nowrap;
+}
+.bim-bill-row--unlinked { background: var(--bim-bg-page, #F7F9FA); }
+
+/* Plan <-> parts-list hover linkage (item 7b, 2026-07-09) — see the pairing
+   note in render/svg.rs and render/catalog.rs's bill_html. Highlighted
+   state uses the reserved machine-layer accent (#234ED8 family) rather than
+   the brand navy, matching this codebase's existing convention that the
+   machine accent marks "the system is telling you something," distinct
+   from ordinary navy UI chrome. */
+.bim-plan-obj rect,
+.bim-plan-obj circle,
+.bim-plan-obj line,
+.bim-plan-obj path {
+  transition: stroke 0.12s ease, fill 0.12s ease, fill-opacity 0.12s ease;
+}
+.bim-plan-obj--hi rect,
+.bim-plan-obj--hi circle {
+  fill: var(--bim-machine-accent-bg, #E8EEF5) !important;
+  fill-opacity: 1 !important;
+  stroke: var(--bim-machine-accent, #234ED8) !important;
+}
+.bim-plan-obj--hi line,
+.bim-plan-obj--hi path {
+  stroke: var(--bim-machine-accent, #234ED8) !important;
+}
+.bim-bill-row[data-plan-obj] { transition: border-color 0.12s ease, background 0.12s ease; }
+.bim-bill-row--hi {
+  border-color: var(--bim-machine-accent, #234ED8) !important;
+  background: var(--bim-machine-accent-bg, #E8EEF5) !important;
+}
+.bim-bill-row__tag {
+  font-family: var(--bim-font-mono);
+  font-size: 0.6875rem;
+  color: var(--bim-fg-caption, #54595D);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.bim-cat-spectable { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
+.bim-cat-spectable th, .bim-cat-spectable td { text-align: left; padding: 0.5rem 0; border-bottom: 1px solid var(--bim-hairline, #E6E7E8); }
+.bim-cat-spectable th { font-weight: 500; color: var(--bim-fg-muted, #6B7280); width: 46%; }
+.bim-cat-spectable td { color: var(--bim-fg, #111827); font-family: var(--bim-font-mono); }
+
+.bim-cat-classblock { display: flex; flex-direction: column; gap: 0.625rem; }
+.bim-cat-clrow { display: flex; flex-direction: column; gap: 0.125rem; }
+.bim-cat-clrow__k { font-size: 0.75rem; color: var(--bim-fg-caption, #54595D); }
+.bim-cat-clrow__v { font-family: var(--bim-font-mono); font-size: 0.875rem; color: var(--bim-fg, #111827); }
+.bim-cat-clrow__v small { display: block; font-family: var(--bim-font-sans); font-size: 0.75rem; color: var(--bim-fg-muted, #6B7280); margin-top: 2px; }
+
+.bim-usedin { display: flex; flex-direction: column; gap: 0.375rem; }
+
+.bim-cat-btn {
+  display: inline-block;
+  border: 1px solid var(--bim-machine-accent, #234ED8);
+  color: var(--bim-machine-accent, #234ED8);
+  background: var(--bim-machine-accent-bg, #E8EEF5);
+  border-radius: var(--bim-radius-control, 6px);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.5625rem 1rem;
+  text-decoration: none;
+}
+.bim-cat-btn:hover { background: var(--bim-machine-accent, #234ED8); color: #fff; }
+
+.bim-detail-page { max-width: 780px; }
+.bim-detail-head { display: flex; gap: 1.25rem; align-items: flex-start; margin: 1rem 0 1.25rem; }
+.bim-detail-head__symbol {
+  width: 96px;
+  height: 96px;
+  flex-shrink: 0;
+  border: 1px solid var(--bim-hairline, #E6E7E8);
+  border-radius: var(--bim-radius-card, 10px);
+  background: var(--bim-bg-page, #F7F9FA);
+  padding: 0.5rem;
+}
+.bim-detail-head__main h1 { font-family: var(--bim-font-display); font-size: 1.75rem; margin: 0.5rem 0 0.25rem; color: var(--bim-fg, #111827); }
+
+@media (max-width: 900px) {
+  .bim-inspector-page { grid-template-columns: 1fr; }
+  .bim-inspector-page__plan { position: static; }
+}
+
+/* ============================================================================
+   404 — branded, full chrome
+   ============================================================================ */
+.bim-notfound { max-width: 640px; padding: 2rem 0; }
+.bim-notfound__code {
+  font-family: var(--bim-font-mono);
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--bim-machine-accent, #234ED8);
+  margin: 0 0 0.75rem;
+}
+.bim-notfound h1 { font-family: var(--bim-font-display); font-size: 1.75rem; margin: 0 0 0.75rem; color: var(--bim-fg, #111827); }
+.bim-notfound__links { display: flex; gap: 1rem; margin-top: 1.5rem; flex-wrap: wrap; }
+.bim-notfound__links a {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--bim-accent, #164679);
+  text-decoration: none;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--bim-border, #E6E7E8);
+  border-radius: var(--bim-radius-control, 6px);
+}
+.bim-notfound__links a:hover { border-color: var(--bim-accent, #164679); }
+
+/* ============================================================================
+   FOOTER — machine-readable links, reserved accent
+   ============================================================================ */
+.bim-machine-link { color: var(--bim-machine-accent, #234ED8) !important; }
+
+/* ============================================================================
+   Radius/spacing discipline — 3 radii, hairline borders, no drop shadows
+   ============================================================================ */
+.bim-category-card, .bim-spec-card, .bim-accordion {
+  border-radius: var(--bim-radius-card, 10px) !important;
+  box-shadow: none !important;
+}

@@ -32,6 +32,10 @@ accounting advice. Statements regarding planned, intended, or targeted future \
 activities are forward-looking and subject to change without notice; they are not \
 undertaken to be updated except as required by law.</p>",
     );
+    let objects_current = if active_path.starts_with("/objects") { r#" aria-current="page""# } else { "" };
+    let compositions_current = if active_path.starts_with("/compositions") { r#" aria-current="page""# } else { "" };
+    let research_current = if active_path.starts_with("/research") { r#" aria-current="page""# } else { "" };
+    let discipline_current = if active_path.starts_with("/discipline") { r#" aria-current="page""# } else { "" };
     let theme_toggle = if editor_route {
         String::new()
     } else {
@@ -88,16 +92,52 @@ undertaken to be updated except as required by law.</p>",
   <link rel="stylesheet" href="/static/fonts.css">
   <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/bim-layout.css">
-  <link rel="stylesheet" href="/static/bim-components.css">{carbon_assets}{theme_preload_script}
+  <link rel="stylesheet" href="/static/bim-components.css">
+  <link rel="stylesheet" href="/static/bim-planroom.css">{carbon_assets}{theme_preload_script}
   <script type="module" src="/static/bim.js"></script>
 </head>
 <body class="bim-body">
   <header class="bim-header">
     <div class="bim-header__inner">
-      <a href="/" class="bim-header__brand" aria-label="Woodfine — BIM Library" data-path="/">BIM Library</a>
+      <a href="/" class="bim-header__brand" aria-label="Woodfine — BIM Library">Woodfine <span class="bim-header__brand-sub">BIM Library</span></a>
+      <nav class="bim-header__nav" aria-label="Primary">
+        <a href="/objects"{objects_current}>Objects</a>
+        <a href="/compositions"{compositions_current}>Compositions</a>
+        <a href="/research"{research_current}>Research</a>
+        <a href="/discipline"{discipline_current}>Discipline</a>
+      </nav>
+      <form class="bim-header__search" method="get" action="/search" role="search">
+        <input type="search" name="q" placeholder="Search" aria-label="Search the registry">
+      </form>
       <div class="bim-header__right">
-        <span class="bim-header__standards">IFC 4.3 &middot; ISO 16739-1:2024 &middot; DTCG</span>
         {theme_toggle}
+        <details class="bim-drawer" id="bim-drawer">
+          <summary class="bim-header__hamburger" aria-label="Open menu">
+            <svg class="bim-header__hamburger-icon" aria-hidden="true" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M3 5.5H17M3 10H17M3 14.5H17" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
+            </svg>
+          </summary>
+          <div class="bim-drawer__backdrop"></div>
+          <div class="bim-drawer__panel" role="dialog" aria-modal="true" aria-label="Menu">
+            <div class="bim-drawer__head">
+              <span class="bim-drawer__brand">Woodfine <span class="bim-header__brand-sub">BIM Library</span></span>
+              <button class="bim-drawer__close" type="button" aria-label="Close menu">
+                <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" width="16" height="16">
+                  <path d="M4.5 4.5L15.5 15.5M15.5 4.5L4.5 15.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"></path>
+                </svg>
+              </button>
+            </div>
+            <form class="bim-drawer__search" method="get" action="/search" role="search">
+              <input type="search" name="q" placeholder="Search" aria-label="Search the registry">
+            </form>
+            <nav class="bim-drawer__nav" aria-label="Primary">
+              <a href="/objects"{objects_current}>Objects</a>
+              <a href="/compositions"{compositions_current}>Compositions</a>
+              <a href="/research"{research_current}>Research</a>
+              <a href="/discipline"{discipline_current}>Discipline</a>
+            </nav>
+          </div>
+        </details>
       </div>
     </div>
   </header>
@@ -130,10 +170,10 @@ undertaken to be updated except as required by law.</p>",
       </div>
       <div>
         <p class="bim-footer__heading">Machine-readable surface</p>
-        <ul class="bim-footer__list">
-          <li><a href="/api/tokens.json">/api/tokens.json</a> &mdash; full DTCG bundle</li>
-          <li><a href="/mcp">/mcp</a> &mdash; MCP JSON-RPC endpoint</li>
-          <li><a href="/research">/research</a> &mdash; research backplane</li>
+        <ul class="bim-footer__list bim-footer__list--machine">
+          <li><a class="bim-machine-link" href="/api/tokens.json">/api/tokens.json</a> &mdash; full DTCG bundle</li>
+          <li><a class="bim-machine-link" href="/mcp">/mcp</a> &mdash; MCP JSON-RPC endpoint</li>
+          <li><a class="bim-machine-link" href="/research">/research</a> &mdash; research backplane</li>
         </ul>
       </div>
       <div>
@@ -191,6 +231,10 @@ undertaken to be updated except as required by law.</p>",
         carbon_assets = carbon_assets,
         theme_preload_script = theme_preload_script,
         theme_toggle = theme_toggle,
+        objects_current = objects_current,
+        compositions_current = compositions_current,
+        research_current = research_current,
+        discipline_current = discipline_current,
         disclosure_body = disclosure_body,
         content = content,
         tc = tc,

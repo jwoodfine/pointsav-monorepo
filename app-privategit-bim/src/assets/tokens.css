@@ -3,105 +3,114 @@
  * SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
  */
 
-/* tokens.css — family continuity with home.woodfinegroup.com (2026-07-04).
-   Reverses the 2026-07-03 RD.7 Spectrum-chrome decision (drafting-blue
-   #1A4480, deliberate differentiation-by-color from the rest of the
-   Woodfine/PointSav network) per explicit operator direction: this catalog
-   should read as part of the same family, not a deliberately different
-   product. Values below are copied directly from home.woodfinegroup.com's
-   live tokens.css (its --m-navy-700/--m-navy-600/--m-navy-100/--m-ink-900/
-   --m-grey-50/--m-grey-200 primitives), not approximated. Differentiation
-   now comes from real content grounding (the "Anatomy of a Key Plan" hero)
-   rather than a different palette — see BRIEF-app-privategit-bim.md. */
+/* tokens.css — "The Plan Room" (2026-07-09 v3 redesign).
+   Every hex value below is copied verbatim from the visual-direction spec's
+   color_system, which itself traces each value to a computed/measured
+   selector on home.woodfinegroup.com's live tokens.css. No invented hues —
+   see BRIEF-bim-v3-hyperscaler-redesign.md. The reserved machine-layer
+   accent (#234ED8) is used ONLY on IFC/DTCG download chips, /api links, and
+   verification badges — never on nav, headings, or general UI. */
 
 :root {
-  /* #164679 — home.woodfinegroup.com's real brand navy (--m-navy-700).
-     Sole interactive accent on the site: buttons, active-nav border, focus
-     rings, link text, chip accents. */
-  --bim-accent:           #164679;
-  --bim-accent-hover:     #1D5795;  /* home.woodfinegroup.com's --m-navy-600, its own hover/active value */
-  --bim-accent-active:    #10365C;  /* home.woodfinegroup.com's --m-navy-800 */
-  --bim-accent-subtle:    #E8EEF5;  /* home.woodfinegroup.com's --m-navy-100, selected/active row tint */
+  /* ---- Light theme — "day paper" ---- */
+  --bim-bg-page:          #F7F9FA;  /* --m-grey-50 / --m-surface-page */
+  --bim-bg-surface:       #FFFFFF;  /* --m-white / --m-surface-raised */
+  --bim-hairline:         #E6E7E8;  /* --m-grey-200 / --m-surface-section / --m-border */
+  --bim-border:           #E6E7E8;
+  --bim-border-subtle:    #E6E7E8;
+  --bim-border-strong:    #C8CCD1;  /* --m-border-strong / --m-grey-350 */
 
-  --bim-fg:               #111827;  /* home.woodfinegroup.com's --m-ink-900 */
-  --bim-fg-secondary:     #344054;
-  --bim-fg-muted:         #667085;
-  /* WCAG AA fix (2026-07-03 audit): #98A2B3 measured ~2.2-2.6:1 on white/
-     sidebar backgrounds, failing the 4.5:1 minimum for normal-size text
-     (header standards line, sidebar section counts). #5D6773 verified
-     5.0:1+ against both --bim-bg-surface and --bim-bg-sidebar. */
-  --bim-fg-faint:         #5D6773;
+  --bim-accent:           #164679;  /* --m-navy-700 — masthead, links, primary actions, drawing line-work */
+  --bim-accent-active:    #10365C;  /* --m-navy-800 — hover/active step; secondary drawing line weight */
+  --bim-accent-hover:     #1D5795;  /* --m-navy-600 — link hover, focus ring */
+  --bim-accent-subtle:    #E8EEF5;  /* --m-navy-100 — selection bg / navy wash / zone fills */
 
-  --bim-border:           #D0D5DD;
-  --bim-border-subtle:    #E5E7EB;
-  --bim-border-strong:    #98A2B3;
+  --bim-fg:               #111827;  /* --m-ink-900 — body text on light */
+  --bim-fg-secondary:     #54595D;  /* --m-ink-550 — muted text, captions, provenance lines */
+  --bim-fg-muted:         #6B7280;  /* --m-ink-500 / --m-ink-muted — AA-safe small text on light */
+  --bim-fg-faint:         #6B7280;
+  --bim-fg-caption:       #54595D;
 
-  --bim-bg-page:          #F7F9FA;  /* home.woodfinegroup.com's --m-grey-50 */
-  --bim-bg-surface:       #FFFFFF;
-  --bim-bg-sidebar:       #E6E7E8;  /* home.woodfinegroup.com's --m-grey-200 */
+  --bim-on-chrome:        #FFFFFF; /* primary text on navy chrome */
+  --bim-on-chrome-muted:  #B4C5D5; /* --m-slate-300 — text/line-work on navy chrome */
+  --bim-heading:          #111827; /* --m-ink-900 — light-mode heading color; dark theme overrides to #FFFFFF below */
+
+  --bim-bg-sidebar:       #E6E7E8;
   --bim-bg-subtle:        #E6E7E8;
-  --bim-bg-panel:         #E8E8E8;  /* tab bar / preview-frame header band */
+  --bim-bg-panel:         #E8E8E8;
   --bim-bg-tertiary:      #E8E8E8;
-  --bim-bg-code:          #1A1A1A; /* dark in both themes */
-  --bim-nav-hover-bg:     #E5E9EF;
+  --bim-bg-code:          #1A1A1A;
+  --bim-nav-hover-bg:     #E8EEF5;
 
-  --bim-header-height:    48px;
+  /* Reserved machine-layer accent — [data-brand=pointsav] --m-navy-700
+     override in the shared brand file. IFC/DTCG download chips, /api
+     links, verification badges ONLY. */
+  --bim-machine-accent:    #234ED8;
+  --bim-machine-accent-bg: #E8EEF5;
+
+  --bim-header-height:    56px;
   --bim-header-stack:     var(--bim-header-height);
   --bim-sidebar-width:    272px;
 
+  --bim-radius-chip: 999px;
+  --bim-radius-control: 6px;
+  --bim-radius-card: 10px;
   --bim-radius-none: 0;
-  --bim-radius-sm:   4px;   /* chips, badges, inputs, tabs (top corners) */
-  --bim-radius-md:   6px;   /* buttons, cards/panels on grids */
-  --bim-radius-lg:   8px;   /* preview frames, hero SVG panel, modals */
+  --bim-radius-sm:   4px;
+  --bim-radius-md:   6px;
+  --bim-radius-lg:   8px;
 
-  /* AEC semantic status colors — from woodfine-media-assets/css/theme-woodfine.css,
-     brand-governed (Woodfine Color Matrix). For regulation/compliance status display.
-     Kept as-is per RD.7 §6.2: unrelated to the visual-direction change. */
-  --bim-safe:      #54924E;  /* IDS pass */
+  /* AEC semantic status colors — unchanged, unrelated to the visual-direction
+     reset (regulation/compliance status display). */
+  --bim-safe:      #54924E;
   --bim-safe-bg:   #ECFDF3;
-  --bim-warning:   #B54708;  /* regulation warning */
+  --bim-warning:   #B54708;
   --bim-warning-bg: #FFF8ED;
-  --bim-mep:       #0E7490;  /* MEP / systems */
+  --bim-mep:       #0E7490;
   --bim-mep-bg:    #ECFEFF;
-  --bim-error:     #B42318;  /* clash / IDS fail */
+  --bim-error:     #B42318;
   --bim-error-bg:  #FEF3F2;
 }
 
-/* color-scheme hints the browser's native form-control/scrollbar rendering
-   to match the active theme (data-theme is set before first paint by the
-   inline script in shell.rs's <head>, defaulting to "light" — see there
-   for the /edit/* force-light rule). */
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"]  { color-scheme: dark; }
 
-/* Dark mode — desaturated instrument-navy (promoted from the pre-existing
-   preview-frame-only palette to a full page palette per RD.7 §6.2), not the
-   prior near-black wiki-era palette. Reads as "technical instrument" and
-   stays distinguishable from design.pointsav.com's #161616 Carbon dark.
-   Footer and code blocks remain permanently dark, un-toggled, in both
-   themes (unchanged convention). */
+/* ---- Dark theme — "night paper" ----
+   --m-ink-950 (#0E1117) is a real, defined-but-previously-unrendered
+   Woodfine token, repurposed as the dark-mode ground per the visual-
+   direction spec — every dark value below still traces to the same
+   home.woodfinegroup.com token file. Applied as a COMPLETE token-pair
+   system: every surface (including the footer and the plan diagrams)
+   flips together — no half-inverted states. */
 :root[data-theme="dark"] {
-  --bim-accent:           #5E9BDE;
-  --bim-accent-hover:     #7FB0E8;
-  --bim-accent-active:    #A3C6EF;
-  --bim-accent-subtle:    rgba(94, 155, 222, 0.16);
+  --bim-bg-page:          #0E1117;  /* --m-ink-950 */
+  --bim-bg-surface:       #0B2340;  /* --m-navy-900 */
+  --bim-hairline:         rgba(180, 197, 213, 0.16);
+  --bim-border:           rgba(180, 197, 213, 0.16);
+  --bim-border-subtle:    rgba(180, 197, 213, 0.10);
+  --bim-border-strong:    rgba(180, 197, 213, 0.34);
 
-  --bim-fg:               #E8EDF5;
-  --bim-fg-secondary:     #C3CBD9;
-  --bim-fg-muted:         #8B96A8;
-  /* WCAG AA fix, same rationale as the light-theme value above. #8E9BB2
-     verified 4.5:1+ against both --bim-bg-surface and --bim-bg-page. */
-  --bim-fg-faint:         #8E9BB2;
+  --bim-accent:           #1D5795;  /* --m-navy-600 — dark-mode link/accent step */
+  --bim-accent-active:    #B4C5D5;
+  --bim-accent-hover:     #B4C5D5;  /* --m-slate-300 — brightened hover, still in-palette */
+  --bim-accent-subtle:    rgba(29, 87, 149, 0.22);
 
-  --bim-border:           #2E3D5A;
-  --bim-border-subtle:    rgba(232, 237, 245, 0.06);
-  --bim-border-strong:    #43547A;
+  --bim-fg:               #B4C5D5;  /* --m-slate-300 — dark-mode ink + drawing line-work */
+  --bim-fg-secondary:     #B4C5D5;
+  --bim-fg-muted:         #8CA0B4;  /* --m-slate-300 dimmed toward ground; same hue family */
+  --bim-fg-faint:         #8CA0B4;
+  --bim-fg-caption:       #8CA0B4;
 
-  --bim-bg-page:          #1C2333;
-  --bim-bg-surface:       #242E42;
-  --bim-bg-sidebar:       #1A2030;
-  --bim-bg-subtle:        #1A2030;
-  --bim-bg-panel:         #202A3E;
-  --bim-bg-tertiary:      #202A3E;
-  --bim-nav-hover-bg:     #202839;
+  --bim-on-chrome:        #FFFFFF;
+  --bim-on-chrome-muted:  #B4C5D5;
+  --bim-heading:          #FFFFFF; /* --m-white / --m-ink-on-chrome — dark-mode headings, overrides light default above */
+
+  --bim-bg-sidebar:       #0B2340;
+  --bim-bg-subtle:        rgba(180, 197, 213, 0.08);
+  --bim-bg-panel:         #0B2340;
+  --bim-bg-tertiary:      rgba(180, 197, 213, 0.08);
+  --bim-nav-hover-bg:     rgba(180, 197, 213, 0.10);
+
+  --bim-machine-accent:    #5E86E8; /* --m-navy-700 override lightened toward --m-slate-300 for AA on dark ground */
+  --bim-machine-accent-bg: rgba(35, 78, 216, 0.18);
 }

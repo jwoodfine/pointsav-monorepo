@@ -33,9 +33,12 @@ pub async fn tokens_json_handler(State(state): State<AppState>) -> Json<Value> {
         .collect();
     // `_catalog`: normalized { objects, compositions } derived from the raw
     // DTCG above (interior furniture + key-plans), with `.ifc` availability
-    // and PO-1's resolved bill-of-objects folded in. Consumed by the home
-    // page's bim-catalog.js to populate the detail modal without a new route.
-    // Underscore-prefixed so it stays distinct from the DTCG token files.
+    // and PO-1's resolved bill-of-objects folded in. Machine-readable
+    // surface only as of the 2026-07-09 "Plan Room" reset — /objects and
+    // /compositions render server-side from the same `build_catalog`
+    // inputs directly (see render/catalog.rs); this key is no longer
+    // consumed by any client-side JS. Underscore-prefixed so it stays
+    // distinct from the DTCG token files.
     combined.insert("_catalog".into(), render::catalog::build_catalog(&state));
     Json(Value::Object(combined))
 }

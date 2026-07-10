@@ -15,13 +15,21 @@ pub async fn about_handler(State(state): State<AppState>) -> Html<String> {
         ));
     }
 
+    // Renamed from "About BIM Objects" to the bare noun "Discipline"
+    // (2026-07-09 operator decision — matches the grammatical pattern of
+    // the other primary nav items: Objects, Compositions, Research; no
+    // article, not "The Discipline"). Page content below is unchanged from
+    // before the rename — only the kicker/h1/title change, per scope. The
+    // kicker keeps the "The <phrase>" lead-in pattern the Objects/
+    // Compositions pages use ("The parts" / "The assemblies") ahead of
+    // their own bare-noun h1.
     let content = format!(
         r#"<div class="bim-breadcrumbs">
   <a href="/" data-path="/" class="bim-nav-link">Home</a>
 </div>
 <header class="bim-cat-pagehead">
-  <span class="bim-cat-kicker">About the catalog</span>
-  <h1>About BIM Objects</h1>
+  <span class="bim-cat-kicker">The discipline</span>
+  <h1>Discipline</h1>
 </header>
 <article class="bim-article">
   {sections}
@@ -29,8 +37,8 @@ pub async fn about_handler(State(state): State<AppState>) -> Html<String> {
     );
 
     Html(render::shell::page_shell(
-        "About BIM Objects",
-        "/about",
+        "Discipline",
+        "/discipline",
         &content,
         &state,
     ))
