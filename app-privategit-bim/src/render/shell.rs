@@ -37,7 +37,7 @@ undertaken to be updated except as required by law.</p>",
     } else {
         ""
     };
-    let compositions_current = if active_path.starts_with("/compositions") {
+    let key_plans_current = if active_path.starts_with("/key-plans") {
         r#" aria-current="page""#
     } else {
         ""
@@ -124,7 +124,7 @@ undertaken to be updated except as required by law.</p>",
       <nav class="bim-header__nav" aria-label="Primary">
         <a href="/method"{method_current}>Method</a>
         <a href="/objects"{objects_current}>Objects</a>
-        <a href="/compositions"{compositions_current}>Compositions</a>
+        <a href="/key-plans"{key_plans_current}>Key Plans</a>
         <a href="/research"{research_current}>Research</a>
       </nav>
       <form class="bim-header__search" method="get" action="/search" role="search">
@@ -154,7 +154,7 @@ undertaken to be updated except as required by law.</p>",
             <nav class="bim-drawer__nav" aria-label="Primary">
               <a href="/method"{method_current}>Method</a>
               <a href="/objects"{objects_current}>Objects</a>
-              <a href="/compositions"{compositions_current}>Compositions</a>
+              <a href="/key-plans"{key_plans_current}>Key Plans</a>
               <a href="/research"{research_current}>Research</a>
             </nav>
           </div>
@@ -183,7 +183,7 @@ undertaken to be updated except as required by law.</p>",
         <p class="bim-footer__heading">Woodfine BIM Library</p>
         <ul class="bim-footer__list">
           <li>Specification BIM Objects for the built environment</li>
-          <li>{tc} BIM Object categories &middot; {comp} components &middot; {rc} research&nbsp;entries</li>
+          <li>{tc} BIM Object categories &middot; {comp} Key&nbsp;Plans &middot; {rc} research&nbsp;entries</li>
           <li>IFC&nbsp;4.3 (ISO&nbsp;16739-1:2024) &middot; Uniclass&nbsp;2015 &middot; DTCG</li>
           <li>BIM Object data licensed <strong>Apache-2.0</strong> &middot; platform code <strong>AGPL-3.0-or-later</strong></li>
           <li><a href="https://github.com/pointsav/pointsav-monorepo">Platform source code (github.com/pointsav)</a></li>
@@ -255,7 +255,7 @@ undertaken to be updated except as required by law.</p>",
         theme_preload_script = theme_preload_script,
         theme_toggle = theme_toggle,
         objects_current = objects_current,
-        compositions_current = compositions_current,
+        key_plans_current = key_plans_current,
         research_current = research_current,
         method_current = method_current,
         disclosure_body = disclosure_body,

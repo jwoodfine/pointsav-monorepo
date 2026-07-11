@@ -276,6 +276,17 @@ function drawOnAnimate(svg) {
     el.style.strokeDashoffset = String(len);
     el.style.transition = 'stroke-dashoffset ' + motion.duration + ' ' + motion.easing;
     el.style.transitionDelay = Math.min(i, motion.staggerCap) * motion.stagger + 'ms';
+    // Once the draw-on completes, drop the inline dash properties this
+    // function set so the element falls back to its real CSS/attribute
+    // stroke-dasharray (e.g. a containment line's dashed pattern) instead
+    // of staying solid forever — without this, every dashed element this
+    // function ever touches permanently loses its dash after animating once.
+    el.addEventListener('transitionend', () => {
+      el.style.removeProperty('stroke-dasharray');
+      el.style.removeProperty('stroke-dashoffset');
+      el.style.removeProperty('transition');
+      el.style.removeProperty('transition-delay');
+    }, { once: true });
     // Two nested rAFs: the first commits the dashoffset-at-full-length
     // style so the browser has actually painted that starting state before
     // the second rAF flips it to 0 — setting both in the same frame would
@@ -293,9 +304,12 @@ function drawOnAnimate(svg) {
 // (.bim-home-masthead__visual) — the site's single largest visual asset
 // now drafts itself in on the page a visitor actually lands on first,
 // using the exact same mechanism rather than a bespoke hero-only animation.
+// Round 9 (2026-07-11): extended again to the Method page's two teaching
+// diagrams (.bim-method-figure) — previously the one page whose whole job
+// is explaining the model had zero motion despite this system existing.
 function initPlanDrawOn() {
   const svgs = document.querySelectorAll(
-    '.bim-inspector-page__plan .bim-kp-diagram, .bim-home-masthead__visual .bim-kp-diagram'
+    '.bim-inspector-page__plan .bim-kp-diagram, .bim-home-masthead__visual .bim-kp-diagram, .bim-method-figure .bim-method-diagram'
   );
   if (!svgs.length) return;
   if ('IntersectionObserver' in window) {

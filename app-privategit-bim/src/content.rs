@@ -57,8 +57,12 @@ pub fn render_markdown(md: &str) -> String {
 /// The four content sections a category belongs to, grouped by DTCG entity
 /// shape rather than a flat list: Taxonomy (IFC classification/scalar
 /// tokens), Objects (instantiable/placeable BIM Object families), Compositions
-/// (rules that assemble Objects into Tiles/Floor Plates), Context (site/
-/// environmental overlay data). See NEXT.md 2026-07-03 IA reorganization.
+/// (rules that assemble Key Plans into Tiles/Floor Plates — the variant name
+/// is a pre-existing internal identifier, unrelated to the public
+/// "Composition" concept retired sitewide in Round 9 2026-07-11; its public
+/// label is "Key Plans", matching what these categories actually describe),
+/// Context (site/environmental overlay data). See NEXT.md 2026-07-03 IA
+/// reorganization.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Section {
     Taxonomy,
@@ -72,7 +76,7 @@ impl Section {
         match self {
             Section::Taxonomy => "Taxonomy",
             Section::Objects => "Objects",
-            Section::Compositions => "Compositions",
+            Section::Compositions => "Key Plans",
             Section::Context => "Context",
         }
     }

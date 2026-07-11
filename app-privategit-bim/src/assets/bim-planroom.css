@@ -897,11 +897,23 @@ body.bim-drawer-open { overflow: hidden; }
    read as the same drawing-set convention as every composition thumbnail,
    not a second visual language. */
 .bim-method-figure {
-  margin: 1.25rem 0 1.75rem;
+  /* Round 9 (2026-07-11): wider vertical rhythm than the original Round 6
+     value — these are now teaching diagrams the reader is meant to pause
+     on, not compact inline references, so they need more breathing room
+     from the surrounding prose. */
+  margin: 2.25rem 0 2.5rem;
   border: 1px solid var(--bim-hairline, #E6E7E8);
   border-radius: var(--bim-radius-card, 10px);
   overflow: hidden;
   background: var(--bim-bg-surface, #fff);
+  /* Round 9 (2026-07-11): a slower, more deliberate draw-on pace than the
+     default UI stagger (600ms/12ms) — these two diagrams are meant to be
+     read as a short narrative beat-by-beat, not glanced at like a reference
+     plan, matching the homepage hero's precedent of scoping motion tokens
+     per-container via the same custom properties `readMotionTokens()` (bim.js)
+     already reads. */
+  --bim-motion-drawon-duration: 900ms;
+  --bim-motion-drawon-stagger: 90ms;
 }
 .bim-method-diagram {
   width: 100%;
@@ -911,11 +923,16 @@ body.bim-drawer-open { overflow: hidden; }
   display: block;
 }
 .bim-method-figure figcaption {
-  padding: 0.625rem 1rem;
+  /* Round 9 (2026-07-11): Inter body copy instead of the site-wide mono
+     default — these captions now carry a full explanatory sentence, not a
+     short reference tag, and read better at prose weight/line-height than
+     the compact all-caps mono treatment used for short labels elsewhere. */
+  padding: 0.75rem 1rem 0.875rem;
   border-top: 1px solid var(--bim-hairline, #E6E7E8);
-  font-size: 0.75rem;
+  font-family: var(--bim-font-sans);
+  font-size: 0.8125rem;
+  line-height: 1.5;
   color: var(--bim-fg-caption, #54595D);
-  font-family: var(--bim-font-mono);
 }
 .bim-inspector-page__rail { min-width: 0; }
 /* Round 6 (2026-07-10) bug fix: area/classification metadata moved here from
