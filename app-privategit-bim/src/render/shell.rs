@@ -32,10 +32,26 @@ accounting advice. Statements regarding planned, intended, or targeted future \
 activities are forward-looking and subject to change without notice; they are not \
 undertaken to be updated except as required by law.</p>",
     );
-    let objects_current = if active_path.starts_with("/objects") { r#" aria-current="page""# } else { "" };
-    let compositions_current = if active_path.starts_with("/compositions") { r#" aria-current="page""# } else { "" };
-    let research_current = if active_path.starts_with("/research") { r#" aria-current="page""# } else { "" };
-    let method_current = if active_path.starts_with("/method") { r#" aria-current="page""# } else { "" };
+    let objects_current = if active_path.starts_with("/objects") {
+        r#" aria-current="page""#
+    } else {
+        ""
+    };
+    let compositions_current = if active_path.starts_with("/compositions") {
+        r#" aria-current="page""#
+    } else {
+        ""
+    };
+    let research_current = if active_path.starts_with("/research") {
+        r#" aria-current="page""#
+    } else {
+        ""
+    };
+    let method_current = if active_path.starts_with("/method") {
+        r#" aria-current="page""#
+    } else {
+        ""
+    };
     let theme_toggle = if editor_route {
         String::new()
     } else {
@@ -101,10 +117,10 @@ undertaken to be updated except as required by law.</p>",
     <div class="bim-header__inner">
       <a href="/" class="bim-header__brand" aria-label="Woodfine — BIM Library">Woodfine <span class="bim-header__brand-sub">BIM Library</span></a>
       <nav class="bim-header__nav" aria-label="Primary">
+        <a href="/method"{method_current}>Method</a>
         <a href="/objects"{objects_current}>Objects</a>
         <a href="/compositions"{compositions_current}>Compositions</a>
         <a href="/research"{research_current}>Research</a>
-        <a href="/method"{method_current}>Method</a>
       </nav>
       <form class="bim-header__search" method="get" action="/search" role="search">
         <input type="search" name="q" placeholder="Search" aria-label="Search the registry">
@@ -131,10 +147,10 @@ undertaken to be updated except as required by law.</p>",
               <input type="search" name="q" placeholder="Search" aria-label="Search the registry">
             </form>
             <nav class="bim-drawer__nav" aria-label="Primary">
+              <a href="/method"{method_current}>Method</a>
               <a href="/objects"{objects_current}>Objects</a>
               <a href="/compositions"{compositions_current}>Compositions</a>
               <a href="/research"{research_current}>Research</a>
-              <a href="/method"{method_current}>Method</a>
             </nav>
           </div>
         </details>
@@ -190,9 +206,11 @@ undertaken to be updated except as required by law.</p>",
     <div class="bim-footer__base">
       <div class="bim-footer__base-row">
         <div class="bim-footer__cities">
-          <span>Vancouver</span>
-          <span class="bim-footer__cities-sep" aria-hidden="true">|</span>
-          <span>New York</span>
+          <span class="bim-footer__cities-inner">
+            <span>Vancouver</span>
+            <span class="bim-footer__cities-sep" aria-hidden="true">|</span>
+            <span>New York</span>
+          </span>
         </div>
         <div class="bim-footer__badges">
           <a class="bim-badge bim-badge--license" href="https://creativecommons.org/licenses/by-nd/4.0/"

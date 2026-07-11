@@ -60,6 +60,18 @@
   --bim-radius-md:   6px;
   --bim-radius-lg:   8px;
 
+  /* Round 6 (2026-07-10): the SVG "draw-on" system (bim.js drawOnAnimate)
+     previously carried its duration/easing/stagger as hardcoded JS magic
+     numbers. Formalized as real motion tokens here — bim.js reads these
+     via getComputedStyle rather than hardcoding, so the whole drafting
+     system tunes from one place, themeable per surface if a future
+     context (e.g. the homepage hero) wants a different pace without a
+     second set of numbers buried in script. */
+  --bim-motion-drawon-duration: 600ms;
+  --bim-motion-drawon-easing: ease;
+  --bim-motion-drawon-stagger: 12ms;
+  --bim-motion-drawon-stagger-cap: 40;
+
   /* AEC semantic status colors — unchanged, unrelated to the visual-direction
      reset (regulation/compliance status display). */
   --bim-safe:      #54924E;

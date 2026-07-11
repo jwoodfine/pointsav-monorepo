@@ -201,11 +201,11 @@ pub fn render_token_page(category: &str, state: &AppState) -> String {
 
   <details class="bim-accordion">
     <summary>Regulation</summary>
-    <div class="bim-spec-card__body"><p class="bim-empty">No regulatory overlays registered for this category yet.</p></div>
+    <div class="bim-spec-card__body"><p class="bim-empty">No regulatory overlays registered for this category.</p></div>
   </details>
   <details class="bim-accordion">
     <summary>Climate Zone</summary>
-    <div class="bim-spec-card__body"><p class="bim-empty">Climate zone constraints not yet modeled for this category.</p></div>
+    <div class="bim-spec-card__body"><p class="bim-empty">No climate zone constraints modeled for this category.</p></div>
   </details>
   <details class="bim-accordion">
     <summary>Token Format</summary>

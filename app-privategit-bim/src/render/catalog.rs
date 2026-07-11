@@ -32,9 +32,11 @@
 //! Honest-partial-completion convention (2026-07 audit's "83% of
 //! Compositions show no constituent Objects" finding): only PO-1 carries a
 //! real, structured `furniture_refs` array. Every other Composition's
-//! "Parts list" renders an "Object linking: N of M — pending" status chip
+//! "Parts list" renders an "N of M parts linked to the catalog" status chip
 //! instead of a fabricated bill or a false "assembled from 0 object
-//! entries" line.
+//! entries" line. (Compositions with zero furniture data at all are kept
+//! out of the public grid entirely — see `composition_is_publicly_visible`
+//! — rather than showing this chip at 0 of 0.)
 
 use crate::state::AppState;
 use serde_json::{json, Map, Value};
@@ -173,6 +175,28 @@ fn dims_summary(dims: &Value) -> String {
     }
 }
 
+/// Round 6 (2026-07-10) P2: true for a composition that should be visible
+/// on the public catalog. Suppresses "room-programme-only" entries —
+/// `has_zone_data` true but zero bill items, meaning no `furniture_program`
+/// was ever authored, only bare room names — a genuinely thin record, not
+/// ready for public display. Corporate Office (`has_zone_data` false, a
+/// different correct-by-design floor-scale record type) and any
+/// composition with at least one bill item (even partially linked, e.g.
+/// PO-2/PO-3) both pass. This is a display-layer gate only — the
+/// underlying token data and `/api/tokens.json` are untouched.
+fn composition_is_publicly_visible(c: &Value) -> bool {
+    let has_zone = c
+        .get("has_zone_data")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let bill_len = c
+        .get("bill")
+        .and_then(Value::as_array)
+        .map(|a| a.len())
+        .unwrap_or(0);
+    !(has_zone && bill_len == 0)
+}
+
 /// Round 5 (2026-07-10): groups a flat spec-row array under real IFC
 /// property-set headers where a genuine Pset name applies (currently just
 /// `Pset_ManufacturerTypeInformation`, which real IFC deployments use for
@@ -184,12 +208,20 @@ fn dims_summary(dims: &Value) -> String {
 /// IFC-literate to a specifier already looking for that pattern.
 fn spec_rows_grouped(rows: &[Value]) -> String {
     const MFR_KEYS: &[&str] = &["Manufacturer", "Product line", "Model", "SKU"];
-    const CLASS_KEYS: &[&str] = &["IFC 4.3 entity class", "Uniclass 2015 (Pr)", "Uniclass 2015 — Pr"];
+    const CLASS_KEYS: &[&str] = &[
+        "IFC 4.3 entity class",
+        "Uniclass 2015 (Pr)",
+        "Uniclass 2015 — Pr",
+    ];
     let mut out = String::new();
     let mut last_group: Option<&'static str> = None;
     for r in rows {
         let arr = r.as_array().cloned().unwrap_or_default();
-        let k = arr.first().and_then(Value::as_str).unwrap_or("").to_string();
+        let k = arr
+            .first()
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
         let v = arr.get(1).and_then(Value::as_str).unwrap_or("").to_string();
         let group = if MFR_KEYS.contains(&k.as_str()) {
             "Pset_ManufacturerTypeInformation"
@@ -205,7 +237,11 @@ fn spec_rows_grouped(rows: &[Value]) -> String {
             ));
             last_group = Some(group);
         }
-        out.push_str(&format!("<tr><th>{}</th><td>{}</td></tr>", esc(&k), esc(&v)));
+        out.push_str(&format!(
+            "<tr><th>{}</th><td>{}</td></tr>",
+            esc(&k),
+            esc(&v)
+        ));
     }
     out
 }
@@ -581,7 +617,9 @@ pub(crate) fn percent_encode(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     for b in s.bytes() {
         match b {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => out.push(b as char),
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
+                out.push(b as char)
+            }
             _ => out.push_str(&format!("%{:02X}", b)),
         }
     }
@@ -684,7 +722,10 @@ fn counted(values: impl Iterator<Item = String>) -> Vec<(String, usize)> {
 }
 
 fn search_tokens(q: &str) -> Vec<String> {
-    q.trim().split_whitespace().map(|t| t.to_lowercase()).collect()
+    q.trim()
+        .split_whitespace()
+        .map(|t| t.to_lowercase())
+        .collect()
 }
 
 fn matches_search(haystack: &str, tokens: &[String]) -> bool {
@@ -755,13 +796,20 @@ pub(crate) fn render_composition_card(c: &Value) -> String {
     let category = s(c, "category");
     let cat_label = s(c, "category_label");
     let space = s(c, "uniclass_space");
-    let has_zone = c.get("has_zone_data").and_then(Value::as_bool).unwrap_or(false);
+    let has_zone = c
+        .get("has_zone_data")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     let area_sf = int_of(c, "area_sf");
     let area_line = match area_sf {
         Some(sf) => format!("{sf} SF"),
         None => "—".to_string(),
     };
-    let bill_len = c.get("bill").and_then(Value::as_array).map(|a| a.len()).unwrap_or(0);
+    let bill_len = c
+        .get("bill")
+        .and_then(Value::as_array)
+        .map(|a| a.len())
+        .unwrap_or(0);
     let linked_len = c
         .get("bill")
         .and_then(Value::as_array)
@@ -793,12 +841,12 @@ pub(crate) fn render_composition_card(c: &Value) -> String {
     let (thumb, note) = if has_zone {
         let svg = s(c, "svg");
         let note = if bill_len == 0 && has_room_program {
-            r#"<span class="bim-cat-card__note">Room programme only — furniture layout not yet authored</span>"#.to_string()
+            r#"<span class="bim-cat-card__note">Room programme</span>"#.to_string()
         } else if bill_len == 0 {
-            r#"<span class="bim-cat-card__note">Object linking: 0 of 0 — pending</span>"#.to_string()
+            String::new()
         } else if linked_len < bill_len {
             format!(
-                r#"<span class="bim-cat-card__note">Object linking: {linked_len} of {bill_len} — pending</span>"#
+                r#"<span class="bim-cat-card__note">{linked_len} of {bill_len} parts linked to the catalog</span>"#
             )
         } else {
             String::new()
@@ -845,7 +893,13 @@ pub(crate) fn render_composition_card(c: &Value) -> String {
 
 pub fn render_home(state: &AppState) -> String {
     let objects = build_objects(state);
-    let compositions = build_compositions(state, &objects);
+    // Same visibility gate as render_compositions_index (Round 6 P2) — the
+    // homepage's stated count must agree with what /compositions actually
+    // shows, or the two numbers contradict each other on the same site.
+    let compositions: Vec<Value> = build_compositions(state, &objects)
+        .into_iter()
+        .filter(composition_is_publicly_visible)
+        .collect();
     let obj_n = objects.len();
     let comp_n = compositions.len();
 
@@ -871,12 +925,38 @@ pub fn render_home(state: &AppState) -> String {
         })
         .collect();
 
+    // Round 6 (2026-07-10): the hero was text-only — at 1440-1920px the
+    // right half was empty grid paper (the cohesion audit's gap #2). Fill
+    // it with a real Key Plan, not an invented illustrative one: PO-1's
+    // actual zone data if the composition is present in this catalog,
+    // falling back to representative values only if it is ever absent.
+    // The same draw-on animation used on composition detail pages applies
+    // here (bim.js watches `.bim-home-masthead__visual .bim-kp-diagram`
+    // too now) — the site's single largest visual asset gets to draft
+    // itself in on the page a visitor actually lands on first.
+    let hero_svg = compositions
+        .iter()
+        .find(|c| s(c, "id") == "PO-1")
+        .map(|c| {
+            let z1 = c.get("zone1").and_then(Value::as_f64).unwrap_or(6.0);
+            let z2 = c.get("zone2").and_then(Value::as_f64).unwrap_or(3.5);
+            let z3 = c.get("zone3").and_then(Value::as_f64);
+            let area = c.get("area_m2").and_then(Value::as_f64);
+            super::svg::render_kp_zone_svg(z1, z2, z3, "private-office", area)
+        })
+        .unwrap_or_else(|| {
+            super::svg::render_kp_zone_svg(6.0, 3.5, Some(2.0), "private-office", None)
+        });
+
     format!(
         r##"<div class="bim-home">
   <section class="bim-home-masthead">
-    <h1>Woodfine BIM Library</h1>
-    <div class="bim-home-masthead__lede">{lede}</div>
-    <p class="bim-home-registry-line">{obj_n} objects &middot; {comp_n} compositions &middot; IFC&nbsp;4.3 &middot; Uniclass&nbsp;2015</p>
+    <div class="bim-home-masthead__text">
+      <h1>Woodfine BIM Library</h1>
+      <div class="bim-home-masthead__lede">{lede}</div>
+      <p class="bim-home-registry-line">{obj_n} objects &middot; {comp_n} compositions &middot; IFC&nbsp;4.3 &middot; Uniclass&nbsp;2015</p>
+    </div>
+    <div class="bim-home-masthead__visual" aria-hidden="true">{hero_svg}</div>
   </section>
 
   <section class="bim-home-shelves" aria-label="The two shelves">
@@ -907,11 +987,20 @@ pub fn render_home(state: &AppState) -> String {
 // SSR — `/objects` catalog page
 // ─────────────────────────────────────────────────────────────────────────────
 
-pub fn render_objects_index(state: &AppState, q: &str, uni: Option<&str>, mfr: Option<&str>) -> String {
+pub fn render_objects_index(
+    state: &AppState,
+    q: &str,
+    uni: Option<&str>,
+    mfr: Option<&str>,
+) -> String {
     let objects = build_objects(state);
     let tokens = search_tokens(q);
 
-    let uni_items = counted(objects.iter().map(|o| s(o, "uniclass_pr_title").to_string()));
+    let uni_items = counted(
+        objects
+            .iter()
+            .map(|o| s(o, "uniclass_pr_title").to_string()),
+    );
     let mfr_items = counted(objects.iter().map(|o| s(o, "manufacturer").to_string()));
 
     let matches: Vec<&Value> = objects
@@ -929,8 +1018,24 @@ pub fn render_objects_index(state: &AppState, q: &str, uni: Option<&str>, mfr: O
 
     let uni_pairs = counted_pairs(uni_items);
     let mfr_pairs = counted_pairs(mfr_items);
-    let uni_chips = chip_row("Uniclass Pr — product type", "/objects", "uni", &uni_pairs, uni, q, &[("mfr", mfr)]);
-    let mfr_chips = chip_row("Manufacturer", "/objects", "mfr", &mfr_pairs, mfr, q, &[("uni", uni)]);
+    let uni_chips = chip_row(
+        "Uniclass Pr — product type",
+        "/objects",
+        "uni",
+        &uni_pairs,
+        uni,
+        q,
+        &[("mfr", mfr)],
+    );
+    let mfr_chips = chip_row(
+        "Manufacturer",
+        "/objects",
+        "mfr",
+        &mfr_pairs,
+        mfr,
+        q,
+        &[("uni", uni)],
+    );
 
     format!(
         r##"<div class="bim-catalog-page">
@@ -961,8 +1066,12 @@ pub fn render_objects_index(state: &AppState, q: &str, uni: Option<&str>, mfr: O
   </form>
 </div>"##,
         q = esc(q),
-        uni_hidden = uni.map(|v| format!(r#"<input type="hidden" name="uni" value="{}">"#, esc(v))).unwrap_or_default(),
-        mfr_hidden = mfr.map(|v| format!(r#"<input type="hidden" name="mfr" value="{}">"#, esc(v))).unwrap_or_default(),
+        uni_hidden = uni
+            .map(|v| format!(r#"<input type="hidden" name="uni" value="{}">"#, esc(v)))
+            .unwrap_or_default(),
+        mfr_hidden = mfr
+            .map(|v| format!(r#"<input type="hidden" name="mfr" value="{}">"#, esc(v)))
+            .unwrap_or_default(),
         uni_chips = uni_chips,
         mfr_chips = mfr_chips,
         n = matches.len(),
@@ -982,7 +1091,10 @@ pub fn render_compositions_index(
     layout: Option<&str>,
 ) -> String {
     let objects = build_objects(state);
-    let compositions = build_compositions(state, &objects);
+    let compositions: Vec<Value> = build_compositions(state, &objects)
+        .into_iter()
+        .filter(composition_is_publicly_visible)
+        .collect();
     let tokens = search_tokens(q);
 
     // Use-Case chips: (query_value = category slug, display_label, count).
@@ -1002,19 +1114,33 @@ pub fn render_compositions_index(
         order.sort_by_key(|slug| category_rank(slug));
         order
             .into_iter()
-            .map(|slug| (slug.to_string(), category_label(slug).to_string(), counts[slug]))
+            .map(|slug| {
+                (
+                    slug.to_string(),
+                    category_label(slug).to_string(),
+                    counts[slug],
+                )
+            })
             .collect()
     };
 
     // Layout chips: (query_value = "modeled"/"floor", display_label, count).
     let modeled_n = compositions
         .iter()
-        .filter(|c| c.get("has_zone_data").and_then(Value::as_bool).unwrap_or(false))
+        .filter(|c| {
+            c.get("has_zone_data")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })
         .count();
     let floor_n = compositions.len() - modeled_n;
     let mut layout_pairs: Vec<(String, String, usize)> = Vec::new();
     if modeled_n > 0 {
-        layout_pairs.push(("modeled".to_string(), "Zone layout modeled".to_string(), modeled_n));
+        layout_pairs.push((
+            "modeled".to_string(),
+            "Zone layout modeled".to_string(),
+            modeled_n,
+        ));
     }
     if floor_n > 0 {
         layout_pairs.push(("floor".to_string(), "Floor-scale".to_string(), floor_n));
@@ -1027,7 +1153,10 @@ pub fn render_compositions_index(
         .filter(|c| {
             layout
                 .map(|v| {
-                    let has_zone = c.get("has_zone_data").and_then(Value::as_bool).unwrap_or(false);
+                    let has_zone = c
+                        .get("has_zone_data")
+                        .and_then(Value::as_bool)
+                        .unwrap_or(false);
                     (v == "modeled") == has_zone
                 })
                 .unwrap_or(true)
@@ -1038,11 +1167,17 @@ pub fn render_compositions_index(
         .iter()
         .filter(|cat| use_case.map(|v| v == **cat).unwrap_or(true))
         .map(|cat| {
-            let in_section: Vec<&&Value> = matches.iter().filter(|c| s(c, "category") == *cat).collect();
+            let in_section: Vec<&&Value> = matches
+                .iter()
+                .filter(|c| s(c, "category") == *cat)
+                .collect();
             if in_section.is_empty() {
                 return String::new();
             }
-            let cards: String = in_section.iter().map(|c| render_composition_card(c)).collect();
+            let cards: String = in_section
+                .iter()
+                .map(|c| render_composition_card(c))
+                .collect();
             format!(
                 r#"<section class="bim-cat-usesection">
   <h2 class="bim-cat-usesection__h">{label}</h2>
@@ -1060,8 +1195,24 @@ pub fn render_compositions_index(
         sections
     };
 
-    let use_chips = chip_row("Use Case", "/compositions", "use", &use_pairs, use_case, q, &[("layout", layout)]);
-    let layout_chips = chip_row("Layout", "/compositions", "layout", &layout_pairs, layout, q, &[("use", use_case)]);
+    let use_chips = chip_row(
+        "Use Case",
+        "/compositions",
+        "use",
+        &use_pairs,
+        use_case,
+        q,
+        &[("layout", layout)],
+    );
+    let layout_chips = chip_row(
+        "Layout",
+        "/compositions",
+        "layout",
+        &layout_pairs,
+        layout,
+        q,
+        &[("use", use_case)],
+    );
 
     format!(
         r##"<div class="bim-catalog-page">
@@ -1085,8 +1236,12 @@ pub fn render_compositions_index(
   {body}
 </div>"##,
         q = esc(q),
-        use_hidden = use_case.map(|v| format!(r#"<input type="hidden" name="use" value="{}">"#, esc(v))).unwrap_or_default(),
-        layout_hidden = layout.map(|v| format!(r#"<input type="hidden" name="layout" value="{}">"#, esc(v))).unwrap_or_default(),
+        use_hidden = use_case
+            .map(|v| format!(r#"<input type="hidden" name="use" value="{}">"#, esc(v)))
+            .unwrap_or_default(),
+        layout_hidden = layout
+            .map(|v| format!(r#"<input type="hidden" name="layout" value="{}">"#, esc(v)))
+            .unwrap_or_default(),
         use_chips = use_chips,
         layout_chips = layout_chips,
         n = matches.len(),
@@ -1243,10 +1398,19 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<String> {
         .unwrap_or_default();
 
     let dl = match o.get("ifc_file").and_then(Value::as_str) {
-        Some(f) => format!(r#"<a class="bim-cat-btn" href="/furniture/download/{}">Download IFC (.ifc)</a>"#, esc(f)),
-        None => r#"<p class="bim-cat-note">No IFC block published for this object yet.</p>"#.to_string(),
+        Some(f) => format!(
+            r#"<a class="bim-cat-btn" href="/furniture/download/{}">Download IFC (.ifc)</a>"#,
+            esc(f)
+        ),
+        None => {
+            r#"<p class="bim-cat-note">No IFC block published for this object yet.</p>"#.to_string()
+        }
     };
-    let src = match o.get("url").and_then(Value::as_str).filter(|u| !u.is_empty()) {
+    let src = match o
+        .get("url")
+        .and_then(Value::as_str)
+        .filter(|u| !u.is_empty())
+    {
         Some(u) => format!(
             r#"<p class="bim-cat-note">Manufacturer source: <a href="{u}" target="_blank" rel="noopener">{u}</a></p>"#,
             u = esc(u)
@@ -1283,7 +1447,9 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<String> {
     let used_in_block = if used_in.is_empty() {
         String::new()
     } else {
-        format!(r#"<div class="bim-cat-secth">Used in</div><div class="bim-usedin">{used_in}</div>"#)
+        format!(
+            r#"<div class="bim-cat-secth">Used in</div><div class="bim-usedin">{used_in}</div>"#
+        )
     };
 
     Some(format!(
@@ -1298,7 +1464,7 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<String> {
         <span class="bim-cat-chip bim-cat-chip--machine" title="Real, downloadable machine-readable data — see Download below">IFC 4.3 &middot; DTCG</span>
       </div>
       <h1>{name}</h1>
-      <p class="bim-detail-head__prov">{mfr} &middot; verified BIM Object</p>
+      <p class="bim-detail-head__prov">{mfr} &middot; BIM Object</p>
     </div>
   </header>
   <p class="bim-cat-desc">{description}</p>
@@ -1336,7 +1502,10 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<String> {
 // ─────────────────────────────────────────────────────────────────────────────
 
 fn zone_bars_html(c: &Value) -> String {
-    let has_zone = c.get("has_zone_data").and_then(Value::as_bool).unwrap_or(false);
+    let has_zone = c
+        .get("has_zone_data")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     if !has_zone {
         return r#"<p class="bim-cat-note">Floor-scale plan — sized as a proportion of the floor plate; no three-zone cross-section is modeled at this program level.</p>"#.to_string();
     }
@@ -1345,7 +1514,10 @@ fn zone_bars_html(c: &Value) -> String {
         ("Zone 2", "Magazine", c.get("zone2").and_then(Value::as_f64)),
         ("Zone 3", "Corridor", c.get("zone3").and_then(Value::as_f64)),
     ];
-    let present: Vec<(&str, &str, f64)> = rows.into_iter().filter_map(|(a, b, v)| v.map(|v| (a, b, v))).collect();
+    let present: Vec<(&str, &str, f64)> = rows
+        .into_iter()
+        .filter_map(|(a, b, v)| v.map(|v| (a, b, v)))
+        .collect();
     let max = present.iter().fold(0.0_f64, |m, (_, _, v)| m.max(*v));
     let bars: String = present
         .iter()
@@ -1364,7 +1536,11 @@ fn zone_bars_html(c: &Value) -> String {
 }
 
 fn bill_html(c: &Value, comp_slug: &str) -> String {
-    let bill = c.get("bill").and_then(Value::as_array).cloned().unwrap_or_default();
+    let bill = c
+        .get("bill")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
     let n = bill.len();
     let linked_n = bill
         .iter()
@@ -1372,15 +1548,22 @@ fn bill_html(c: &Value, comp_slug: &str) -> String {
         .count();
 
     if n == 0 {
-        let program = c.get("furniture_program").and_then(Value::as_array).cloned().unwrap_or_default();
-        return format!(
-            r#"<div class="bim-bill-status"><span class="bim-bill-status__chip">Object linking: 0 of 0 — pending</span></div><p class="bim-cat-note">No structured furniture program on record for this entry yet.{extra}</p>"#,
-            extra = if program.is_empty() { "".to_string() } else { " Prose program on file.".to_string() }
-        );
+        let program = c
+            .get("furniture_program")
+            .and_then(Value::as_array)
+            .cloned()
+            .unwrap_or_default();
+        return if program.is_empty() {
+            r#"<p class="bim-cat-note">Room programme on record; no furniture layout catalogued.</p>"#.to_string()
+        } else {
+            r#"<p class="bim-cat-note">Furniture programme on record; not linked to catalog Objects.</p>"#.to_string()
+        };
     }
 
     let status_chip = if linked_n < n {
-        format!(r#"<div class="bim-bill-status"><span class="bim-bill-status__chip">Object linking: {linked_n} of {n} — pending</span></div>"#)
+        format!(
+            r#"<div class="bim-bill-status"><span class="bim-bill-status__chip">{linked_n} of {n} parts linked to the catalog</span></div>"#
+        )
     } else {
         String::new()
     };
@@ -1414,7 +1597,7 @@ fn bill_html(c: &Value, comp_slug: &str) -> String {
                 )
             } else {
                 format!(
-                    r#"<div class="bim-bill-row bim-bill-row--unlinked" data-plan-obj="{i}"><span class="bim-bill-row__name">{name}</span><span class="bim-bill-row__tag">not yet linked</span></div>"#,
+                    r#"<div class="bim-bill-row bim-bill-row--unlinked" data-plan-obj="{i}"><span class="bim-bill-row__name">{name}</span><span class="bim-bill-row__tag">not in catalog</span></div>"#,
                     i = i,
                     name = esc(name),
                 )
@@ -1430,7 +1613,11 @@ fn bill_html(c: &Value, comp_slug: &str) -> String {
 /// right inspector rail swaps to the object's spec sheet, with a breadcrumb
 /// and a "back to composition" link, so context is never destroyed (fixes
 /// the 2026-07 audit's "clicking a bill row wipes the whole panel" finding).
-pub fn render_composition_detail(state: &AppState, slug: &str, highlight_object: Option<&str>) -> Option<String> {
+pub fn render_composition_detail(
+    state: &AppState,
+    slug: &str,
+    highlight_object: Option<&str>,
+) -> Option<String> {
     let objects = build_objects(state);
     let compositions = build_compositions(state, &objects);
     let c = compositions.iter().find(|c| s(c, "slug") == slug)?;
@@ -1440,7 +1627,10 @@ pub fn render_composition_detail(state: &AppState, slug: &str, highlight_object:
     let cat_label = s(c, "category_label");
     let space = s(c, "uniclass_space");
     let description = s(c, "description");
-    let has_zone = c.get("has_zone_data").and_then(Value::as_bool).unwrap_or(false);
+    let has_zone = c
+        .get("has_zone_data")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
     let area_sf = int_of(c, "area_sf");
     let area_m2 = c.get("area_m2").and_then(Value::as_str);
 
@@ -1449,7 +1639,45 @@ pub fn render_composition_detail(state: &AppState, slug: &str, highlight_object:
     } else {
         super::svg::render_floor_scale_svg()
     };
-    let plan_variant = if has_zone { "" } else { " bim-cat-preview--floorscale" };
+    let plan_variant = if has_zone {
+        ""
+    } else {
+        " bim-cat-preview--floorscale"
+    };
+
+    // Round 6 (2026-07-10) bug fix: this metadata used to sit at the bottom of
+    // the (often much taller) rail. Since .bim-inspector-page__plan is sticky
+    // and only as tall as the drawing itself, that left a large stretch of
+    // empty page background below the plan on any composition with a long
+    // parts list. It describes the plan, not the parts list, so it belongs
+    // under the drawing in both the normal and object-highlight views.
+    let plan_area_line = match (area_sf, area_m2) {
+        (Some(sf), Some(m2)) => format!(
+            r#"<div class="bim-cat-areabox"><span class="bim-cat-areabox__kicker">Data Box</span><span class="bim-cat-areabox__n">{sf}<small> SF</small></span><span class="bim-cat-areabox__l">Net leasable area &middot; {m2} m²</span></div>"#,
+            sf = sf,
+            m2 = esc(m2)
+        ),
+        (Some(sf), None) => format!(
+            r#"<div class="bim-cat-areabox"><span class="bim-cat-areabox__kicker">Data Box</span><span class="bim-cat-areabox__n">{sf}<small> SF</small></span><span class="bim-cat-areabox__l">Net leasable area</span></div>"#,
+            sf = sf
+        ),
+        _ => String::new(),
+    };
+    let plan_classblock = format!(
+        r#"<div class="bim-cat-secth">Classification &amp; registry</div>
+    <div class="bim-cat-classblock">
+      <div class="bim-cat-clrow"><span class="bim-cat-clrow__k">Uniclass 2015 — SL (Spaces/locations)</span><span class="bim-cat-clrow__v">{space}</span></div>
+      <div class="bim-cat-clrow"><span class="bim-cat-clrow__k">Key Plan reference</span><span class="bim-cat-clrow__v">{id}<small>{cat_label}</small></span></div>
+    </div>"#,
+        space = esc(space),
+        id = esc(id),
+        cat_label = esc(cat_label),
+    );
+    let plan_meta = format!(
+        "{plan_area_line}{plan_classblock}",
+        plan_area_line = plan_area_line,
+        plan_classblock = plan_classblock
+    );
 
     let breadcrumb_normal = format!(
         r#"<nav class="bim-breadcrumbs"><a href="/">Home</a> / <a href="/compositions">Compositions</a> / <span>{name}</span></nav>"#,
@@ -1472,8 +1700,12 @@ pub fn render_composition_detail(state: &AppState, slug: &str, highlight_object:
             .map(|rows| spec_rows_grouped(rows))
             .unwrap_or_default();
         let dl = match o.get("ifc_file").and_then(Value::as_str) {
-            Some(f) => format!(r#"<a class="bim-cat-btn" href="/furniture/download/{}">Download IFC (.ifc)</a>"#, esc(f)),
-            None => r#"<p class="bim-cat-note">No IFC block published for this object yet.</p>"#.to_string(),
+            Some(f) => format!(
+                r#"<a class="bim-cat-btn" href="/furniture/download/{}">Download IFC (.ifc)</a>"#,
+                esc(f)
+            ),
+            None => r#"<p class="bim-cat-note">No IFC block published for this object yet.</p>"#
+                .to_string(),
         };
         format!(
             r#"<nav class="bim-breadcrumbs"><a href="/">Home</a> / <span class="bim-cat-chip bim-cat-chip--ef bim-cat-chip--inline"><span class="bim-cat-chip__lv">SL</span>{space}</span> / <a href="/compositions/{slug}">{id}</a> / <span>{o_name}</span></nav>
@@ -1484,7 +1716,7 @@ pub fn render_composition_detail(state: &AppState, slug: &str, highlight_object:
       <span class="bim-cat-chip bim-cat-chip--machine">IFC 4.3 &middot; DTCG</span>
     </div>
     <h2 class="bim-inspector__title">{o_name}</h2>
-    <p class="bim-detail-head__prov">{manufacturer} &middot; verified BIM Object</p>
+    <p class="bim-detail-head__prov">{manufacturer} &middot; BIM Object</p>
     <p class="bim-cat-desc">{description_o}</p>
     <div class="bim-cat-secth">Specification &amp; property set</div>
     <table class="bim-cat-spectable"><tbody>{spec_rows}</tbody></table>
@@ -1495,17 +1727,20 @@ pub fn render_composition_detail(state: &AppState, slug: &str, highlight_object:
     </div>
     <div class="bim-cat-secth">Download <span class="bim-cat-chip bim-cat-chip--machine">machine-readable</span></div>
     {dl}"#,
-            slug = esc(slug), id = esc(id), name = esc(name), space = esc(space), o_name = esc(o_name),
-            uni_pr = esc(uni_pr), uni_title = esc(uni_title), ifc_class = esc(ifc_class),
-            manufacturer = esc(manufacturer), description_o = esc(description_o),
-            spec_rows = spec_rows, dl = dl,
+            slug = esc(slug),
+            id = esc(id),
+            name = esc(name),
+            space = esc(space),
+            o_name = esc(o_name),
+            uni_pr = esc(uni_pr),
+            uni_title = esc(uni_title),
+            ifc_class = esc(ifc_class),
+            manufacturer = esc(manufacturer),
+            description_o = esc(description_o),
+            spec_rows = spec_rows,
+            dl = dl,
         )
     } else {
-        let area_line = match (area_sf, area_m2) {
-            (Some(sf), Some(m2)) => format!(r#"<div class="bim-cat-areabox"><span class="bim-cat-areabox__kicker">Data Box</span><span class="bim-cat-areabox__n">{sf}<small> SF</small></span><span class="bim-cat-areabox__l">Net leasable area &middot; {m2} m²</span></div>"#, sf = sf, m2 = esc(m2)),
-            (Some(sf), None) => format!(r#"<div class="bim-cat-areabox"><span class="bim-cat-areabox__kicker">Data Box</span><span class="bim-cat-areabox__n">{sf}<small> SF</small></span><span class="bim-cat-areabox__l">Net leasable area</span></div>"#, sf = sf),
-            _ => String::new(),
-        };
         let spec_rows: String = c
             .get("spec")
             .and_then(Value::as_array)
@@ -1520,21 +1755,18 @@ pub fn render_composition_detail(state: &AppState, slug: &str, highlight_object:
     <h2 class="bim-inspector__title">{name}</h2>
     <p class="bim-detail-head__prov">{id} &middot; {cat_label}</p>
     <p class="bim-cat-desc">{description}</p>
-    {area_line}
     <div class="bim-cat-secth">Zone allocation</div>
     {zone_bars}
     <div class="bim-cat-secth">Parts list <span class="bim-cat-secth__sub">every Object this assembly is built from</span></div>
     {bill}
     <div class="bim-cat-secth">Specification</div>
-    <table class="bim-cat-spectable"><tbody>{spec_rows}</tbody></table>
-    <div class="bim-cat-secth">Classification &amp; registry</div>
-    <div class="bim-cat-classblock">
-      <div class="bim-cat-clrow"><span class="bim-cat-clrow__k">Uniclass 2015 — SL (Spaces/locations)</span><span class="bim-cat-clrow__v">{space}</span></div>
-      <div class="bim-cat-clrow"><span class="bim-cat-clrow__k">Key Plan reference</span><span class="bim-cat-clrow__v">{id}<small>{cat_label}</small></span></div>
-    </div>"#,
+    <table class="bim-cat-spectable"><tbody>{spec_rows}</tbody></table>"#,
             breadcrumb = breadcrumb_normal,
-            space = esc(space), name = esc(name), id = esc(id), cat_label = esc(cat_label),
-            description = esc(description), area_line = area_line,
+            space = esc(space),
+            name = esc(name),
+            id = esc(id),
+            cat_label = esc(cat_label),
+            description = esc(description),
             zone_bars = zone_bars_html(c),
             bill = bill_html(c, slug),
             spec_rows = spec_rows,
@@ -1545,6 +1777,7 @@ pub fn render_composition_detail(state: &AppState, slug: &str, highlight_object:
         r#"<div class="bim-inspector-page">
   <div class="bim-inspector-page__plan">
     <div class="bim-cat-preview{plan_variant}">{plan_svg}</div>
+    <div class="bim-inspector-page__plan-meta">{plan_meta}</div>
   </div>
   <div class="bim-inspector-page__rail">
     {right_rail}
@@ -1552,6 +1785,7 @@ pub fn render_composition_detail(state: &AppState, slug: &str, highlight_object:
 </div>"#,
         plan_variant = plan_variant,
         plan_svg = plan_svg,
+        plan_meta = plan_meta,
         right_rail = right_rail,
     ))
 }
