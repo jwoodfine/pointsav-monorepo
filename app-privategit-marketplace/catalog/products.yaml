@@ -21,3 +21,23 @@ installers:
     path: os-network-admin/beta
     license_tier: fsl
     price_usdc: 0
+
+  - id: app-orchestration-command
+    name: PointSav Orchestration Command Server
+    description: Invite-token pairing and fleet API hub for Totebox Orchestration
+    edition: "0.0.1"
+    platform: "Linux x86_64"
+    size_mb: 2
+    path: app-orchestration-command/0.0.1
+    license_tier: proprietary
+    price_usdc: 0
+
+  - id: app-mediakit-knowledge
+    name: PointSav Knowledge Wiki
+    description: Self-hosted Wikipedia-pattern wiki engine — documentation, projects, and corporate instances
+    edition: "0.1.0"
+    platform: "x86_64-unknown-linux-gnu"
+    size_mb: 259
+    path: app-mediakit-knowledge/0.1.0
+    license_tier: fsl
+    price_usdc: 0
