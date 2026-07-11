@@ -105,6 +105,11 @@ undertaken to be updated except as required by law.</p>",
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{full_title}</title>
   <meta name="description" content="Building specifications that enforce compliance at placement, not inspection after the fact. Open-standard IFC 4.3 BIM Object catalog.">
+  <!-- Round 7 (2026-07-11): inline SVG favicon — a bounded room with a
+       zone-partition line, same navy-stroke plan-drawing convention used
+       throughout the site. No new binary asset to manage; browsers were
+       requesting /favicon.ico and getting a 404 on every page load. -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23F7F9FA'/%3E%3Crect x='5' y='5' width='22' height='22' rx='1' fill='none' stroke='%23164679' stroke-width='2.5'/%3E%3Cline x1='5' y1='20' x2='27' y2='20' stroke='%23164679' stroke-width='2'/%3E%3C/svg%3E">
   <link rel="stylesheet" href="/static/fonts.css">
   <link rel="stylesheet" href="/static/tokens.css">
   <link rel="stylesheet" href="/static/bim-layout.css">

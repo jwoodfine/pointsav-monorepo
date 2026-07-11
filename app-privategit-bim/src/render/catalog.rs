@@ -1373,7 +1373,7 @@ pub fn render_objects_compare(state: &AppState, ids: &[String]) -> String {
 // SSR — `/objects/{slug}` detail page
 // ─────────────────────────────────────────────────────────────────────────────
 
-pub fn render_object_detail(state: &AppState, slug: &str) -> Option<String> {
+pub fn render_object_detail(state: &AppState, slug: &str) -> Option<(String, String)> {
     let objects = build_objects(state);
     let compositions = build_compositions(state, &objects);
     let o = objects.iter().find(|o| s(o, "id") == slug)?;
@@ -1451,7 +1451,7 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<String> {
         )
     };
 
-    Some(format!(
+    let html = format!(
         r#"<div class="bim-detail-page bim-detail-page--object">
   <nav class="bim-breadcrumbs"><a href="/">Home</a> / <a href="/objects">Objects</a> / <span>{name}</span></nav>
   <header class="bim-detail-head">
@@ -1492,7 +1492,8 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<String> {
         used_in_block = used_in_block,
         dl = dl,
         src = src,
-    ))
+    );
+    Some((name.to_string(), html))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1616,12 +1617,32 @@ pub fn render_composition_detail(
     state: &AppState,
     slug: &str,
     highlight_object: Option<&str>,
-) -> Option<String> {
+) -> Option<(String, String)> {
     let objects = build_objects(state);
     let compositions = build_compositions(state, &objects);
     let c = compositions.iter().find(|c| s(c, "slug") == slug)?;
+    // Round 7 (2026-07-11): a composition not publicly visible (Corporate
+    // Office — no real zone/space-planning data) is being actively
+    // deprioritized, not just left thin — its detail page 404s like it
+    // doesn't exist, unlike the room-programme-only entries this same gate
+    // suppresses from the grid, which stay directly reachable by design.
+    if !composition_is_publicly_visible(c) {
+        return None;
+    }
 
     let name = s(c, "name");
+    // Round 7 (2026-07-11): real browser-tab title — the object's own name
+    // when viewing its spec sheet inside a composition, the composition's
+    // name otherwise. Previously the route handler passed a hardcoded
+    // literal "Composition" regardless of which composition was open.
+    let page_title = match highlight_object {
+        Some(obj_slug) => objects
+            .iter()
+            .find(|o| s(o, "id") == obj_slug)
+            .map(|o| s(o, "name").to_string())
+            .unwrap_or_else(|| name.to_string()),
+        None => name.to_string(),
+    };
     let id = s(c, "id");
     let cat_label = s(c, "category_label");
     let space = s(c, "uniclass_space");
@@ -1770,7 +1791,7 @@ pub fn render_composition_detail(
         )
     };
 
-    Some(format!(
+    let html = format!(
         r#"<div class="bim-inspector-page">
   <div class="bim-inspector-page__plan">
     <div class="bim-cat-preview{plan_variant}">{plan_svg}</div>
@@ -1784,7 +1805,8 @@ pub fn render_composition_detail(
         plan_svg = plan_svg,
         plan_meta = plan_meta,
         right_rail = right_rail,
-    ))
+    );
+    Some((page_title, html))
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

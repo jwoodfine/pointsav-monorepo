@@ -41,8 +41,8 @@ pub async fn composition_detail_handler(
     State(state): State<AppState>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     match render::catalog::render_composition_detail(&state, &slug, None) {
-        Some(content) => Ok(Html(render::shell::page_shell(
-            "Composition",
+        Some((name, content)) => Ok(Html(render::shell::page_shell(
+            &name,
             &format!("/compositions/{slug}"),
             &content,
             &state,
@@ -56,8 +56,8 @@ pub async fn composition_object_handler(
     State(state): State<AppState>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     match render::catalog::render_composition_detail(&state, &slug, Some(&object_slug)) {
-        Some(content) => Ok(Html(render::shell::page_shell(
-            "Composition",
+        Some((name, content)) => Ok(Html(render::shell::page_shell(
+            &name,
             &format!("/compositions/{slug}/o/{object_slug}"),
             &content,
             &state,
