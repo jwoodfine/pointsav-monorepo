@@ -23,14 +23,14 @@ pub async fn about_handler(State(state): State<AppState>) -> Html<String> {
         ));
         if section.heading == "Two ladders, one substrate" {
             sections.push_str(&format!(
-                r#"<figure class="bim-method-figure">{svg}<figcaption>The element ladder (Object aggregates into Composition) and the space ladder (Zone aggregates into Key Plan, Tile, Floor Plate, Building) — joined only by containment, never merged into one ladder.</figcaption></figure>"#,
+                r#"<figure class="bim-method-figure">{svg}<figcaption>The element ladder (Object aggregates into Composition) and the space ladder (Key Plan aggregates into Tile, Floor Plate, Building) — joined only by containment, never merged into one ladder.</figcaption></figure>"#,
                 svg = render::svg::render_two_ladder_svg()
             ));
         } else if section.heading == "Key Plans and Tiles" {
             let illustrative_zone_svg =
                 render::svg::render_kp_zone_svg(6.0, 3.5, Some(2.0), "private-office", None);
             sections.push_str(&format!(
-                r#"<figure class="bim-method-figure">{svg}<figcaption>An illustrative Key Plan cross-section: Zone 1 Habitat, Zone 2 Magazine, Zone 3 Corridor. Real depths vary by Key Plan; see individual Composition pages for measured values.</figcaption></figure>"#,
+                r#"<figure class="bim-method-figure">{svg}<figcaption>An illustrative Key Plan cross-section: Habitat, Magazine, Corridor. Real depths vary by Key Plan; see individual Composition pages for measured values.</figcaption></figure>"#,
                 svg = illustrative_zone_svg
             ));
         }

@@ -96,7 +96,7 @@ pub fn render_kp_zone_svg(
     let caption = "var(--bim-fg-caption)";
 
     // Drawing area: x=22, y=10, max_w=153, h=94 within 180×112 viewBox.
-    // Left 22px reserved for Z1/Z2/Z3 labels.
+    // Left 22px reserved for the Habitat/Magazine/Corridor letter labels.
     let x0: f64 = 22.0;
     let y0: f64 = 10.0;
     let max_dw: f64 = 153.0;
@@ -258,16 +258,26 @@ pub fn render_kp_zone_svg(
         ));
     }
 
-    // Zone labels (left of plan) — caption weight, uniform across zones.
-    // Z1/Z2/Z3 letters are the primary identity of each band (kept visible
-    // at every viewport, class `--zone`); the depth-in-metres numbers below
-    // each letter are tertiary detail (class `--dim`) — real, but the least
+    // Habitat/Magazine/Corridor labels (left of plan) — caption weight,
+    // uniform across all three. Round 7 (2026-07-10): were "Z1"/"Z2"/"Z3" —
+    // dropped the "Zone N" ordinal (real research found no architectural
+    // standard, IFC construct, or mainstream BIM tool uses it; Revit's own
+    // default zone is literally "Default," IFC's IfcZone means something
+    // else entirely) in favour of single-letter initials of the real
+    // proprietary names, same footprint as the labels they replace. The
+    // letters are the primary identity of each band (kept visible at every
+    // viewport, class `--zone`); the depth-in-metres numbers below each
+    // letter are tertiary detail (class `--dim`) — real, but the least
     // load-bearing text on the diagram, and the one Round 5's live 360px
     // audit found rendering as small as 4.0px computed. `--dim` nodes are
     // hidden below a render-width threshold in bim-planroom.css rather than
     // shrunk further; the letters stay legible on their own at every size.
+    // Full names (Habitat/Magazine/Corridor) render alongside the parallel
+    // HTML zone-bar view (`zone_bars_html`, catalog.rs) and in the
+    // surrounding prose/figcaption — this diagram isn't the only place a
+    // reader sees the real name.
     s.push_str(&format!(
-        "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"{}\" class=\"bim-plan-mono bim-plan-mono--zone\" text-anchor=\"end\">Z1</text>",
+        "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"{}\" class=\"bim-plan-mono bim-plan-mono--zone\" text-anchor=\"end\">H</text>",
         lz1a, caption
     ));
     s.push_str(&format!(
@@ -275,7 +285,7 @@ pub fn render_kp_zone_svg(
         lz1b, caption, z1
     ));
     s.push_str(&format!(
-        "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"{}\" class=\"bim-plan-mono bim-plan-mono--zone\" text-anchor=\"end\">Z2</text>",
+        "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"{}\" class=\"bim-plan-mono bim-plan-mono--zone\" text-anchor=\"end\">M</text>",
         lz2a, caption
     ));
     s.push_str(&format!(
@@ -284,7 +294,7 @@ pub fn render_kp_zone_svg(
     ));
     if h3 >= 8.0 {
         s.push_str(&format!(
-            "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"{}\" class=\"bim-plan-mono bim-plan-mono--zone\" text-anchor=\"end\">Z3</text>",
+            "<text x=\"21\" y=\"{:.1}\" font-size=\"5\" fill=\"{}\" class=\"bim-plan-mono bim-plan-mono--zone\" text-anchor=\"end\">C</text>",
             lz3a, caption
         ));
         if h3 >= 14.0 {
@@ -957,7 +967,7 @@ pub fn render_two_ladder_svg() -> String {
     let accent_subtle = "var(--bim-accent-subtle)";
     let caption = "var(--bim-fg-caption)";
     let mut s = String::with_capacity(2400);
-    s.push_str("<svg class=\"bim-method-diagram\" viewBox=\"0 0 320 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"The two-ladder model: element ladder (Object, Composition) and space ladder (Zone, Key Plan, Tile, Floor Plate, Building), joined by containment\">");
+    s.push_str("<svg class=\"bim-method-diagram\" viewBox=\"0 0 320 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"The two-ladder model: element ladder (Object, Composition) and space ladder (Key Plan, Tile, Floor Plate, Building), joined by containment\">");
     s.push_str("<rect width=\"320\" height=\"210\" fill=\"var(--bim-bg-surface)\"/>");
 
     // Column headers.
@@ -986,14 +996,20 @@ pub fn render_two_ladder_svg() -> String {
         "<text x=\"78\" y=\"120\" font-size=\"5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"start\">aggregates</text>"
     ));
 
-    // Space ladder: Building, Floor Plate, Tile, Key Plan, Zone (top to
-    // bottom), five rungs, solid aggregation lines between each.
-    let space_rungs: [(&str, f64); 5] = [
-        ("Building", 10.0),
-        ("Floor Plate", 52.0),
-        ("Tile", 94.0),
-        ("Key Plan", 136.0),
-        ("Zone", 178.0),
+    // Space ladder: Building, Floor Plate, Tile, Key Plan (top to bottom),
+    // four rungs, solid aggregation lines between each. Round 7 (2026-07-10):
+    // "Zone" was removed as a fifth rung here — Habitat/Magazine/Corridor
+    // are the internal decomposition of a single Key Plan, not a separate
+    // composable spatial unit with its own aggregation chain the way Tiles
+    // aggregate Key Plans (a real modelling error this diagram introduced;
+    // see "Key Plans and Tiles" for where Habitat/Magazine/Corridor are
+    // actually explained). Rungs re-centered in the 210-height viewBox at
+    // the same 42px pitch (22 rung height + 20 gap) used before.
+    let space_rungs: [(&str, f64); 4] = [
+        ("Building", 31.0),
+        ("Floor Plate", 73.0),
+        ("Tile", 115.0),
+        ("Key Plan", 157.0),
     ];
     for (label, y) in space_rungs {
         s.push_str(&format!(
@@ -1014,12 +1030,15 @@ pub fn render_two_ladder_svg() -> String {
     // ladder), dashed — the one relationship that is genuinely different
     // in kind (an Object/Composition sits INSIDE a Key Plan; it is not
     // aggregated the way a Tile aggregates Key Plans).
+    // Round 7 (2026-07-10): endpoint recomputed to land on Key Plan's new
+    // vertical center (157 + 22/2 = 168, was 147 when Key Plan sat at y=136
+    // with Zone still occupying the rung below it).
     s.push_str(&format!(
-        "<line x1=\"114\" y1=\"53\" x2=\"186\" y2=\"147\" stroke=\"{accent}\" stroke-width=\"1\" stroke-dasharray=\"4,3\"/>\
-<path d=\"M186,147 l-8,-2 l1,6 z\" fill=\"{accent}\"/>"
+        "<line x1=\"114\" y1=\"53\" x2=\"186\" y2=\"168\" stroke=\"{accent}\" stroke-width=\"1\" stroke-dasharray=\"4,3\"/>\
+<path d=\"M186,168 l-8,-2 l1,6 z\" fill=\"{accent}\"/>"
     ));
     s.push_str(&format!(
-        "<text x=\"150\" y=\"95\" font-size=\"5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" transform=\"rotate(30 150 95)\">contained in</text>"
+        "<text x=\"150\" y=\"106\" font-size=\"5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" transform=\"rotate(35 150 106)\">contained in</text>"
     ));
 
     s.push_str("</svg>");
