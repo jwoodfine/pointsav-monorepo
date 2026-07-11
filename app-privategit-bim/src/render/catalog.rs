@@ -175,26 +175,27 @@ fn dims_summary(dims: &Value) -> String {
     }
 }
 
-/// Round 6 (2026-07-10) P2: true for a composition that should be visible
-/// on the public catalog. Suppresses "room-programme-only" entries —
-/// `has_zone_data` true but zero bill items, meaning no `furniture_program`
-/// was ever authored, only bare room names — a genuinely thin record, not
-/// ready for public display. Corporate Office (`has_zone_data` false, a
-/// different correct-by-design floor-scale record type) and any
-/// composition with at least one bill item (even partially linked, e.g.
-/// PO-2/PO-3) both pass. This is a display-layer gate only — the
-/// underlying token data and `/api/tokens.json` are untouched.
+/// Round 7 (2026-07-10): true for a composition that should be visible on
+/// the public catalog. Visible iff the entry carries real Key Plan
+/// space-planning data (`has_zone_data` — a real zone1 depth, sourced from
+/// `FIN.xlsx Summary_Key Plans V3 2025-11-29`), regardless of whether its
+/// furniture bill is linked yet — Private Office, Medical, Academic,
+/// Laboratory, Business, and Civic all qualify. Corporate Office's 5
+/// entries carry no zone data at all (a different, correct-by-design
+/// floor-scale leasehold record type, not a Key Plan) and are suppressed by
+/// this gate, per operator direction. (Superseded Round 6 P2 logic: this
+/// gate previously suppressed exactly the entries it should have shown —
+/// `has_zone_data && bill.len() == 0` hid every real Key Plan category
+/// except Private Office while letting Corporate Office through only
+/// because it has no zone fields to check.) Display-layer gate only — the
+/// underlying token data and `/api/tokens.json` are untouched; a suppressed
+/// entry's own detail page stays directly reachable, matching the existing
+/// precedent for the room-programme-only entries this gate suppressed
+/// previously.
 fn composition_is_publicly_visible(c: &Value) -> bool {
-    let has_zone = c
-        .get("has_zone_data")
+    c.get("has_zone_data")
         .and_then(Value::as_bool)
-        .unwrap_or(false);
-    let bill_len = c
-        .get("bill")
-        .and_then(Value::as_array)
-        .map(|a| a.len())
-        .unwrap_or(0);
-    !(has_zone && bill_len == 0)
+        .unwrap_or(false)
 }
 
 /// Round 5 (2026-07-10): groups a flat spec-row array under real IFC
@@ -497,13 +498,13 @@ pub(crate) fn build_compositions(state: &AppState, objects: &[Value]) -> Vec<Val
             _ => {}
         }
         if let Some(z) = z1 {
-            row("Zone 1 (Habitat) depth", format!("{} m", round2(z)));
+            row("Habitat depth", format!("{} m", round2(z)));
         }
         if let Some(z) = z2 {
-            row("Zone 2 (Magazine) depth", format!("{} m", round2(z)));
+            row("Magazine depth", format!("{} m", round2(z)));
         }
         if let Some(z) = z3 {
-            row("Zone 3 (Corridor) depth", format!("{} m", round2(z)));
+            row("Corridor depth", format!("{} m", round2(z)));
         }
         if let Some(fr) = f_of(val, "facade_frontage_m") {
             row("Facade frontage", format!("{} m", round2(fr)));
@@ -1508,9 +1509,9 @@ fn zone_bars_html(c: &Value) -> String {
         return r#"<p class="bim-cat-note">Floor-scale plan — sized as a proportion of the floor plate; no three-zone cross-section is modeled at this program level.</p>"#.to_string();
     }
     let rows: Vec<(&str, &str, Option<f64>)> = vec![
-        ("Zone 1", "Habitat", c.get("zone1").and_then(Value::as_f64)),
-        ("Zone 2", "Magazine", c.get("zone2").and_then(Value::as_f64)),
-        ("Zone 3", "Corridor", c.get("zone3").and_then(Value::as_f64)),
+        ("H", "Habitat", c.get("zone1").and_then(Value::as_f64)),
+        ("M", "Magazine", c.get("zone2").and_then(Value::as_f64)),
+        ("C", "Corridor", c.get("zone3").and_then(Value::as_f64)),
     ];
     let present: Vec<(&str, &str, f64)> = rows
         .into_iter()
