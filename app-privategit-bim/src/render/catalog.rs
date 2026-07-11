@@ -722,10 +722,7 @@ fn counted(values: impl Iterator<Item = String>) -> Vec<(String, usize)> {
 }
 
 fn search_tokens(q: &str) -> Vec<String> {
-    q.trim()
-        .split_whitespace()
-        .map(|t| t.to_lowercase())
-        .collect()
+    q.split_whitespace().map(|t| t.to_lowercase()).collect()
 }
 
 fn matches_search(haystack: &str, tokens: &[String]) -> bool {
@@ -1308,7 +1305,8 @@ pub fn render_objects_compare(state: &AppState, ids: &[String]) -> String {
             .to_string();
     }
 
-    let rows: [(&str, fn(&Value) -> String); 5] = [
+    type CompareRow = (&'static str, fn(&Value) -> String);
+    let rows: [CompareRow; 5] = [
         ("Name", |o| esc(s(o, "name"))),
         ("Manufacturer", |o| esc(s(o, "manufacturer"))),
         ("Dimensions", |o| esc(&compare_dims_cell(o))),
@@ -1685,9 +1683,7 @@ pub fn render_composition_detail(
     );
 
     let right_rail = if let Some(obj_slug) = highlight_object {
-        let Some(o) = objects.iter().find(|o| s(o, "id") == obj_slug) else {
-            return None;
-        };
+        let o = objects.iter().find(|o| s(o, "id") == obj_slug)?;
         let o_name = s(o, "name");
         let ifc_class = s(o, "ifc_class");
         let uni_pr = s(o, "uniclass_pr");
