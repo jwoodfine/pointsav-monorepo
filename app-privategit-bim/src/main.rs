@@ -32,8 +32,14 @@ fn build_app(app_state: state::AppState, static_dir: PathBuf) -> Router {
         // axum/matchit already disambiguates a literal static segment over a
         // param segment at the same position regardless of registration
         // order, but this reads correctly either way.
-        .route("/objects/compare", get(routes::objects::objects_compare_handler))
-        .route("/objects/{slug}", get(routes::objects::object_detail_handler))
+        .route(
+            "/objects/compare",
+            get(routes::objects::objects_compare_handler),
+        )
+        .route(
+            "/objects/{slug}",
+            get(routes::objects::object_detail_handler),
+        )
         .route(
             "/compositions",
             get(routes::compositions::compositions_index_handler),
@@ -47,7 +53,10 @@ fn build_app(app_state: state::AppState, static_dir: PathBuf) -> Router {
             get(routes::compositions::composition_object_handler),
         )
         .route("/method", get(routes::about::about_handler))
-        .route("/disclaimers", get(routes::disclaimers::disclaimers_handler))
+        .route(
+            "/disclaimers",
+            get(routes::disclaimers::disclaimers_handler),
+        )
         .route("/tokens", get(routes::tokens::tokens_index_handler))
         .route(
             "/tokens/{name}",
@@ -378,7 +387,12 @@ mod route_tests {
             let article = &html[start..end];
 
             // Rebuild the section HTML exactly as the handlers do, straight
-            // from the source page data.
+            // from the source page data. Round 6 (2026-07-10) P3: the
+            // /method handler injects a real diagram <figure> right after
+            // two specific sections (about.rs) — mirror that here via the
+            // same render::svg calls, so this test still catches any
+            // unintended drift in a section's own source-derived HTML while
+            // not false-failing on the intentional diagram insertions.
             let mut expected = String::new();
             for section in page.sections.iter() {
                 expected.push_str(&format!(
@@ -386,6 +400,24 @@ mod route_tests {
                     render::shell::esc(&section.heading),
                     section.body_html,
                 ));
+                if path == "/method" && section.heading == "Two ladders, one substrate" {
+                    expected.push_str(&format!(
+                        r#"<figure class="bim-method-figure">{svg}<figcaption>The element ladder (Object aggregates into Composition) and the space ladder (Zone aggregates into Key Plan, Tile, Floor Plate, Building) — joined only by containment, never merged into one ladder.</figcaption></figure>"#,
+                        svg = render::svg::render_two_ladder_svg()
+                    ));
+                } else if path == "/method" && section.heading == "Key Plans and Tiles" {
+                    let illustrative_zone_svg = render::svg::render_kp_zone_svg(
+                        6.0,
+                        3.5,
+                        Some(2.0),
+                        "private-office",
+                        None,
+                    );
+                    expected.push_str(&format!(
+                        r#"<figure class="bim-method-figure">{svg}<figcaption>An illustrative Key Plan cross-section: Zone 1 Habitat, Zone 2 Magazine, Zone 3 Corridor. Real depths vary by Key Plan; see individual Composition pages for measured values.</figcaption></figure>"#,
+                        svg = illustrative_zone_svg
+                    ));
+                }
             }
             assert!(!expected.is_empty(), "{path} has source sections");
             assert!(

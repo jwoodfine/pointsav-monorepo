@@ -129,5 +129,6 @@ fn coat_rack_symbol() -> String {
 
 // ── Fallback: plain bounding-box rectangle for any ungrouped object ────────
 fn generic_symbol() -> String {
-    r##"<rect x="24" y="34" width="62" height="42" class="bim-plan-primary" fill="none"/>"##.to_string()
+    r##"<rect x="24" y="34" width="62" height="42" class="bim-plan-primary" fill="none"/>"##
+        .to_string()
 }

@@ -201,7 +201,8 @@ pub fn render_kp_zone_svg(
     let gap_half = 13.0;
     s.push_str(&format!(
         "<rect x=\"{:.1}\" y=\"3\" width=\"26\" height=\"7\" fill=\"{}\"/>",
-        plan_center_x - 13.0, "var(--bim-bg-surface)"
+        plan_center_x - 13.0,
+        "var(--bim-bg-surface)"
     ));
     s.push_str(&format!(
         "<text x=\"{:.1}\" y=\"8.5\" font-size=\"5.5\" fill=\"{}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" letter-spacing=\"1.2\">FACADE</text>",
@@ -936,6 +937,93 @@ pub fn render_floor_scale_svg() -> String {
     }
     s.push_str("<text x=\"90\" y=\"9\" font-size=\"5\" fill=\"var(--bim-fg-caption)\" class=\"bim-plan-mono\" text-anchor=\"middle\" letter-spacing=\"1.1\">FLOOR-SCALE — ZONE LAYOUT NOT MODELED</text>");
     s.push_str("<text x=\"90\" y=\"104\" font-size=\"4.5\" fill=\"var(--bim-fg-caption)\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\">CORE (illustrative)</text>");
+    s.push_str("</svg>");
+    s
+}
+
+/// Round 6 (2026-07-10) P3: the two-ladder model diagram for the Method
+/// page — the page whose entire job is explaining this model rendered zero
+/// diagrams while every composition detail page rendered a real one (the
+/// cohesion-audit's single highest-leverage visual finding). Two labeled
+/// columns — the element ladder (Object -> Composition) and the space
+/// ladder (Zone -> Key Plan -> Tile -> Floor Plate -> Building) — each
+/// rung connected to the next by a solid aggregation line, with a single
+/// dashed containment line bridging Composition to Key Plan. Same visual
+/// grammar as the plan diagrams: navy strokes, mono labels, dashed lines
+/// reserved for the one relationship that is genuinely different in kind
+/// (containment, not aggregation) — never a second decorative dash style.
+pub fn render_two_ladder_svg() -> String {
+    let accent = "var(--bim-accent)";
+    let accent_subtle = "var(--bim-accent-subtle)";
+    let caption = "var(--bim-fg-caption)";
+    let mut s = String::with_capacity(2400);
+    s.push_str("<svg class=\"bim-method-diagram\" viewBox=\"0 0 320 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"The two-ladder model: element ladder (Object, Composition) and space ladder (Zone, Key Plan, Tile, Floor Plate, Building), joined by containment\">");
+    s.push_str(&format!(
+        "<rect width=\"320\" height=\"210\" fill=\"var(--bim-bg-surface)\"/>"
+    ));
+
+    // Column headers.
+    s.push_str(&format!(
+        "<text x=\"64\" y=\"14\" font-size=\"7\" fill=\"{accent}\" class=\"bim-plan-mono\" text-anchor=\"middle\" letter-spacing=\"1.2\" font-weight=\"600\">ELEMENT LADDER</text>"
+    ));
+    s.push_str(&format!(
+        "<text x=\"236\" y=\"14\" font-size=\"7\" fill=\"{accent}\" class=\"bim-plan-mono\" text-anchor=\"middle\" letter-spacing=\"1.2\" font-weight=\"600\">SPACE LADDER</text>"
+    ));
+
+    // Element ladder: Composition (upper), Object (lower) — box + label,
+    // solid aggregation line between them.
+    let elem_rungs: [(&str, f64); 2] = [("Composition", 40.0), ("Object", 168.0)];
+    for (label, y) in elem_rungs {
+        s.push_str(&format!(
+            "<rect x=\"14\" y=\"{y:.1}\" width=\"100\" height=\"26\" rx=\"2\" fill=\"{accent_subtle}\" stroke=\"{accent}\" stroke-width=\"1\"/>\
+<text x=\"64\" y=\"{ty:.1}\" font-size=\"7.5\" fill=\"{accent}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">{label}</text>",
+            ty = y + 16.5
+        ));
+    }
+    s.push_str(&format!(
+        "<line x1=\"64\" y1=\"66\" x2=\"64\" y2=\"168\" stroke=\"{accent}\" stroke-width=\"1\"/>\
+<path d=\"M64,66 l-3,7 l6,0 z\" fill=\"{accent}\"/>"
+    ));
+    s.push_str(&format!(
+        "<text x=\"78\" y=\"120\" font-size=\"5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"start\">aggregates</text>"
+    ));
+
+    // Space ladder: Building, Floor Plate, Tile, Key Plan, Zone (top to
+    // bottom), five rungs, solid aggregation lines between each.
+    let space_rungs: [(&str, f64); 5] = [
+        ("Building", 10.0),
+        ("Floor Plate", 52.0),
+        ("Tile", 94.0),
+        ("Key Plan", 136.0),
+        ("Zone", 178.0),
+    ];
+    for (label, y) in space_rungs {
+        s.push_str(&format!(
+            "<rect x=\"186\" y=\"{y:.1}\" width=\"100\" height=\"22\" rx=\"2\" fill=\"var(--bim-bg-surface)\" stroke=\"{accent}\" stroke-width=\"1\"/>\
+<text x=\"236\" y=\"{ty:.1}\" font-size=\"7\" fill=\"{accent}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">{label}</text>",
+            ty = y + 14.5
+        ));
+    }
+    for pair in space_rungs.windows(2) {
+        let (y_upper_bottom, y_lower_top) = (pair[0].1 + 22.0, pair[1].1);
+        s.push_str(&format!(
+            "<line x1=\"236\" y1=\"{y_upper_bottom:.1}\" x2=\"236\" y2=\"{y_lower_top:.1}\" stroke=\"{accent}\" stroke-width=\"1\"/>\
+<path d=\"M236,{y_upper_bottom:.1} l-3,7 l6,0 z\" fill=\"{accent}\"/>"
+        ));
+    }
+
+    // Containment bridge: Composition (element ladder) -> Key Plan (space
+    // ladder), dashed — the one relationship that is genuinely different
+    // in kind (an Object/Composition sits INSIDE a Key Plan; it is not
+    // aggregated the way a Tile aggregates Key Plans).
+    s.push_str(&format!(
+        "<line x1=\"114\" y1=\"53\" x2=\"186\" y2=\"147\" stroke=\"{accent}\" stroke-width=\"1\" stroke-dasharray=\"4,3\"/>\
+<path d=\"M186,147 l-8,-2 l1,6 z\" fill=\"{accent}\"/>"
+    ));
+    s.push_str(&format!(
+        "<text x=\"150\" y=\"95\" font-size=\"5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" transform=\"rotate(30 150 95)\">contained in</text>"
+    ));
+
     s.push_str("</svg>");
     s
 }

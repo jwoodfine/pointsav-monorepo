@@ -41,7 +41,9 @@ pub async fn objects_index_handler(
     let uni = params.get("uni").map(String::as_str);
     let mfr = params.get("mfr").map(String::as_str);
     let content = render::catalog::render_objects_index(&state, &q, uni, mfr);
-    Html(render::shell::page_shell("Objects", "/objects", &content, &state))
+    Html(render::shell::page_shell(
+        "Objects", "/objects", &content, &state,
+    ))
 }
 
 /// Dimensions-scoped compare (item 8, 2026-07-09). `ids` comes from the
@@ -56,7 +58,12 @@ pub async fn objects_compare_handler(
 ) -> Html<String> {
     let ids = parse_repeated_ids(raw.as_deref());
     let content = render::catalog::render_objects_compare(&state, &ids);
-    Html(render::shell::page_shell("Compare Objects", "/objects", &content, &state))
+    Html(render::shell::page_shell(
+        "Compare Objects",
+        "/objects",
+        &content,
+        &state,
+    ))
 }
 
 pub async fn object_detail_handler(

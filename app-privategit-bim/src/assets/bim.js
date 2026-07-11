@@ -240,10 +240,30 @@ document.addEventListener('keydown', (e) => {
 // small on-screen SVGs at once cost real paint time for no real payoff: the
 // single large plan on the detail page is the one moment that reads as an
 // actual "drawing."
+// Round 6 (2026-07-10): duration/easing/stagger now live as real CSS
+// custom-property tokens (tokens.css `--bim-motion-drawon-*`), read once
+// here rather than hardcoded per-call — the whole draw-on system tunes
+// from one place. Falls back to the same values the tokens currently hold
+// if a future page renders this before tokens.css has loaded.
+function readMotionTokens() {
+  const cs = getComputedStyle(document.documentElement);
+  const duration = (cs.getPropertyValue('--bim-motion-drawon-duration') || '600ms').trim() || '600ms';
+  const easing = (cs.getPropertyValue('--bim-motion-drawon-easing') || 'ease').trim() || 'ease';
+  const stagger = parseInt(cs.getPropertyValue('--bim-motion-drawon-stagger'), 10);
+  const staggerCap = parseInt(cs.getPropertyValue('--bim-motion-drawon-stagger-cap'), 10);
+  return {
+    duration,
+    easing,
+    stagger: Number.isFinite(stagger) ? stagger : 12,
+    staggerCap: Number.isFinite(staggerCap) ? staggerCap : 40,
+  };
+}
+
 function drawOnAnimate(svg) {
   if (!svg || svg.dataset.drawnOn === '1') return;
   svg.dataset.drawnOn = '1';
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const motion = readMotionTokens();
   const shapes = svg.querySelectorAll('path, rect, line, circle, polyline, polygon');
   shapes.forEach((el, i) => {
     const stroke = el.getAttribute('stroke');
@@ -254,8 +274,8 @@ function drawOnAnimate(svg) {
     if (!len || !isFinite(len)) return;
     el.style.strokeDasharray = String(len);
     el.style.strokeDashoffset = String(len);
-    el.style.transition = 'stroke-dashoffset 0.6s ease';
-    el.style.transitionDelay = Math.min(i, 40) * 12 + 'ms';
+    el.style.transition = 'stroke-dashoffset ' + motion.duration + ' ' + motion.easing;
+    el.style.transitionDelay = Math.min(i, motion.staggerCap) * motion.stagger + 'ms';
     // Two nested rAFs: the first commits the dashoffset-at-full-length
     // style so the browser has actually painted that starting state before
     // the second rAF flips it to 0 — setting both in the same frame would
@@ -268,21 +288,28 @@ function drawOnAnimate(svg) {
   });
 }
 
+// Round 6 (2026-07-10): extended from the single composition-detail plan
+// to also cover the homepage hero's self-composing Key Plan
+// (.bim-home-masthead__visual) — the site's single largest visual asset
+// now drafts itself in on the page a visitor actually lands on first,
+// using the exact same mechanism rather than a bespoke hero-only animation.
 function initPlanDrawOn() {
-  const svg = document.querySelector('.bim-inspector-page__plan .bim-kp-diagram');
-  if (!svg) return;
+  const svgs = document.querySelectorAll(
+    '.bim-inspector-page__plan .bim-kp-diagram, .bim-home-masthead__visual .bim-kp-diagram'
+  );
+  if (!svgs.length) return;
   if ('IntersectionObserver' in window) {
     const io = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
-          drawOnAnimate(svg);
-          io.disconnect();
+          drawOnAnimate(entry.target);
+          io.unobserve(entry.target);
         }
       });
     }, { threshold: 0.15 });
-    io.observe(svg);
+    svgs.forEach((svg) => io.observe(svg));
   } else {
-    drawOnAnimate(svg);
+    svgs.forEach((svg) => drawOnAnimate(svg));
   }
 }
 initPlanDrawOn();

@@ -168,7 +168,11 @@ pub fn render_search_results(query: &str, state: &AppState) -> String {
             (description, 8),
         ];
         if let Some(score) = score_match(&tokens, &fields) {
-            let snippet_source = if description.is_empty() { ifc_class } else { description };
+            let snippet_source = if description.is_empty() {
+                ifc_class
+            } else {
+                description
+            };
             hits.push(Hit {
                 kind: "Object",
                 title: name.to_string(),
@@ -184,11 +188,18 @@ pub fn render_search_results(query: &str, state: &AppState) -> String {
         let name = c.get("name").and_then(Value::as_str).unwrap_or("");
         let id = c.get("id").and_then(Value::as_str).unwrap_or("");
         let slug = c.get("slug").and_then(Value::as_str).unwrap_or("");
-        let cat_label = c.get("category_label").and_then(Value::as_str).unwrap_or("");
+        let cat_label = c
+            .get("category_label")
+            .and_then(Value::as_str)
+            .unwrap_or("");
         let description = c.get("description").and_then(Value::as_str).unwrap_or("");
         let fields = [(name, 80), (id, 60), (cat_label, 30), (description, 8)];
         if let Some(score) = score_match(&tokens, &fields) {
-            let snippet_source = if description.is_empty() { cat_label } else { description };
+            let snippet_source = if description.is_empty() {
+                cat_label
+            } else {
+                description
+            };
             hits.push(Hit {
                 kind: "Composition",
                 title: name.to_string(),
