@@ -71,8 +71,8 @@ pub async fn object_detail_handler(
     State(state): State<AppState>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
     match render::catalog::render_object_detail(&state, &slug) {
-        Some(content) => Ok(Html(render::shell::page_shell(
-            "Object",
+        Some((name, content)) => Ok(Html(render::shell::page_shell(
+            &name,
             &format!("/objects/{slug}"),
             &content,
             &state,
