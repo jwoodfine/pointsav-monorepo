@@ -967,7 +967,7 @@ pub fn render_home(state: &AppState) -> String {
     <a class="bim-home-shelf" href="/compositions">
       <span class="bim-home-shelf__kicker">The assemblies</span>
       <h2>Compositions <span class="bim-cat-count">{comp_n}</span></h2>
-      <p>An assembly — parts combined into a room, a floor, a building, with the rules checked at every join.</p>
+      <p>An assembly of Objects — what an architectural drawing becomes once its parts are real, with the rules checked at every join.</p>
       <span class="bim-home-shelf__cta">Browse Compositions →</span>
     </a>
   </section>
@@ -1217,7 +1217,7 @@ pub fn render_compositions_index(
   <header class="bim-cat-pagehead">
     <span class="bim-cat-kicker">The assemblies</span>
     <h1>Compositions</h1>
-    <p class="bim-cat-pagehead__lede">An assembly — parts combined into a room, a floor, a building, with the rules checked at every join. Start from an assembly and open its parts list.</p>
+    <p class="bim-cat-pagehead__lede">An assembly of Objects — what an architectural drawing becomes once its parts are real, with the rules checked at every join. Start from an assembly and open its parts list.</p>
   </header>
   <form class="bim-cat-searchform" method="get" action="/compositions">
     <label class="bim-cat-search">
