@@ -3,7 +3,7 @@
 > Hot open items. ≤200 lines. Backlog at `.agent/next-backlog.md` (not yet created).
 > **Scope: this archive only.** Cross-repo and workspace-level items live at `~/Foundry/NEXT.md`.
 
-Last updated: 2026-07-09
+Last updated: 2026-07-10
 
 ---
 
@@ -47,6 +47,10 @@ Last updated: 2026-07-09
       branch — would affect every archive that clones this monorepo, not just project-workplace.
       Flagged to Command via the same outbox message; cross-archive-governance scope, not a
       unilateral Totebox fix.
+- [ ] **NEW (2026-07-10) — Stage 6 pending, 2 more commits:** "Copy file path" feature +
+      docx-freeze bugfix in `app-privategit-workbench/src/assets/index.html` and
+      `app-workplace-http-prototype/src/assets/workbench/index.html` (both rebuilt, redeployed,
+      verified live — see BRIEF-workplace-workbench.md 2026-07-10 work log). Flagged via outbox.
 
 ## Active (Totebox scope)
 
@@ -65,6 +69,23 @@ Last updated: 2026-07-09
       briefs dir (`BRIEF-workplace-workbench.md`, `BRIEF-workplace-architecture.md` [superseded],
       `BRIEF-workplace-roadmap.md` [superseded]). Both need reclaiming/relocating into this
       archive next substantive session.
+
+## Completed (2026-07-10 — Copy-path feature + docx-freeze bugfix)
+
+- [x] **"Copy file path" toolbar button + context-menu entries** — both `app-privategit-workbench`
+      and `app-workplace-http-prototype`; shared `copyToClipboard()` helper extracted in each
+      file. Plan-mode approved (`can-we-add-the-parallel-pony.md`). Both services rebuilt +
+      redeployed + verified live.
+- [x] **docx-freeze bugfix** — `fileMode()` in both apps defaulted every unrecognized extension
+      to `'text'` mode, rendering raw binary bytes as a giant garbled string and freezing the
+      tab on `.docx` (and any other unlisted binary format). Added `BINARY_EXTS` allowlist →
+      new `'unsupported'` mode with a short placeholder message instead. Applied to both apps
+      (operator confirmed after the parallel bug was found in the sibling app). Both services
+      rebuilt + redeployed + verified live.
+- [x] **PPN port-mapping doc-drift found and memory-logged (not fixed this session):**
+      `app-workplace-http-prototype/CLAUDE.md` claims `10.8.0.9:9200` reaches it; live nginx
+      config actually routes that URL to `app-privategit-workbench` (:9210). See memory
+      `ppn-nginx-port-mapping-drift`.
 
 ## Completed (2026-07-07 — automode cleanup pass, plan `can-we-make-a-validated-cloud`)
 
