@@ -13,7 +13,7 @@ use super::shell::esc;
 /// under the four Sections the hero's callouts route to. This used to be
 /// a stub that silently rendered the homepage template instead (the
 /// `/tokens` dead-link bug found in the 2026-07-03 audit); it's now a
-/// distinct page with anchors (`#taxonomy`, `#objects`, `#compositions`,
+/// distinct page with anchors (`#taxonomy`, `#objects`, `#key-plans`,
 /// `#context`) matching the hero's real-fact hotspot targets.
 pub fn render_tokens_index(state: &AppState) -> String {
     let mut groups = String::new();
@@ -27,7 +27,7 @@ pub fn render_tokens_index(state: &AppState) -> String {
   </div>
   <div class="bim-category-grid">{cards}</div>
 </section>"#,
-            id = section.label().to_lowercase(),
+            id = section.label().to_lowercase().replace(' ', "-"),
             num = i + 1,
             label = section.label(),
             cards = cards,
@@ -45,6 +45,42 @@ pub fn render_tokens_index(state: &AppState) -> String {
 </div>"#,
         groups = groups,
     )
+}
+
+/// Round 9 (2026-07-11) L2: `$description` fields in the DTCG token files
+/// carry real spec content plus, in many entries, a trailing internal
+/// maintenance note ("Amended 2026-07-03 per tool-buildingwidth-architecture.md
+/// §Internal inconsistencies #5...") — the audit trail for this session's own
+/// data-correction work, never meant for public reading. Filters by internal-
+/// citation content (a `.md` filename, an internal doc name, "operator
+/// decision/confirmed" process language) rather than by leading verb
+/// ("Corrected"/"Amended"/...), because at least one real entry
+/// (`performance.dtcg.json`'s IsFireExit description) starts with "Corrected"
+/// but is itself the substantive, citable spec content — a verb-based filter
+/// would have deleted it.
+fn strip_internal_maintenance_notes(description: &str) -> String {
+    const INTERNAL_MARKERS: [&str; 7] = [
+        ".md",
+        "§Internal inconsistencies",
+        "cleanup-log",
+        "operator decision",
+        "operator-confirmed",
+        "operator confirmed",
+        "tool-buildingwidth-architecture",
+    ];
+    let kept: Vec<&str> = description
+        .split(". ")
+        .filter(|sentence| {
+            let s = sentence.trim_start();
+            !INTERNAL_MARKERS.iter().any(|m| sentence.contains(m))
+                && !s.starts_with("Was previously")
+        })
+        .collect();
+    let mut out = kept.join(". ");
+    if !out.is_empty() && !out.ends_with(['.', '!', '?']) {
+        out.push('.');
+    }
+    out
 }
 
 pub fn render_token_page(category: &str, state: &AppState) -> String {
@@ -89,11 +125,16 @@ pub fn render_token_page(category: &str, state: &AppState) -> String {
                 // an empty <td> reads as a broken/half-populated table —
                 // "—" makes the sparseness a legible fact about the data,
                 // not something that looks like a rendering bug).
-                let description = entity
+                let raw_description = entity
                     .get("$description")
                     .and_then(|v| v.as_str())
-                    .filter(|s| !s.is_empty())
-                    .unwrap_or("—");
+                    .unwrap_or("");
+                let stripped_description = strip_internal_maintenance_notes(raw_description);
+                let description = if stripped_description.is_empty() {
+                    "—"
+                } else {
+                    stripped_description.as_str()
+                };
                 let ifc_class = entity
                     .get("$value")
                     .and_then(|v| v.get("ifc_class"))

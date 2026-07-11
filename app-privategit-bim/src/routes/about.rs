@@ -8,7 +8,7 @@ use crate::{render, render::shell::esc, state::AppState};
 pub async fn about_handler(State(state): State<AppState>) -> Html<String> {
     // Round 6 (2026-07-10) P3: the Method page explains the two-ladder
     // model and the three-zone cross-section in prose only — every
-    // composition detail page carries a real diagram, the page whose job
+    // Key Plan detail page carries a real diagram, the page whose job
     // is teaching the underlying model carried none (the cohesion audit's
     // highest-leverage visual finding). Inject a real diagram right after
     // the section that introduces each concept, matching the same visual
@@ -21,17 +21,15 @@ pub async fn about_handler(State(state): State<AppState>) -> Html<String> {
             esc(&section.heading),
             section.body_html,
         ));
-        if section.heading == "Two ladders, one substrate" {
+        if section.heading == "The containment model" {
             sections.push_str(&format!(
-                r#"<figure class="bim-method-figure">{svg}<figcaption>The element ladder (Object aggregates into Composition) and the space ladder (Key Plan aggregates into Tile, Floor Plate, Building) — joined only by containment, never merged into one ladder.</figcaption></figure>"#,
-                svg = render::svg::render_two_ladder_svg()
+                r#"<figure class="bim-method-figure">{svg}<figcaption>An Object placed in a Key Plan stays a part — it is contained in the plan, never summed into the spatial ladder. Key Plans aggregate into Tiles, Tiles into Floor Plates, Floor Plates into the Building.</figcaption></figure>"#,
+                svg = render::svg::render_containment_model_svg()
             ));
         } else if section.heading == "Key Plans and Tiles" {
-            let illustrative_zone_svg =
-                render::svg::render_kp_zone_svg(6.0, 3.5, Some(2.0), "private-office", None);
             sections.push_str(&format!(
-                r#"<figure class="bim-method-figure">{svg}<figcaption>An illustrative Key Plan cross-section: Habitat, Magazine, Corridor. Real depths vary by Key Plan; see individual Composition pages for measured values.</figcaption></figure>"#,
-                svg = illustrative_zone_svg
+                r#"<figure class="bim-method-figure">{svg}<figcaption>Every Key Plan divides its depth into the same three zones, measured from the facade inward: Habitat holds the 6.0 m daylight perimeter, Magazine the 3.5 m of flexible depth behind it, and Corridor the final 2.0 m of circulation. The depths shown are illustrative; each Key Plan records its own.</figcaption></figure>"#,
+                svg = render::svg::render_method_zone_svg()
             ));
         }
     }
@@ -41,8 +39,8 @@ pub async fn about_handler(State(state): State<AppState>) -> Html<String> {
     // meaning of "discipline models"/discipline-based clash detection, which
     // is confusing for exactly the AEC-literate audience this site targets;
     // "Method" carries no competing meaning and matches the site's own live
-    // kicker pattern — "The parts" / "The assemblies" / "The method" — as a
-    // single plain noun like Objects/Compositions/Research). Page content
+    // kicker pattern — "The parts" / "The plans" / "The method" — as a
+    // single plain noun like Objects/Key Plans/Research). Page content
     // itself was also rewritten this round to correct a real ontology error
     // (see woodfine-bim-library/site-content/pages/about.md) — this route
     // handler's structure is otherwise unchanged.

@@ -1,67 +1,26 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
 
-use axum::extract::{Path, Query, State};
-use axum::http::StatusCode;
-use axum::response::Html;
-use std::collections::HashMap;
+use axum::extract::Path;
+use axum::response::Redirect;
 
-use crate::{render, state::AppState};
+// Round 9 (2026-07-11): `/compositions/*` retired as the public section —
+// "Composition" was never a distinct data entity (every entry was 1:1 with
+// a `key-plans.dtcg.json` token; the real assembly-of-Objects artifact is
+// the furniture bill, already labeled "Parts list"). The real routes now
+// live in `routes/key_plans.rs`; this module is a permanent legacy redirect
+// for old links/bookmarks.
 
-pub async fn compositions_index_handler(
-    Query(params): Query<HashMap<String, String>>,
-    State(state): State<AppState>,
-) -> Html<String> {
-    let q = params.get("q").cloned().unwrap_or_default();
-    let use_case = params.get("use").map(String::as_str);
-    let layout = params.get("layout").map(String::as_str);
-    let content = render::catalog::render_compositions_index(&state, &q, use_case, layout);
-    Html(render::shell::page_shell(
-        "Compositions",
-        "/compositions",
-        &content,
-        &state,
-    ))
+pub async fn compositions_index_redirect() -> Redirect {
+    Redirect::permanent("/key-plans")
 }
 
-fn not_found(state: &AppState) -> (StatusCode, Html<String>) {
-    (
-        StatusCode::NOT_FOUND,
-        Html(render::shell::page_shell(
-            "Not found",
-            "",
-            &render::catalog::render_not_found(),
-            state,
-        )),
-    )
+pub async fn composition_detail_redirect(Path(slug): Path<String>) -> Redirect {
+    Redirect::permanent(&format!("/key-plans/{slug}"))
 }
 
-pub async fn composition_detail_handler(
-    Path(slug): Path<String>,
-    State(state): State<AppState>,
-) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    match render::catalog::render_composition_detail(&state, &slug, None) {
-        Some((name, content)) => Ok(Html(render::shell::page_shell(
-            &name,
-            &format!("/compositions/{slug}"),
-            &content,
-            &state,
-        ))),
-        None => Err(not_found(&state)),
-    }
-}
-
-pub async fn composition_object_handler(
+pub async fn composition_object_redirect(
     Path((slug, object_slug)): Path<(String, String)>,
-    State(state): State<AppState>,
-) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    match render::catalog::render_composition_detail(&state, &slug, Some(&object_slug)) {
-        Some((name, content)) => Ok(Html(render::shell::page_shell(
-            &name,
-            &format!("/compositions/{slug}/o/{object_slug}"),
-            &content,
-            &state,
-        ))),
-        None => Err(not_found(&state)),
-    }
+) -> Redirect {
+    Redirect::permanent(&format!("/key-plans/{slug}/o/{object_slug}"))
 }

@@ -9,17 +9,17 @@
 //!   Objects. Each carries its verified IFC 4.3 entity class and Uniclass
 //!   2015 **Pr** (Products) code, and a hand-authored inline SVG plan symbol
 //!   (`plan_symbols`) in place of the old letter-monogram thumbnail.
-//! * **Compositions** (`/compositions`, `/compositions/{slug}`,
-//!   `/compositions/{slug}/o/{object}`) — Key Plans, walked from
-//!   `key-plans.dtcg.json` with the shared `card::collect_kp_leaves` helper
-//!   and drawn with `svg::render_kp_zone_svg_from_value` (recolored to the
-//!   single navy line-work language — see `svg.rs`). The detail page is a
+//! * **Key Plans** (`/key-plans`, `/key-plans/{slug}`,
+//!   `/key-plans/{slug}/o/{object}`) — Woodfine's room-scale space records,
+//!   walked from `key-plans.dtcg.json` with the shared `card::collect_kp_leaves`
+//!   helper and drawn with `svg::render_kp_zone_svg_from_value` (recolored to
+//!   the single navy line-work language — see `svg.rs`). The detail page is a
 //!   plan-anchored inspector: the key-plan drawing stays fixed on the left;
-//!   the right rail swaps between the composition's own Data Box/bill and an
-//!   inspected object's spec sheet, with a breadcrumb and back-link — no
+//!   the right rail swaps between the Key Plan's own Data Box/parts list and
+//!   an inspected object's spec sheet, with a breadcrumb and back-link — no
 //!   660px slide-over modal, no full-context loss on click-through.
 //! * **Home** (`/`) — a compact registry front door: masthead + the two
-//!   shelves (Objects/Compositions) + prose sourced from
+//!   shelves (Objects/Key Plans) + prose sourced from
 //!   `site-content/pages/home.md`.
 //!
 //! Every page is a real URL; search and facet state are GET query params, so
@@ -29,14 +29,21 @@
 //! plain `<a href>` toggles — the whole catalog is fully functional with
 //! JavaScript disabled.
 //!
-//! Honest-partial-completion convention (2026-07 audit's "83% of
-//! Compositions show no constituent Objects" finding): only PO-1 carries a
-//! real, structured `furniture_refs` array. Every other Composition's
-//! "Parts list" renders an "N of M parts linked to the catalog" status chip
-//! instead of a fabricated bill or a false "assembled from 0 object
-//! entries" line. (Compositions with zero furniture data at all are kept
-//! out of the public grid entirely — see `composition_is_publicly_visible`
-//! — rather than showing this chip at 0 of 0.)
+//! Round 9 (2026-07-11): retired "Composition" as a public top-line concept
+//! — it was never a distinct data entity (every `/key-plans/*` entry is 1:1
+//! with a `key-plans.dtcg.json` token; the real assembly-of-Objects artifact
+//! is the furniture bill, already labeled "Parts list"). Routes, labels, and
+//! this module's identifiers were renamed to match what the data actually
+//! is; `/compositions/*` now 301s to `/key-plans/*` for legacy links.
+//!
+//! Honest-partial-completion convention (2026-07 audit's "83% of Key Plans
+//! show no constituent Objects" finding, still accurate post-rename): only
+//! PO-1/PO-2/PO-3 carry a real, structured `furniture_refs` array. Every
+//! other Key Plan's "Parts list" renders an "N of M parts linked to the
+//! catalog" status chip instead of a fabricated bill or a false "assembled
+//! from 0 object entries" line. (Key Plans with zero furniture data at all
+//! are kept out of the public grid entirely — see
+//! `key_plan_is_publicly_visible` — rather than showing this chip at 0 of 0.)
 
 use crate::state::AppState;
 use serde_json::{json, Map, Value};
@@ -175,7 +182,7 @@ fn dims_summary(dims: &Value) -> String {
     }
 }
 
-/// Round 7 (2026-07-10): true for a composition that should be visible on
+/// Round 7 (2026-07-10): true for a Key Plan that should be visible on
 /// the public catalog. Visible iff the entry carries real Key Plan
 /// space-planning data (`has_zone_data` — a real zone1 depth, sourced from
 /// `FIN.xlsx Summary_Key Plans V3 2025-11-29`), regardless of whether its
@@ -192,7 +199,7 @@ fn dims_summary(dims: &Value) -> String {
 /// entry's own detail page stays directly reachable, matching the existing
 /// precedent for the room-programme-only entries this gate suppressed
 /// previously.
-fn composition_is_publicly_visible(c: &Value) -> bool {
+fn key_plan_is_publicly_visible(c: &Value) -> bool {
     c.get("has_zone_data")
         .and_then(Value::as_bool)
         .unwrap_or(false)
@@ -247,7 +254,7 @@ fn spec_rows_grouped(rows: &[Value]) -> String {
     out
 }
 
-/// URL-safe slug for a Composition's `internal_code` (e.g. "CO-1/2" →
+/// URL-safe slug for a Key Plan's `internal_code` (e.g. "CO-1/2" →
 /// "co-1-2") — internal codes carry a literal `/` for some categories
 /// (Corporate Office fractional floors), which would otherwise split into
 /// extra path segments. Distinct from the human-readable `id`/display code.
@@ -402,10 +409,10 @@ pub(crate) fn build_objects(state: &AppState) -> Vec<Value> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Compositions — Key Plans from key-plans.dtcg.json
+// Key Plans from key-plans.dtcg.json
 // ─────────────────────────────────────────────────────────────────────────────
 
-pub(crate) fn build_compositions(state: &AppState, objects: &[Value]) -> Vec<Value> {
+pub(crate) fn build_key_plans(state: &AppState, objects: &[Value]) -> Vec<Value> {
     let mut out: Vec<Value> = Vec::new();
 
     let Some(bim) = state
@@ -536,7 +543,7 @@ pub(crate) fn build_compositions(state: &AppState, objects: &[Value]) -> Vec<Val
         let mut e = Map::new();
         e.insert("id".into(), json!(internal_code));
         e.insert("slug".into(), json!(slug));
-        e.insert("kind".into(), json!("composition"));
+        e.insert("kind".into(), json!("key-plan"));
         e.insert("name".into(), json!(display_name));
         e.insert("category".into(), json!(category));
         e.insert("category_label".into(), json!(cat_label));
@@ -549,7 +556,7 @@ pub(crate) fn build_compositions(state: &AppState, objects: &[Value]) -> Vec<Val
         // version stored these as strings (json!(z1.map(round2))), which
         // silently defeated as_f64() (a JSON String is never numeric to
         // serde_json) and rendered an empty <div class="bim-cat-zones"></div>
-        // on every composition with real zone data, incl. /compositions/po-1
+        // on every Key Plan with real zone data, incl. /key-plans/po-1
         // (2026-07-09 audit finding).
         e.insert("zone1".into(), json!(z1));
         e.insert("zone2".into(), json!(z2));
@@ -596,15 +603,15 @@ pub(crate) fn build_compositions(state: &AppState, objects: &[Value]) -> Vec<Val
 // Public: normalized catalog for the `/api/tokens.json` extension
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Normalized `{ objects: [...], compositions: [...] }` catalog. Consumed by
+/// Normalized `{ objects: [...], key_plans: [...] }` catalog. Consumed by
 /// `bim-catalog.js` (via the `_catalog` key added to `/api/tokens.json`) to
 /// populate the detail modal without a full page reload.
 pub fn build_catalog(state: &AppState) -> Value {
     let objects = build_objects(state);
-    let compositions = build_compositions(state, &objects);
+    let key_plans = build_key_plans(state, &objects);
     json!({
         "objects": objects,
-        "compositions": compositions,
+        "key-plans": key_plans,
     })
 }
 
@@ -785,9 +792,9 @@ pub(crate) fn render_object_card(o: &Value) -> String {
     )
 }
 
-// ── composition card (navy key-plan thumbnail; honest empty-bill note) ────
+// ── Key Plan card (navy key-plan thumbnail; honest empty-bill note) ──────
 
-pub(crate) fn render_composition_card(c: &Value) -> String {
+pub(crate) fn render_key_plan_card(c: &Value) -> String {
     let slug = s(c, "slug");
     let id = s(c, "id");
     let name = s(c, "name");
@@ -864,7 +871,7 @@ pub(crate) fn render_composition_card(c: &Value) -> String {
     };
 
     format!(
-        r#"<a class="bim-cat-card bim-cat-card--comp" href="/compositions/{slug}" data-cat="{category}" aria-label="{name} — view specification">
+        r#"<a class="bim-cat-card bim-cat-card--comp" href="/key-plans/{slug}" data-cat="{category}" aria-label="{name} — view specification">
   {thumb}
   <span class="bim-cat-card__body">
     <span class="bim-cat-chip bim-cat-chip--ef"><span class="bim-cat-chip__lv">SL</span>{space}</span>
@@ -891,15 +898,15 @@ pub(crate) fn render_composition_card(c: &Value) -> String {
 
 pub fn render_home(state: &AppState) -> String {
     let objects = build_objects(state);
-    // Same visibility gate as render_compositions_index (Round 6 P2) — the
-    // homepage's stated count must agree with what /compositions actually
+    // Same visibility gate as render_key_plans_index (Round 6 P2) — the
+    // homepage's stated count must agree with what /key-plans actually
     // shows, or the two numbers contradict each other on the same site.
-    let compositions: Vec<Value> = build_compositions(state, &objects)
+    let key_plans: Vec<Value> = build_key_plans(state, &objects)
         .into_iter()
-        .filter(composition_is_publicly_visible)
+        .filter(key_plan_is_publicly_visible)
         .collect();
     let obj_n = objects.len();
-    let comp_n = compositions.len();
+    let kp_n = key_plans.len();
 
     let lede = state
         .home_page
@@ -926,13 +933,13 @@ pub fn render_home(state: &AppState) -> String {
     // Round 6 (2026-07-10): the hero was text-only — at 1440-1920px the
     // right half was empty grid paper (the cohesion audit's gap #2). Fill
     // it with a real Key Plan, not an invented illustrative one: PO-1's
-    // actual zone data if the composition is present in this catalog,
+    // actual zone data if the Key Plan is present in this catalog,
     // falling back to representative values only if it is ever absent.
-    // The same draw-on animation used on composition detail pages applies
+    // The same draw-on animation used on Key Plan detail pages applies
     // here (bim.js watches `.bim-home-masthead__visual .bim-kp-diagram`
     // too now) — the site's single largest visual asset gets to draft
     // itself in on the page a visitor actually lands on first.
-    let hero_svg = compositions
+    let hero_svg = key_plans
         .iter()
         .find(|c| s(c, "id") == "PO-1")
         .map(|c| {
@@ -952,7 +959,7 @@ pub fn render_home(state: &AppState) -> String {
     <div class="bim-home-masthead__text">
       <h1>Woodfine BIM Library</h1>
       <div class="bim-home-masthead__lede">{lede}</div>
-      <p class="bim-home-registry-line">{obj_n} objects &middot; {comp_n} compositions &middot; IFC&nbsp;4.3 &middot; Uniclass&nbsp;2015</p>
+      <p class="bim-home-registry-line">{obj_n} objects &middot; {kp_n} key plans &middot; IFC&nbsp;4.3 &middot; Uniclass&nbsp;2015</p>
     </div>
     <div class="bim-home-masthead__visual" aria-hidden="true">{hero_svg}</div>
   </section>
@@ -964,18 +971,18 @@ pub fn render_home(state: &AppState) -> String {
       <p>A smart specification for one part of a building — geometry, data, and the rules it must meet, in one open file.</p>
       <span class="bim-home-shelf__cta">Browse Objects →</span>
     </a>
-    <a class="bim-home-shelf" href="/compositions">
+    <a class="bim-home-shelf" href="/key-plans">
       <span class="bim-home-shelf__kicker">The assemblies</span>
-      <h2>Compositions <span class="bim-cat-count">{comp_n}</span></h2>
+      <h2>Key Plans <span class="bim-cat-count">{kp_n}</span></h2>
       <p>An assembly of Objects — what an architectural drawing becomes once its parts are real, with the rules checked at every join.</p>
-      <span class="bim-home-shelf__cta">Browse Compositions →</span>
+      <span class="bim-home-shelf__cta">Browse Key Plans →</span>
     </a>
   </section>
 
   {other_sections}
 </div>"##,
         obj_n = obj_n,
-        comp_n = comp_n,
+        kp_n = kp_n,
         lede = lede,
         other_sections = other_sections,
     )
@@ -1079,19 +1086,19 @@ pub fn render_objects_index(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SSR — `/compositions` catalog page (section headers by use-case)
+// SSR — `/key-plans` catalog page (section headers by use-case)
 // ─────────────────────────────────────────────────────────────────────────────
 
-pub fn render_compositions_index(
+pub fn render_key_plans_index(
     state: &AppState,
     q: &str,
     use_case: Option<&str>,
     layout: Option<&str>,
 ) -> String {
     let objects = build_objects(state);
-    let compositions: Vec<Value> = build_compositions(state, &objects)
+    let key_plans: Vec<Value> = build_key_plans(state, &objects)
         .into_iter()
-        .filter(composition_is_publicly_visible)
+        .filter(key_plan_is_publicly_visible)
         .collect();
     let tokens = search_tokens(q);
 
@@ -1099,7 +1106,7 @@ pub fn render_compositions_index(
     let use_pairs: Vec<(String, String, usize)> = {
         let mut order: Vec<&str> = Vec::new();
         let mut counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
-        for c in &compositions {
+        for c in &key_plans {
             let slug = s(c, "category");
             if slug.is_empty() {
                 continue;
@@ -1123,7 +1130,7 @@ pub fn render_compositions_index(
     };
 
     // Layout chips: (query_value = "modeled"/"floor", display_label, count).
-    let modeled_n = compositions
+    let modeled_n = key_plans
         .iter()
         .filter(|c| {
             c.get("has_zone_data")
@@ -1131,7 +1138,7 @@ pub fn render_compositions_index(
                 .unwrap_or(false)
         })
         .count();
-    let floor_n = compositions.len() - modeled_n;
+    let floor_n = key_plans.len() - modeled_n;
     let mut layout_pairs: Vec<(String, String, usize)> = Vec::new();
     if modeled_n > 0 {
         layout_pairs.push((
@@ -1144,7 +1151,7 @@ pub fn render_compositions_index(
         layout_pairs.push(("floor".to_string(), "Floor-scale".to_string(), floor_n));
     }
 
-    let matches: Vec<&Value> = compositions
+    let matches: Vec<&Value> = key_plans
         .iter()
         .filter(|c| matches_search(s(c, "search"), &tokens))
         .filter(|c| use_case.map(|v| s(c, "category") == v).unwrap_or(true))
@@ -1174,7 +1181,7 @@ pub fn render_compositions_index(
             }
             let cards: String = in_section
                 .iter()
-                .map(|c| render_composition_card(c))
+                .map(|c| render_key_plan_card(c))
                 .collect();
             format!(
                 r#"<section class="bim-cat-usesection">
@@ -1188,14 +1195,14 @@ pub fn render_compositions_index(
         .collect();
 
     let body = if matches.is_empty() {
-        r#"<p class="bim-empty">No compositions match the current filters.</p>"#.to_string()
+        r#"<p class="bim-empty">No Key Plans match the current filters.</p>"#.to_string()
     } else {
         sections
     };
 
     let use_chips = chip_row(
         "Use Case",
-        "/compositions",
+        "/key-plans",
         "use",
         &use_pairs,
         use_case,
@@ -1204,7 +1211,7 @@ pub fn render_compositions_index(
     );
     let layout_chips = chip_row(
         "Layout",
-        "/compositions",
+        "/key-plans",
         "layout",
         &layout_pairs,
         layout,
@@ -1216,20 +1223,20 @@ pub fn render_compositions_index(
         r##"<div class="bim-catalog-page">
   <header class="bim-cat-pagehead">
     <span class="bim-cat-kicker">The assemblies</span>
-    <h1>Compositions</h1>
+    <h1>Key Plans</h1>
     <p class="bim-cat-pagehead__lede">An assembly of Objects — what an architectural drawing becomes once its parts are real, with the rules checked at every join. Start from an assembly and open its parts list.</p>
   </header>
-  <form class="bim-cat-searchform" method="get" action="/compositions">
+  <form class="bim-cat-searchform" method="get" action="/key-plans">
     <label class="bim-cat-search">
       <span class="bim-cat-search__ico" aria-hidden="true">⌕</span>
-      <input type="search" name="q" value="{q}" placeholder="Search the registry" aria-label="Search Compositions">
+      <input type="search" name="q" value="{q}" placeholder="Search the registry" aria-label="Search Key Plans">
     </label>
     {use_hidden}{layout_hidden}
     <button class="bim-cat-searchform__submit" type="submit">Search</button>
   </form>
   <div class="bim-cat-filters">{use_chips}{layout_chips}</div>
   <div class="bim-cat-gridhead">
-    <div class="bim-cat-res"><b>{n}</b> of {total} compositions</div>
+    <div class="bim-cat-res"><b>{n}</b> of {total} Key Plans</div>
   </div>
   {body}
 </div>"##,
@@ -1243,7 +1250,7 @@ pub fn render_compositions_index(
         use_chips = use_chips,
         layout_chips = layout_chips,
         n = matches.len(),
-        total = compositions.len(),
+        total = key_plans.len(),
         body = body,
     )
 }
@@ -1375,7 +1382,7 @@ pub fn render_objects_compare(state: &AppState, ids: &[String]) -> String {
 
 pub fn render_object_detail(state: &AppState, slug: &str) -> Option<(String, String)> {
     let objects = build_objects(state);
-    let compositions = build_compositions(state, &objects);
+    let key_plans = build_key_plans(state, &objects);
     let o = objects.iter().find(|o| s(o, "id") == slug)?;
 
     let name = s(o, "name");
@@ -1417,11 +1424,11 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<(String, Str
         None => String::new(),
     };
 
-    // Reverse lookup — every Composition whose linked bill references this
+    // Reverse lookup — every Key Plan whose linked bill references this
     // Object (2026-07-09 addition: closes the loop the audit's "unlinked
     // bill rows give no way to inspect" finding pointed at, from the object
     // side).
-    let used_in: String = compositions
+    let used_in: String = key_plans
         .iter()
         .filter(|c| {
             c.get("bill")
@@ -1436,7 +1443,7 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<(String, Str
         })
         .map(|c| {
             format!(
-                r#"<a class="bim-usedin-row" href="/compositions/{slug}/o/{obj}">{name}</a>"#,
+                r#"<a class="bim-usedin-row" href="/key-plans/{slug}/o/{obj}">{name}</a>"#,
                 slug = esc(s(c, "slug")),
                 obj = esc(slug),
                 name = esc(s(c, "name")),
@@ -1497,7 +1504,7 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<(String, Str
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SSR — `/compositions/{slug}` and `/compositions/{slug}/o/{object}` —
+// SSR — `/key-plans/{slug}` and `/key-plans/{slug}/o/{object}` —
 // the plan-anchored inspector.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1574,7 +1581,7 @@ fn bill_html(c: &Value, comp_slug: &str) -> String {
     // same ordinal, in a `<g class="bim-plan-obj" data-plan-obj="{i}">`).
     // This is a stable ORDINAL pairing, not a semantic per-SKU match — see
     // the longer note in svg.rs. bim.js highlights both ends on hover; if a
-    // composition's bill is longer than its plan's group count (or vice
+    // Key Plan's bill is longer than its plan's group count (or vice
     // versa), the extra rows/groups simply have no match — a harmless no-op,
     // consistent with this codebase's existing honest-partial-completion
     // convention rather than a fabricated 1:1 claim.
@@ -1588,7 +1595,7 @@ fn bill_html(c: &Value, comp_slug: &str) -> String {
                 let obj_id = b.get("obj_id").and_then(Value::as_str).unwrap_or("");
                 let code = b.get("code").and_then(Value::as_str).unwrap_or("");
                 format!(
-                    r#"<a class="bim-bill-row bim-bill-row--linked" data-plan-obj="{i}" href="/compositions/{comp_slug}/o/{obj_id}"><span class="bim-bill-row__name">{name}</span><span class="bim-bill-row__code">{code} &middot; view object →</span></a>"#,
+                    r#"<a class="bim-bill-row bim-bill-row--linked" data-plan-obj="{i}" href="/key-plans/{comp_slug}/o/{obj_id}"><span class="bim-bill-row__name">{name}</span><span class="bim-bill-row__code">{code} &middot; view object →</span></a>"#,
                     i = i,
                     comp_slug = esc(comp_slug),
                     obj_id = esc(obj_id),
@@ -1608,33 +1615,33 @@ fn bill_html(c: &Value, comp_slug: &str) -> String {
     format!(r#"{status_chip}<div class="bim-bill-rows">{rows}</div>"#)
 }
 
-/// The Composition detail page. `highlight_object` is `Some(obj_slug)` for
-/// `/compositions/{slug}/o/{object}` — the plan stays on the left; only the
+/// The Key Plan detail page. `highlight_object` is `Some(obj_slug)` for
+/// `/key-plans/{slug}/o/{object}` — the plan stays on the left; only the
 /// right inspector rail swaps to the object's spec sheet, with a breadcrumb
-/// and a "back to composition" link, so context is never destroyed (fixes
+/// and a "back to Key Plan" link, so context is never destroyed (fixes
 /// the 2026-07 audit's "clicking a bill row wipes the whole panel" finding).
-pub fn render_composition_detail(
+pub fn render_key_plan_detail(
     state: &AppState,
     slug: &str,
     highlight_object: Option<&str>,
 ) -> Option<(String, String)> {
     let objects = build_objects(state);
-    let compositions = build_compositions(state, &objects);
-    let c = compositions.iter().find(|c| s(c, "slug") == slug)?;
-    // Round 7 (2026-07-11): a composition not publicly visible (Corporate
+    let key_plans = build_key_plans(state, &objects);
+    let c = key_plans.iter().find(|c| s(c, "slug") == slug)?;
+    // Round 7 (2026-07-11): a Key Plan not publicly visible (Corporate
     // Office — no real zone/space-planning data) is being actively
     // deprioritized, not just left thin — its detail page 404s like it
     // doesn't exist, unlike the room-programme-only entries this same gate
     // suppresses from the grid, which stay directly reachable by design.
-    if !composition_is_publicly_visible(c) {
+    if !key_plan_is_publicly_visible(c) {
         return None;
     }
 
     let name = s(c, "name");
     // Round 7 (2026-07-11): real browser-tab title — the object's own name
-    // when viewing its spec sheet inside a composition, the composition's
+    // when viewing its spec sheet inside a Key Plan, the Key Plan's
     // name otherwise. Previously the route handler passed a hardcoded
-    // literal "Composition" regardless of which composition was open.
+    // literal "Composition" regardless of which Key Plan was open.
     let page_title = match highlight_object {
         Some(obj_slug) => objects
             .iter()
@@ -1668,7 +1675,7 @@ pub fn render_composition_detail(
     // Round 6 (2026-07-10) bug fix: this metadata used to sit at the bottom of
     // the (often much taller) rail. Since .bim-inspector-page__plan is sticky
     // and only as tall as the drawing itself, that left a large stretch of
-    // empty page background below the plan on any composition with a long
+    // empty page background below the plan on any Key Plan with a long
     // parts list. It describes the plan, not the parts list, so it belongs
     // under the drawing in both the normal and object-highlight views.
     let plan_area_line = match (area_sf, area_m2) {
@@ -1700,7 +1707,7 @@ pub fn render_composition_detail(
     );
 
     let breadcrumb_normal = format!(
-        r#"<nav class="bim-breadcrumbs"><a href="/">Home</a> / <a href="/compositions">Compositions</a> / <span>{name}</span></nav>"#,
+        r#"<nav class="bim-breadcrumbs"><a href="/">Home</a> / <a href="/key-plans">Key Plans</a> / <span>{name}</span></nav>"#,
         name = esc(name)
     );
 
@@ -1726,8 +1733,8 @@ pub fn render_composition_detail(
                 .to_string(),
         };
         format!(
-            r#"<nav class="bim-breadcrumbs"><a href="/">Home</a> / <span class="bim-cat-chip bim-cat-chip--ef bim-cat-chip--inline"><span class="bim-cat-chip__lv">SL</span>{space}</span> / <a href="/compositions/{slug}">{id}</a> / <span>{o_name}</span></nav>
-    <p class="bim-detail-backlink"><a href="/compositions/{slug}">← Back to {name}</a></p>
+            r#"<nav class="bim-breadcrumbs"><a href="/">Home</a> / <span class="bim-cat-chip bim-cat-chip--ef bim-cat-chip--inline"><span class="bim-cat-chip__lv">SL</span>{space}</span> / <a href="/key-plans/{slug}">{id}</a> / <span>{o_name}</span></nav>
+    <p class="bim-detail-backlink"><a href="/key-plans/{slug}">← Back to {name}</a></p>
     <div class="bim-chip-row">
       <span class="bim-cat-chip bim-cat-chip--pr"><span class="bim-cat-chip__lv">Pr</span>{uni_pr}</span>
       <span class="bim-cat-chip bim-cat-chip--plain">{ifc_class}</span>
@@ -1827,7 +1834,7 @@ pub fn render_not_found() -> String {
   </form>
   <nav class="bim-notfound__links">
     <a href="/objects">Objects</a>
-    <a href="/compositions">Compositions</a>
+    <a href="/key-plans">Key Plans</a>
     <a href="/research">Research</a>
     <a href="/method">Method</a>
   </nav>

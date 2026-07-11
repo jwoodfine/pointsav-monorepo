@@ -23,7 +23,7 @@ fn build_app(app_state: state::AppState, static_dir: PathBuf) -> Router {
     Router::new()
         // Full-page routes
         .route("/", get(routes::home::home_handler))
-        // "The Plan Room" (2026-07-09 v3 redesign) — Objects/Compositions are
+        // "The Plan Room" (2026-07-09 v3 redesign) — Objects/Key Plans are
         // real server-rendered routes, not client-only modal state. Search
         // and facet filters are GET query params (?q=, ?uni=, ?mfr=, ?use=,
         // ?layout=), so Back/reload/link-sharing all work by construction.
@@ -40,17 +40,37 @@ fn build_app(app_state: state::AppState, static_dir: PathBuf) -> Router {
             "/objects/{slug}",
             get(routes::objects::object_detail_handler),
         )
+        // Round 9 (2026-07-11): "Compositions" retired as a public concept —
+        // these are, and always were, Key Plans (see catalog.rs module doc).
+        // /key-plans is now the real index/detail; /compositions/* below
+        // are permanent redirects for old links/bookmarks.
+        .route(
+            "/key-plans",
+            get(routes::key_plans::key_plans_index_handler),
+        )
+        .route(
+            "/key-plans/{slug}",
+            get(routes::key_plans::key_plan_detail_handler),
+        )
+        .route(
+            "/key-plans/{slug}/o/{object}",
+            get(routes::key_plans::key_plan_object_handler),
+        )
+        .route(
+            "/key-plans/download/{filename}",
+            get(routes::key_plans::kp_download_handler),
+        )
         .route(
             "/compositions",
-            get(routes::compositions::compositions_index_handler),
+            get(routes::compositions::compositions_index_redirect),
         )
         .route(
             "/compositions/{slug}",
-            get(routes::compositions::composition_detail_handler),
+            get(routes::compositions::composition_detail_redirect),
         )
         .route(
             "/compositions/{slug}/o/{object}",
-            get(routes::compositions::composition_object_handler),
+            get(routes::compositions::composition_object_redirect),
         )
         .route("/method", get(routes::about::about_handler))
         .route(
@@ -61,11 +81,6 @@ fn build_app(app_state: state::AppState, static_dir: PathBuf) -> Router {
         .route(
             "/tokens/{name}",
             get(routes::tokens::token_category_handler),
-        )
-        .route("/key-plans", get(routes::key_plans::key_plans_handler))
-        .route(
-            "/key-plans/download/{filename}",
-            get(routes::key_plans::kp_download_handler),
         )
         .route("/furniture", get(routes::furniture::furniture_handler))
         .route(
@@ -197,8 +212,9 @@ mod route_tests {
         // Replaces the pre-"Plan Room" home_ssr_has_both_tabs_with_real_data test, which
         // asserted the old tabbed-panel home layout (id="bim-panel-objects"/"bim-panel-compositions"
         // with embedded item listings). The v3 redesign (2026-07-09) replaced that with a compact
-        // front door linking out to /objects and /compositions — those routes have their own
-        // coverage; this test only needs to confirm the home page itself renders correctly.
+        // front door linking out to /objects and /key-plans (renamed from /compositions, Round 9
+        // 2026-07-11) — those routes have their own coverage; this test only needs to confirm the
+        // home page itself renders correctly.
         let app = test_app().await;
         let resp = app
             .oneshot(Request::get("/").body(Body::empty()).unwrap())
@@ -207,26 +223,42 @@ mod route_tests {
         assert_eq!(resp.status(), StatusCode::OK);
         let html = body_string(resp).await;
         assert!(html.contains("Objects"));
-        assert!(html.contains("Compositions"));
+        assert!(html.contains("Key Plans"));
         assert!(html.contains("/objects"));
-        assert!(html.contains("/compositions"));
+        assert!(html.contains("/key-plans"));
     }
 
     #[tokio::test]
-    async fn key_plans_and_furniture_redirect_to_home() {
-        for path in ["/key-plans", "/furniture"] {
-            let app = test_app().await;
-            let resp = app
-                .oneshot(Request::get(path).body(Body::empty()).unwrap())
-                .await
-                .unwrap();
-            assert!(
-                resp.status().is_redirection(),
-                "{path} should redirect, got {}",
-                resp.status()
-            );
-            assert_eq!(resp.headers().get("location").unwrap(), "/");
-        }
+    async fn furniture_redirects_to_home() {
+        let app = test_app().await;
+        let resp = app
+            .oneshot(Request::get("/furniture").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert!(
+            resp.status().is_redirection(),
+            "/furniture should redirect, got {}",
+            resp.status()
+        );
+        assert_eq!(resp.headers().get("location").unwrap(), "/");
+    }
+
+    // Round 9 (2026-07-11): `/compositions` inverted from a real index into a
+    // legacy redirect once "Composition" retired as a public concept — it now
+    // redirects to `/key-plans`, the real index, not to `/`.
+    #[tokio::test]
+    async fn compositions_redirects_to_key_plans() {
+        let app = test_app().await;
+        let resp = app
+            .oneshot(Request::get("/compositions").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert!(
+            resp.status().is_redirection(),
+            "/compositions should redirect, got {}",
+            resp.status()
+        );
+        assert_eq!(resp.headers().get("location").unwrap(), "/key-plans");
     }
 
     #[tokio::test]
@@ -292,7 +324,7 @@ mod route_tests {
         let json: serde_json::Value = serde_json::from_str(&raw).unwrap();
         let cat = &json["_catalog"];
         assert_eq!(cat["objects"].as_array().unwrap().len(), 7);
-        assert_eq!(cat["compositions"].as_array().unwrap().len(), 23);
+        assert_eq!(cat["key-plans"].as_array().unwrap().len(), 23);
         // Raw DTCG token files still present alongside the derived catalog.
         assert!(json.get("interior").is_some());
         assert!(json.get("key-plans").is_some());
@@ -400,22 +432,15 @@ mod route_tests {
                     render::shell::esc(&section.heading),
                     section.body_html,
                 ));
-                if path == "/method" && section.heading == "Two ladders, one substrate" {
+                if path == "/method" && section.heading == "The containment model" {
                     expected.push_str(&format!(
-                        r#"<figure class="bim-method-figure">{svg}<figcaption>The element ladder (Object aggregates into Composition) and the space ladder (Key Plan aggregates into Tile, Floor Plate, Building) — joined only by containment, never merged into one ladder.</figcaption></figure>"#,
-                        svg = render::svg::render_two_ladder_svg()
+                        r#"<figure class="bim-method-figure">{svg}<figcaption>An Object placed in a Key Plan stays a part — it is contained in the plan, never summed into the spatial ladder. Key Plans aggregate into Tiles, Tiles into Floor Plates, Floor Plates into the Building.</figcaption></figure>"#,
+                        svg = render::svg::render_containment_model_svg()
                     ));
                 } else if path == "/method" && section.heading == "Key Plans and Tiles" {
-                    let illustrative_zone_svg = render::svg::render_kp_zone_svg(
-                        6.0,
-                        3.5,
-                        Some(2.0),
-                        "private-office",
-                        None,
-                    );
                     expected.push_str(&format!(
-                        r#"<figure class="bim-method-figure">{svg}<figcaption>An illustrative Key Plan cross-section: Habitat, Magazine, Corridor. Real depths vary by Key Plan; see individual Composition pages for measured values.</figcaption></figure>"#,
-                        svg = illustrative_zone_svg
+                        r#"<figure class="bim-method-figure">{svg}<figcaption>Every Key Plan divides its depth into the same three zones, measured from the facade inward: Habitat holds the 6.0 m daylight perimeter, Magazine the 3.5 m of flexible depth behind it, and Corridor the final 2.0 m of circulation. The depths shown are illustrative; each Key Plan records its own.</figcaption></figure>"#,
+                        svg = render::svg::render_method_zone_svg()
                     ));
                 }
             }

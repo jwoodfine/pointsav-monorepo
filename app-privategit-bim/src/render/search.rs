@@ -139,20 +139,20 @@ pub fn render_search_results(query: &str, state: &AppState) -> String {
         }
     }
 
-    // Objects + Compositions — the same canonical catalog the /objects and
-    // /compositions routes render from (2026-07-09 fix). This used to walk
+    // Objects + Key Plans — the same canonical catalog the /objects and
+    // /key-plans routes render from (2026-07-09 fix). This used to walk
     // raw per-file DTCG entities directly via a local `collect_entities`
     // helper: it hardcoded `kind: "BIM Object"` for every hit
-    // regardless of which file it came from — mis-badging Compositions found
+    // regardless of which file it came from — mis-badging Key Plans found
     // via key-plans.dtcg.json — and read a generic `$value.display_name`
     // field that Objects don't actually carry (their real name lives in
     // `model`, per catalog::build_objects), silently falling back to the raw
     // registry slug instead of the product name. Reusing
-    // catalog::build_objects/build_compositions gets the same name/kind
+    // catalog::build_objects/build_key_plans gets the same name/kind
     // resolution the catalog pages already have right, instead of
     // re-deriving it here with different (wrong) field assumptions.
     let objects = super::catalog::build_objects(state);
-    let compositions = super::catalog::build_compositions(state, &objects);
+    let key_plans = super::catalog::build_key_plans(state, &objects);
 
     for o in &objects {
         let name = o.get("name").and_then(Value::as_str).unwrap_or("");
@@ -184,7 +184,7 @@ pub fn render_search_results(query: &str, state: &AppState) -> String {
         }
     }
 
-    for c in &compositions {
+    for c in &key_plans {
         let name = c.get("name").and_then(Value::as_str).unwrap_or("");
         let id = c.get("id").and_then(Value::as_str).unwrap_or("");
         let slug = c.get("slug").and_then(Value::as_str).unwrap_or("");
@@ -201,9 +201,9 @@ pub fn render_search_results(query: &str, state: &AppState) -> String {
                 description
             };
             hits.push(Hit {
-                kind: "Composition",
+                kind: "Key Plan",
                 title: name.to_string(),
-                url: format!("/compositions/{slug}"),
+                url: format!("/key-plans/{slug}"),
                 snippet: highlight_snippet(snippet_source, &tokens),
                 score,
                 tiebreak: slug.to_string(),
