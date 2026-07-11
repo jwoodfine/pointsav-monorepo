@@ -958,9 +958,7 @@ pub fn render_two_ladder_svg() -> String {
     let caption = "var(--bim-fg-caption)";
     let mut s = String::with_capacity(2400);
     s.push_str("<svg class=\"bim-method-diagram\" viewBox=\"0 0 320 210\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"The two-ladder model: element ladder (Object, Composition) and space ladder (Zone, Key Plan, Tile, Floor Plate, Building), joined by containment\">");
-    s.push_str(&format!(
-        "<rect width=\"320\" height=\"210\" fill=\"var(--bim-bg-surface)\"/>"
-    ));
+    s.push_str("<rect width=\"320\" height=\"210\" fill=\"var(--bim-bg-surface)\"/>");
 
     // Column headers.
     s.push_str(&format!(
