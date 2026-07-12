@@ -394,6 +394,7 @@ pub fn render_page(
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1";
                 title { (title) }
+                link rel="icon" type="image/svg+xml" href="/static/favicon.svg";
                 meta name="description" content=(description);
                 link rel="canonical" href=(url);
                 meta property="og:type" content="website";
@@ -513,6 +514,7 @@ mod tests {
         assert!(page.contains("probe content"));
 
         // SEO meta/OG/Twitter tags (BRIEF-seo-cross-site-strategy.md gap closure).
+        assert!(page.contains(r#"<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">"#));
         assert!(page.contains(r#"<meta name="description" content="Test description">"#));
         assert!(page.contains(r#"<link rel="canonical" href="https://software.pointsav.com/test">"#));
         assert!(page.contains(r#"<meta property="og:title" content="Test Title">"#));
