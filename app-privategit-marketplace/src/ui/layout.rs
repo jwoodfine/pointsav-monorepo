@@ -32,10 +32,27 @@ const BADGE_GLYPH: &str = r##"<svg viewBox="0 0 24 24" width="14" height="14" ar
 // own inline styles. Token custom properties are emitted from `tokens.rs` below
 // so the single source of truth is the Rust consts. The mobile drawer is a
 // pure-CSS off-canvas panel (checkbox toggle) — no JavaScript asset in this phase.
+//
+// Body font: self-hosted Inter (400/600, latin + latin-ext), byte-identical copy
+// from `app-mediakit-knowledge/static/fonts/` — the same family/sourcing
+// convention already used by the wiki and app-mediakit-marketing-2 (OFL 1.1,
+// zero third-party font CDN). Added 2026-07-12: this crate previously had no
+// `body`/`html` font-family rule at all, so every non-Georgia element was
+// silently falling back to the browser's default serif font — a real,
+// visible inconsistency with the rest of the family, not a deliberate choice.
+// Georgia stays for display headings (unaffected). Only 400/600 weights are
+// fetched (matches what's actually used); the family's own font set only
+// defines up to 600 for Inter, so `font-weight:700` selectors that had no
+// Georgia override were adjusted to 600 to use a real face rather than
+// browser-synthesized bold.
 
 fn chrome_style() -> Markup {
     let css = format!(
-        r#":root{{
+        r#"@font-face{{font-family:"Inter";src:url("/static/fonts/Inter-400-normal-latin.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}}
+@font-face{{font-family:"Inter";src:url("/static/fonts/Inter-400-normal-latin-ext.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap;unicode-range:U+0100-024F,U+0259,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20CF,U+2113,U+2C60-2C7F,U+A720-A7FF;}}
+@font-face{{font-family:"Inter";src:url("/static/fonts/Inter-600-normal-latin.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}}
+@font-face{{font-family:"Inter";src:url("/static/fonts/Inter-600-normal-latin-ext.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap;unicode-range:U+0100-024F,U+0259,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20CF,U+2113,U+2C60-2C7F,U+A720-A7FF;}}
+:root{{
 --sw-topnav-bg:{topnav};
 --sw-on-chrome:{on_chrome};
 --sw-on-chrome-muted:{on_chrome_muted};
@@ -48,9 +65,10 @@ fn chrome_style() -> Markup {
 --sw-ink:{ink};
 --sw-wordmark:{wordmark};
 }}
+body{{font-family:"Inter","Sans Fallback",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;}}
 .sw-masthead{{background:var(--sw-topnav-bg);color:var(--sw-on-chrome);width:100%;}}
 .sw-masthead__inner{{display:flex;align-items:center;gap:24px;height:64px;max-width:1280px;margin:0 auto;padding:0 24px;box-sizing:border-box;}}
-.sw-wordmark{{color:var(--sw-on-chrome);text-decoration:none;font-weight:700;font-size:17px;letter-spacing:.005em;flex:0 0 auto;}}
+.sw-wordmark{{color:var(--sw-on-chrome);text-decoration:none;font-weight:600;font-size:17px;letter-spacing:.005em;flex:0 0 auto;}}
 .sw-search{{flex:1 1 auto;display:flex;justify-content:flex-end;}}
 .sw-search__form{{display:flex;width:100%;max-width:320px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);border-radius:6px;overflow:hidden;}}
 .sw-search__input{{flex:1;background:transparent;border:0;color:#fff;padding:8px 12px;font-size:13px;outline:none;}}
@@ -95,7 +113,7 @@ fn chrome_style() -> Markup {
 .sw-footer__badge-glyph{{display:inline-flex;color:var(--sw-accent);}}
 .sw-footer__badge-text{{display:flex;flex-direction:column;line-height:1.1;}}
 .sw-footer__badge-label{{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--sw-footer-fg-muted);}}
-.sw-footer__badge-name{{font-size:12px;font-weight:700;color:var(--sw-footer-fg);}}
+.sw-footer__badge-name{{font-size:12px;font-weight:600;color:var(--sw-footer-fg);}}
 .sw-footer__legal{{margin-top:20px;padding-top:18px;border-top:1px solid var(--sw-footer-divider);font-size:11.5px;line-height:1.6;}}
 .sw-footer__copyright{{color:var(--sw-footer-fg-muted);margin:0 0 8px;}}
 .sw-footer__trademark{{margin:0;color:var(--sw-footer-fg-muted);max-width:80ch;}}
