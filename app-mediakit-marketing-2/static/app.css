@@ -46,12 +46,22 @@ a:hover {
   outline-offset: var(--m-focus-ring-offset);
 }
 
-/* New in this commit: the language-switch pill sits on the dark masthead,
-   same low-contrast-focus-ring problem the (out-of-range) accessibility
-   audit found for the other masthead controls -- `--m-focus-ring-on-dark`
-   already exists in tokens.css for this. Scoped to just the new element;
-   the masthead's other controls keep whatever focus treatment they
-   already have on canonical. */
+/* Audit finding: the default navy focus ring above measures ~1.3-1.8:1
+   against the navy-700/800/900 surfaces these elements sit on — well under
+   the WCAG 2.2 3:1 requirement (1.4.11 Non-text Contrast, 2.4.11 Focus
+   Appearance). `--m-focus-ring-on-dark` was already defined in tokens.css
+   for exactly this but never actually wired to anything. White gives
+   8-9:1 against every navy surface. Scoped to the elements that actually
+   sit on dark chrome; the default navy ring above stays correct for
+   light-surface elements (footer nav, prose links, disclosure summary).
+   `.m-masthead .m-lang-switch` joins the same rule for the same reason —
+   the language-switch pill sits on the dark masthead too. */
+.m-masthead__nav a:focus-visible,
+.m-masthead__wordmark:focus-visible,
+.m-masthead__burger:focus-visible,
+.m-drawer__close:focus-visible,
+.m-card--button a:focus-visible,
+.m-card--linked a:focus-visible,
 .m-masthead .m-lang-switch:focus-visible {
   outline-color: var(--m-focus-ring-on-dark);
 }

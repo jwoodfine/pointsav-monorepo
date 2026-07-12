@@ -447,6 +447,15 @@
      (9.22:1, WCAG AAA) while links/CTAs/text stay on primary-60. */
   --m-card-linked-bg: var(--m-navy-800);
 
+  /* Audit finding 2026-07-11: --m-ink-on-chrome-muted (slate-300) was tuned
+     for Woodfine's navy-700 (#164679, 5.4:1) and never re-verified after
+     this brand's navy-700 override above — slate-300 on #234ed8 measures
+     ~3.77:1, failing WCAG 1.4.3 (needs 4.5:1 for normal-size text) on the
+     masthead nav's resting state (hover/focus already switch to white and
+     pass). This override clears AA while staying visually distinct from
+     the white hover/focus state. */
+  --m-masthead-ink-muted: #d5deea;
+
   --m-hero-band-bg:        var(--m-slate-300);
   --m-hero-band-ink:       var(--m-ink-900);
   --m-hero-band-ink-muted: var(--m-ink-700);  /* 5.3:1 on slate — fixes a live contrast failure */

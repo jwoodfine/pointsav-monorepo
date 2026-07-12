@@ -1025,7 +1025,14 @@ fn icon_strip(icons: &[crate::content::IconTile]) -> Markup {
                             loading="lazy"
                             style=[icon.scale.map(|s| format!("transform: scale({s})"))];
                         div.m-icon-strip__text {
-                            h3.m-icon-strip__title { (icon.alt) }
+                            // h2, not h3 — audit finding: the icon strip is
+                            // a top-level section directly under <main>, a
+                            // peer of the card-grid sections whose titles are
+                            // already h2, so its titles were mis-leveled
+                            // (h1 -> h3 with no h2 between). CSS sets this
+                            // element's font-size independently of the tag,
+                            // so this is a semantic-only change.
+                            h2.m-icon-strip__title { (icon.alt) }
                             @if let Some(body) = &icon.body {
                                 p.m-icon-strip__body { (body) }
                             }
