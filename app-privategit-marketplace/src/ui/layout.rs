@@ -15,6 +15,7 @@
 
 use maud::{html, Markup, PreEscaped, DOCTYPE};
 
+use super::lang::{lang_switch, Lang};
 use super::surface::SoftwareSurface;
 use super::tokens;
 
@@ -74,6 +75,9 @@ body{{font-family:"Inter","Sans Fallback",system-ui,-apple-system,"Segoe UI",Ari
 .sw-search__input{{flex:1;background:transparent;border:0;color:#fff;padding:8px 12px;font-size:13px;outline:none;}}
 .sw-search__input::placeholder{{color:rgba(255,255,255,.6);}}
 .sw-search__btn{{background:transparent;border:0;color:rgba(255,255,255,.85);padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;}}
+.sw-lang-switch{{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;color:var(--sw-on-chrome);text-decoration:none;font-size:13px;white-space:nowrap;padding:6px 10px;border:1px solid rgba(255,255,255,.18);border-radius:6px;}}
+.sw-lang-switch:hover,.sw-lang-switch:focus-visible{{border-color:rgba(255,255,255,.4);}}
+.sw-lang-switch__glyph{{width:14px;height:14px;flex-shrink:0;}}
 .sw-hamburger{{display:none;background:transparent;border:0;color:var(--sw-on-chrome);padding:6px;cursor:pointer;align-items:center;}}
 .sw-hamburger:focus-visible{{outline:2px solid #fff;outline-offset:2px;}}
 .sw-mobile-nav{{display:none;background:var(--sw-topnav-bg);}}
@@ -168,13 +172,37 @@ body{{font-family:"Inter","Sans Fallback",system-ui,-apple-system,"Segoe UI",Ari
 /// prior pass is now itself redundant with the wordmark and is removed along with
 /// the drawer/burger system that existed only to hold it and the now-removed
 /// Account link on mobile.
-pub fn masthead(surface: SoftwareSurface) -> Markup {
+pub fn masthead(surface: SoftwareSurface, lang: Lang, lang_toggle_href: &str) -> Markup {
+    let nav = lang.nav_labels();
     html! {
         header."sw-masthead" role="banner" {
             div."sw-masthead__inner" {
-                a."sw-wordmark" href="/" aria-label=(surface.home_label()) {
+                a."sw-wordmark" href=(lang.localize("/")) aria-label=(surface.home_label()) {
                     (surface.home_label())
                 }
+                div."sw-search" {
+                    form."sw-search__form" role="search" action=(lang.localize("/software")) method="get" {
+                        label."sw-search__input" style="display:none" for="sw-q" { (nav.search_label) }
+                        input."sw-search__input" #"sw-q" type="search" name="q"
+                            placeholder=(nav.search_placeholder) autocomplete="off"
+                            aria-label=(nav.search_label);
+                        button."sw-search__btn" type="submit" aria-label=(nav.search_label) {
+                            (PreEscaped(SEARCH_ICON))
+                        }
+                    }
+                }
+                // MVL Spanish toggle (operator-approved 2026-07-12) — same globe-glyph
+                // + reciprocal-label pattern verified live on home.pointsav.com. Only
+                // /software, /pricing, /licensing have a real ES sibling; every other
+                // page's toggle falls back to the other language's /software (see
+                // `render_page`'s `toggle_href`), same as visiting an untranslated
+                // page on the home-* sites falls back to that site's ES/EN root.
+                // Placed BEFORE the hamburger (not after) so the hamburger's own
+                // `margin-left:auto` (mobile only) is the only auto-margin claimant
+                // in this row — two competing auto-margins on adjacent siblings is
+                // exactly the mobile-overflow bug home.pointsav.com's own CSS
+                // comment documents having to fix after shipping this pattern first.
+                (lang_switch(lang, lang_toggle_href))
                 // Real <button>, not a checkbox+label: natively focusable and
                 // Enter/Space-activatable with no extra JS, and can carry
                 // aria-expanded/aria-controls correctly. A pure-CSS checkbox
@@ -183,34 +211,25 @@ pub fn masthead(surface: SoftwareSurface) -> Markup {
                 // `display:none` on the checkbox removed it from tab order
                 // entirely, and a <label> alone doesn't natively respond to
                 // Enter/Space the way a button does.
-                button."sw-hamburger" type="button" aria-label="Menu"
+                button."sw-hamburger" type="button" aria-label=(nav.menu_label)
                     aria-expanded="false" aria-controls="sw-mobile-nav" {
                     (PreEscaped(HAMBURGER_ICON))
-                }
-                div."sw-search" {
-                    form."sw-search__form" role="search" action="/software" method="get" {
-                        label."sw-search__input" style="display:none" for="sw-q" { "Search products" }
-                        input."sw-search__input" #"sw-q" type="search" name="q"
-                            placeholder="Search products\u{2026}" autocomplete="off"
-                            aria-label="Search products";
-                        button."sw-search__btn" type="submit" aria-label="Search" {
-                            (PreEscaped(SEARCH_ICON))
-                        }
-                    }
                 }
             }
             // Same 7 links as the footer's "Site" column — the only masthead-level
             // path to Pricing/Licensing/Contact/Disclaimer/Privacy/Accessibility on
             // mobile, where the footer is otherwise reachable only by scrolling to
-            // the bottom of the page.
+            // the bottom of the page. Products/Pricing/Licensing link to the ES
+            // sibling when `lang` is Spanish; the other four have no ES page yet
+            // (MVL scope) and stay pointed at the English original.
             nav."sw-mobile-nav" #"sw-mobile-nav" aria-label="Mobile navigation" {
-                a href="/software" { "Products" }
-                a href="/pricing" { "Pricing" }
-                a href="/licensing" { "Licensing" }
-                a href="/page/contact" { "Contact Us" }
-                a href="/page/disclaimer" { "Disclaimer" }
-                a href="/page/privacy" { "Privacy" }
-                a href="/page/accessibility" { "Accessibility" }
+                a href=(lang.localize("/software")) { (nav.products) }
+                a href=(lang.localize("/pricing")) { (nav.pricing) }
+                a href=(lang.localize("/licensing")) { (nav.licensing) }
+                a href="/page/contact" { (nav.contact) }
+                a href="/page/disclaimer" { (nav.disclaimer) }
+                a href="/page/privacy" { (nav.privacy) }
+                a href="/page/accessibility" { (nav.accessibility) }
             }
             (mobile_nav_script())
         }
@@ -250,7 +269,8 @@ btn.addEventListener('click',function(){
 /// Note: the brand lockup reads "PointSav Software" WITHOUT a ™ — that exact string
 /// is not one of the enumerated marks in TRADEMARK.md v1.1, so asserting a mark on
 /// it would be inaccurate. The enumerated marks carry ™ in the trademark line only.
-pub fn footer(surface: SoftwareSurface) -> Markup {
+pub fn footer(surface: SoftwareSurface, lang: Lang) -> Markup {
+    let nav = lang.nav_labels();
     html! {
         footer."sw-footer" role="contentinfo" {
             div."sw-footer__inner" {
@@ -262,19 +282,19 @@ pub fn footer(surface: SoftwareSurface) -> Markup {
                         }
                     }
                     div."sw-footer__col" {
-                        h2 { "Site" }
+                        h2 { (nav.site_col) }
                         ul {
-                            li { a href="/software" { "Products" } }
-                            li { a href="/pricing" { "Pricing" } }
-                            li { a href="/licensing" { "Licensing" } }
-                            li { a href="/page/contact" { "Contact Us" } }
-                            li { a href="/page/disclaimer" { "Disclaimer" } }
-                            li { a href="/page/privacy" { "Privacy" } }
-                            li { a href="/page/accessibility" { "Accessibility" } }
+                            li { a href=(lang.localize("/software")) { (nav.products) } }
+                            li { a href=(lang.localize("/pricing")) { (nav.pricing) } }
+                            li { a href=(lang.localize("/licensing")) { (nav.licensing) } }
+                            li { a href="/page/contact" { (nav.contact) } }
+                            li { a href="/page/disclaimer" { (nav.disclaimer) } }
+                            li { a href="/page/privacy" { (nav.privacy) } }
+                            li { a href="/page/accessibility" { (nav.accessibility) } }
                         }
                     }
                     div."sw-footer__col" {
-                        h2 { "Network" }
+                        h2 { (nav.network_col) }
                         ul {
                             li {
                                 a href="https://home.pointsav.com/" target="_blank" rel="noopener"
@@ -396,18 +416,30 @@ const SITE_URL: &str = "https://software.pointsav.com";
 /// that 404s honestly rather than a fabricated-looking placeholder path.
 const OG_IMAGE_PATH: &str = "/static/og-default.png";
 
+/// `translated`: true only for the three MVL Spanish pages (`/software`,
+/// `/pricing`, `/licensing`) — controls whether `hreflang` alternate `<link>`s
+/// are emitted and whether the masthead's lang-switch pill targets the real ES/EN
+/// sibling of `path` (vs. falling back to the other language's `/software`).
 pub fn render_page(
     surface: SoftwareSurface,
+    lang: Lang,
     title: &str,
     description: &str,
     path: &str,
+    translated: bool,
     content: Markup,
 ) -> Markup {
     let url = format!("{SITE_URL}{path}");
     let image = format!("{SITE_URL}{OG_IMAGE_PATH}");
+    let unprefixed = path.strip_prefix(lang.prefix()).unwrap_or(path);
+    let toggle_href = if translated {
+        lang.other().localize(unprefixed)
+    } else {
+        lang.other().localize("/software")
+    };
     html! {
         (DOCTYPE)
-        html lang="en" {
+        html lang=(lang.code()) {
             head {
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1";
@@ -415,6 +447,11 @@ pub fn render_page(
                 link rel="icon" type="image/svg+xml" href="/static/favicon.svg";
                 meta name="description" content=(description);
                 link rel="canonical" href=(url);
+                @if translated {
+                    link rel="alternate" hreflang="en" href=(format!("{SITE_URL}{}", Lang::En.localize(unprefixed)));
+                    link rel="alternate" hreflang="es" href=(format!("{SITE_URL}{}", Lang::Es.localize(unprefixed)));
+                    link rel="alternate" hreflang="x-default" href=(format!("{SITE_URL}{}", Lang::En.localize(unprefixed)));
+                }
                 meta property="og:type" content="website";
                 meta property="og:site_name" content="PointSav Software";
                 meta property="og:title" content=(title);
@@ -428,9 +465,9 @@ pub fn render_page(
                 (chrome_style())
             }
             body {
-                (masthead(surface))
+                (masthead(surface, lang, &toggle_href))
                 main { (content) }
-                (footer(surface))
+                (footer(surface, lang))
             }
         }
     }
@@ -447,11 +484,27 @@ pub fn render_page(
 /// footer immediately before `</body>`.
 ///
 /// Defensive: if the essential anchors are missing the page is served unchanged.
-pub fn wrap_static_html(raw: &str, surface: SoftwareSurface) -> String {
+///
+/// `path`/`translated` mirror `render_page`'s own params — used only to compute
+/// the masthead's lang-switch toggle target (`/licensing` <-> `/es/licensing`).
+pub fn wrap_static_html(
+    raw: &str,
+    surface: SoftwareSurface,
+    lang: Lang,
+    path: &str,
+    translated: bool,
+) -> String {
     if !raw.contains("</head>") || !raw.contains("</body>") {
         tracing::warn!("static page missing </head> or </body>; serving without Sovereign chrome");
         return raw.to_string();
     }
+
+    let unprefixed = path.strip_prefix(lang.prefix()).unwrap_or(path);
+    let toggle_href = if translated {
+        lang.other().localize(unprefixed)
+    } else {
+        lang.other().localize("/software")
+    };
 
     // 1. Strip the page's own light chrome (single header/footer per file).
     let mut out = remove_between(raw, "<header class=\"topnav\">", "</header>");
@@ -462,12 +515,12 @@ pub fn wrap_static_html(raw: &str, surface: SoftwareSurface) -> String {
     out = out.replacen("</head>", &format!("{style}\n</head>"), 1);
 
     // 3. Mount the masthead (+ drawer) right after the <body …> open tag.
-    out = insert_after_body_open(&out, &masthead(surface).into_string());
+    out = insert_after_body_open(&out, &masthead(surface, lang, &toggle_href).into_string());
 
     // 4. Mount the footer right before </body>.
     out = out.replacen(
         "</body>",
-        &format!("{}\n</body>", footer(surface).into_string()),
+        &format!("{}\n</body>", footer(surface, lang).into_string()),
         1,
     );
 
@@ -517,26 +570,32 @@ mod tests {
 
     #[test]
     fn render_page_wraps_content_in_full_chrome() {
-        let page =
-            render_page(
-                SURFACE,
-                "Test Title",
-                "Test description",
-                "/test",
-                html! { p { "probe content" } },
-            )
-            .into_string();
+        let page = render_page(
+            SURFACE,
+            Lang::En,
+            "Test Title",
+            "Test description",
+            "/test",
+            false,
+            html! { p { "probe content" } },
+        )
+        .into_string();
 
         assert!(page.starts_with("<!DOCTYPE html>"));
         assert!(page.contains("<title>Test Title</title>"));
         assert!(page.contains("probe content"));
 
         // SEO meta/OG/Twitter tags (BRIEF-seo-cross-site-strategy.md gap closure).
-        assert!(page.contains(r#"<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">"#));
+        assert!(
+            page.contains(r#"<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">"#)
+        );
         assert!(page.contains(r#"<meta name="description" content="Test description">"#));
-        assert!(page.contains(r#"<link rel="canonical" href="https://software.pointsav.com/test">"#));
+        assert!(
+            page.contains(r#"<link rel="canonical" href="https://software.pointsav.com/test">"#)
+        );
         assert!(page.contains(r#"<meta property="og:title" content="Test Title">"#));
-        assert!(page.contains(r#"<meta property="og:url" content="https://software.pointsav.com/test">"#));
+        assert!(page
+            .contains(r#"<meta property="og:url" content="https://software.pointsav.com/test">"#));
         assert!(page.contains(r#"<meta name="twitter:card" content="summary">"#));
 
         // Masthead markers.
@@ -591,13 +650,56 @@ mod tests {
     }
 
     #[test]
+    fn render_page_translated_emits_hreflang_alternates_and_es_html_lang() {
+        let page = render_page(
+            SURFACE,
+            Lang::Es,
+            "Productos \u{2014} PointSav Software",
+            "Descripci\u{f3}n de prueba",
+            "/es/software",
+            true,
+            html! { p { "contenido de prueba" } },
+        )
+        .into_string();
+
+        assert!(page.starts_with("<!DOCTYPE html>"));
+        assert!(page.contains(r#"<html lang="es">"#));
+        assert!(page.contains(
+            r#"<link rel="alternate" hreflang="en" href="https://software.pointsav.com/software">"#
+        ));
+        assert!(page.contains(r#"<link rel="alternate" hreflang="es" href="https://software.pointsav.com/es/software">"#));
+        assert!(page.contains(r#"<link rel="alternate" hreflang="x-default" href="https://software.pointsav.com/software">"#));
+        // Toggle in the masthead points back at the real English sibling.
+        assert!(page.contains(r#"class="sw-lang-switch" href="/software""#));
+        assert!(page.contains("English"));
+    }
+
+    #[test]
+    fn render_page_untranslated_page_omits_hreflang_and_toggle_falls_back_to_software() {
+        let page = render_page(
+            SURFACE,
+            Lang::En,
+            "Contact us \u{2014} PointSav Software",
+            "Test description",
+            "/page/contact",
+            false,
+            html! { p { "probe" } },
+        )
+        .into_string();
+
+        assert!(!page.contains(r#"rel="alternate" hreflang"#));
+        // No ES sibling for /page/contact -> toggle falls back to /es/software.
+        assert!(page.contains(r#"class="sw-lang-switch" href="/es/software""#));
+    }
+
+    #[test]
     fn masthead_mobile_nav_covers_every_page_unreachable_without_it() {
         // Investigation this session confirmed Pricing/Licensing/Contact/Disclaimer/
         // Privacy/Accessibility were unreachable from mobile except by scrolling to
         // the footer (search collapses to nothing at <=768px, masthead had no nav at
         // all). The hamburger drawer must carry the same links as the footer's Site
         // column so nothing is orphaned on mobile.
-        let html = masthead(SURFACE).into_string();
+        let html = masthead(SURFACE, Lang::En, "/es/software").into_string();
         // Real <button>, not a checkbox+label — keyboard/AT-accessible (WCAG 2.1.1
         // fix): browser-in-the-loop re-audit found the earlier checkbox version
         // unreachable by keyboard (`display:none` removes it from tab order).
@@ -628,7 +730,7 @@ mod tests {
         // (unintentionally) was Privacy's only link anywhere on the site, and
         // Accessibility had never been linked from the footer at all. Both must be
         // reachable from the footer's Site column independent of the mobile nav.
-        let html = footer(SURFACE).into_string();
+        let html = footer(SURFACE, Lang::En).into_string();
         assert!(html.contains(r#"href="/page/privacy""#));
         assert!(html.contains(r#"href="/page/accessibility""#));
     }
@@ -643,7 +745,7 @@ mod tests {
 <footer>OLD FOOTER</footer>
 </body></html>"#;
 
-        let out = wrap_static_html(raw, SURFACE);
+        let out = wrap_static_html(raw, SURFACE, Lang::En, "/licensing", true);
 
         // Original content preserved; old light chrome removed.
         assert!(out.contains("Legal body text."));
@@ -673,10 +775,16 @@ mod tests {
     fn wrap_static_html_missing_anchors_serves_page_unchanged() {
         // Defensive path: no </head> or </body> -> bytes served verbatim.
         let fragment = "<p>fragment without head or body</p>";
-        assert_eq!(wrap_static_html(fragment, SURFACE), fragment);
+        assert_eq!(
+            wrap_static_html(fragment, SURFACE, Lang::En, "/licensing", true),
+            fragment
+        );
 
         let head_only = "<html><head></head><p>no body close</p>";
-        assert_eq!(wrap_static_html(head_only, SURFACE), head_only);
+        assert_eq!(
+            wrap_static_html(head_only, SURFACE, Lang::En, "/licensing", true),
+            head_only
+        );
     }
 
     #[test]
