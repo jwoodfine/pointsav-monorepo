@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🏗️ APP-PRIVATEGIT-SOURCE-CONTROL
+# app-privategit-source
 
 [ 🇬🇧 Read this document in English ](./README.md)
 
