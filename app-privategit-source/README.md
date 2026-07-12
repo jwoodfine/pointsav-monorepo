@@ -1,22 +1,49 @@
-# 🏗️ APP-PRIVATEGIT-SOURCE-CONTROL
+# app-privategit-source
 
-<div align="center">
+Signed binary release server for `software.pointsav.com`. Streams product
+binaries, installer scripts, and manifests over HTTP, gating each download
+behind an Ed25519 license token where the product requires one. Also exposes
+a `/git/*` smart-HTTP endpoint stub (returns 503 — not yet implemented).
 
-[ 🇪🇸 Leer este documento en Español ](./README.es.md)
+**Status:** active — deployed locally (`local-software-source.service`,
+`127.0.0.1:9201`) and on `software.pointsav.com`.
 
-</div>
+## Routes
 
-**Entity:** PointSav Digital Systems™ (The Vendor)
-**Taxonomy:** Tier-1 Core Component
-**Status:** Architectural Scaffold (Pending Engineering Cycle)
+| Method | Path | Notes |
+|---|---|---|
+| GET | `/healthz` | Liveness check |
+| GET | `/releases/` | Lists product directories under `RELEASES_DIR` |
+| GET | `/releases/:product/` | Lists deposited versions for one product |
+| GET | `/releases/:product/install.sh` | Streams the product's install script |
+| GET | `/releases/:product/:version/MANIFEST` | Raw `MANIFEST.json`, unauthenticated |
+| GET | `/releases/:product/latest/:platform` | 307 redirect to the numerically-highest deposited version |
+| GET | `/releases/:product/:version/:platform` | The binary download — gated by license token unless the product's `MANIFEST.json` sets `requires_license: false` |
+| GET/POST | `/git/*path` | Smart-HTTP stub — always 503, not implemented |
+| POST | `/verify-key` | Validates a license token, returns its decoded payload |
+| GET | `/verify-key.pub` | Returns this server's Ed25519 verify key as hex |
+| POST | `/admin/reload-revocation-list` | Reloads the revocation set from disk — loopback-only |
 
----
+`product`/`version`/`platform` path segments are validated (`is_safe_segment`)
+before touching the filesystem — no `..`, path separators, or control
+characters accepted.
 
-## I. ARCHITECTURAL MANDATE
-This directory defines the physical execution parameters, compilation logic, and strict memory boundaries for its respective structural domain. It currently serves as an isolated memory sandbox pending a dedicated engineering cycle.
+## Configuration
 
-## II. COMPONENT ISOLATION
-In accordance with Capability-Based Security (SYS-SEC-01), this component is mathematically air-gapped from all other system functions until explicit cryptographic execution commands are authored and verified.
+| Env var | Default | Purpose |
+|---|---|---|
+| `SOURCE_BIND` | `127.0.0.1:19201` | Listen address. **The default is a test port** — production deployments must set this explicitly (e.g. `127.0.0.1:9201`). |
+| `RELEASES_DIR` | `/var/lib/local-software/releases` | Root of deposited product releases |
+| `VERIFY_KEY_PUB` | unset | Ed25519 public key (hex, or a path to a file containing hex) used to verify license tokens minted by `app-privategit-marketplace`. If unset, `/verify-key` and licensed downloads return 503. |
+| `REVOCATION_LIST_PATH` | unset | Path to a newline-delimited list of revoked token fingerprints |
+| `RUST_LOG` | `info` | Standard `tracing-subscriber` env filter |
 
-## III. LICENSING
-This component is governed by the Sovereign Data Protocol and remains in an active **Incubation Phase**. Refer to the root `LICENSE` file. All structural designs and protocols are strictly reserved.
+`VERIFY_KEY_PUB` must be the public counterpart of the `SIGNING_KEY_SECRET`
+configured on the paired `app-privategit-marketplace` instance — a mismatch
+produces uniform 401s on every licensed download. The marketplace's own
+startup keypair self-test (`VERIFY_KEY_PUB` set on that process too) catches
+this if configured; see that crate's README.
+
+## License
+
+AGPL-3.0-or-later. See the repository root `LICENSE`.

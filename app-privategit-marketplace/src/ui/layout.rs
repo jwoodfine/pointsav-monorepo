@@ -56,8 +56,8 @@ fn chrome_style() -> Markup {
 .sw-search__input{{flex:1;background:transparent;border:0;color:#fff;padding:8px 12px;font-size:13px;outline:none;}}
 .sw-search__input::placeholder{{color:rgba(255,255,255,.6);}}
 .sw-search__btn{{background:transparent;border:0;color:rgba(255,255,255,.85);padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;}}
-.sw-nav-toggle-input{{display:none;}}
 .sw-hamburger{{display:none;background:transparent;border:0;color:var(--sw-on-chrome);padding:6px;cursor:pointer;align-items:center;}}
+.sw-hamburger:focus-visible{{outline:2px solid #fff;outline-offset:2px;}}
 .sw-mobile-nav{{display:none;background:var(--sw-topnav-bg);}}
 .sw-mobile-nav a{{display:block;padding:12px 24px;color:var(--sw-on-chrome);text-decoration:none;font-size:14px;border-top:1px solid rgba(255,255,255,.12);}}
 .sw-mobile-nav a:hover{{background:rgba(255,255,255,.06);}}
@@ -110,7 +110,7 @@ fn chrome_style() -> Markup {
 .sw-masthead__inner{{gap:12px;}}
 .sw-footer__top{{grid-template-columns:1fr;gap:24px;}}
 .sw-hamburger{{display:inline-flex;margin-left:auto;}}
-.sw-nav-toggle-input:checked ~ .sw-mobile-nav{{display:flex;flex-direction:column;}}
+.sw-mobile-nav.sw-mobile-nav--open{{display:flex;flex-direction:column;}}
 }}"#,
         topnav = tokens::TOPNAV_BG,
         on_chrome = tokens::ON_CHROME,
@@ -153,16 +153,20 @@ fn chrome_style() -> Markup {
 pub fn masthead(surface: SoftwareSurface) -> Markup {
     html! {
         header."sw-masthead" role="banner" {
-            // Pure-CSS off-canvas toggle (checkbox + general-sibling selector) — no
-            // JavaScript asset, matches this file's original intent (see the
-            // chrome-stylesheet doc comment above). Mobile-only (>768px hides both
-            // the hamburger and the panel via the same breakpoint `.sw-search` uses).
-            input."sw-nav-toggle-input" #"sw-nav-toggle" type="checkbox" aria-hidden="true";
             div."sw-masthead__inner" {
                 a."sw-wordmark" href="/" aria-label=(surface.home_label()) {
                     (surface.home_label())
                 }
-                label."sw-hamburger" for="sw-nav-toggle" aria-label="Menu" {
+                // Real <button>, not a checkbox+label: natively focusable and
+                // Enter/Space-activatable with no extra JS, and can carry
+                // aria-expanded/aria-controls correctly. A pure-CSS checkbox
+                // version was tried first and found keyboard/AT-inaccessible
+                // (WCAG 2.1.1) by this session's browser-in-the-loop re-audit —
+                // `display:none` on the checkbox removed it from tab order
+                // entirely, and a <label> alone doesn't natively respond to
+                // Enter/Space the way a button does.
+                button."sw-hamburger" type="button" aria-label="Menu"
+                    aria-expanded="false" aria-controls="sw-mobile-nav" {
                     (PreEscaped(HAMBURGER_ICON))
                 }
                 div."sw-search" {
@@ -181,7 +185,7 @@ pub fn masthead(surface: SoftwareSurface) -> Markup {
             // path to Pricing/Licensing/Contact/Disclaimer/Privacy/Accessibility on
             // mobile, where the footer is otherwise reachable only by scrolling to
             // the bottom of the page.
-            nav."sw-mobile-nav" aria-label="Mobile navigation" {
+            nav."sw-mobile-nav" #"sw-mobile-nav" aria-label="Mobile navigation" {
                 a href="/software" { "Products" }
                 a href="/pricing" { "Pricing" }
                 a href="/licensing" { "Licensing" }
@@ -190,8 +194,26 @@ pub fn masthead(surface: SoftwareSurface) -> Markup {
                 a href="/page/privacy" { "Privacy" }
                 a href="/page/accessibility" { "Accessibility" }
             }
+            (mobile_nav_script())
         }
     }
+}
+
+/// Toggles the mobile nav drawer and keeps `aria-expanded` in sync — same
+/// self-contained inline-script pattern as `catalog::rail_script()`/
+/// `catalog::clipboard_script()`. A real `<button>` already gets Enter/Space
+/// activation for free; this only needs to handle the click/keypress result.
+fn mobile_nav_script() -> Markup {
+    let js = r#"(function(){
+var btn=document.querySelector('.sw-hamburger');
+var nav=document.getElementById('sw-mobile-nav');
+if(!btn||!nav){return;}
+btn.addEventListener('click',function(){
+  var open=nav.classList.toggle('sw-mobile-nav--open');
+  btn.setAttribute('aria-expanded',open?'true':'false');
+});
+})();"#;
+    html! { script { (PreEscaped(js)) } }
 }
 
 // ── Footer ──────────────────────────────────────────────────────────────────────
@@ -556,9 +578,14 @@ mod tests {
         // all). The hamburger drawer must carry the same links as the footer's Site
         // column so nothing is orphaned on mobile.
         let html = masthead(SURFACE).into_string();
-        assert!(html.contains(r#"class="sw-nav-toggle-input""#));
+        // Real <button>, not a checkbox+label — keyboard/AT-accessible (WCAG 2.1.1
+        // fix): browser-in-the-loop re-audit found the earlier checkbox version
+        // unreachable by keyboard (`display:none` removes it from tab order).
         assert!(html.contains(r#"class="sw-hamburger""#));
+        assert!(html.contains("aria-expanded=\"false\""));
+        assert!(html.contains("aria-controls=\"sw-mobile-nav\""));
         assert!(html.contains(r#"class="sw-mobile-nav""#));
+        assert!(html.contains(r#"id="sw-mobile-nav""#));
         for href in [
             "/software",
             "/pricing",

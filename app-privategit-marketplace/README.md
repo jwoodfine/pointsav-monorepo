@@ -2,25 +2,43 @@
 
 PointSav software storefront. Serves `software.pointsav.com`.
 
-Customers who do not want to compile from source pay a license fee in USDC (Polygon PoS)
-and receive a signed, pre-compiled binary. The open-source path remains free at
-`github.com/pointsav/pointsav-monorepo`.
+Every product is currently `$0`/BETA regardless of license tier — pricing is
+tracked in the catalog but no product currently charges. Customers who do not
+want to compile from source will eventually pay a license fee in USDC
+(Polygon PoS) and receive a signed, pre-compiled binary; the open-source path
+remains free at `github.com/pointsav/pointsav-monorepo`.
 
 ## Surfaces
 
-- **Browse** — product catalog with version history and pricing
-- **Pay** — USDC on Polygon PoS; payments verified by `tool-wallet`
-- **License** — signed license key issued after on-chain payment confirmation
-- **Download** — signed binary URL valid for 24 h; re-issuable with license key
+- **Browse** (`/software`, `/software/:id`) — catalog rendered live from
+  `products.yaml`, grouped by license tier
+- **Pricing** (`/pricing`), **Licensing** (`/licensing`), and legal pages
+  (`/page/contact`, `/page/disclaimer`, `/page/privacy`, `/page/accessibility`)
+- **Pay** — USDC on Polygon PoS; payments verified via `tool-wallet`
+- **License** — a bearer license token minted after on-chain payment
+  confirmation, valid through the end of the UTC day it was minted (re-mints
+  fresh on a later visit to `/order/:tx_hash`, not a fixed 24h window)
+- **Download** — the license token authenticates one download against
+  `app-privategit-source`
 
 ## Environment variables
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `MARKETPLACE_BIND` | `127.0.0.1:9200` | Listen address (nginx reverse-proxies) |
+| `MARKETPLACE_BIND` | `127.0.0.1:9202` | Listen address |
+| `CATALOG_PATH` | `catalog/products.yaml` | Path to the product catalog YAML |
+| `STATIC_DIR` | `static` | Static assets dir (serves `/static/*`; also where `licensing.html` is read from) |
 | `POLYGON_WALLET_ADDRESS` | — | Receiving wallet for USDC payments |
-| `FS_ENDPOINT` | `http://127.0.0.1:8020` | service-fs WORM ledger for receipt storage |
-| `CATALOG_DIR` | — | Path to flat-file product YAML catalog |
+| `POLYGON_RPC_URL` | `https://polygon-rpc.com` | Polygon JSON-RPC endpoint used for payment confirmation checks |
+| `RECEIPTS_DIR` | `/var/lib/local-software/receipts` | Where confirmed-payment receipts are written |
+| `CLAIMS_DIR` | `/var/lib/local-software/claims` | Off-chain claim-token records (`/v1/claim`) |
+| `SOURCE_BASE_URL` | `https://software.pointsav.com/releases` | Base URL used to build download/manifest links — **set this to the local release server on non-prod hosts** or CSP will block the client-side MANIFEST fetch as cross-origin |
+| `TOOL_WALLET_BIN` | `tool-wallet` | Binary name/path invoked to check payment confirmations |
+| `TX_LOG_PATH` | `/var/lib/local-software/tx-log.jsonl` | Transaction log for confirmed orders |
+| `USDC_CAD_SPOT_RATE` | `1.37` | Spot rate used for CAD-denominated log entries |
+| `SIGNING_KEY_SECRET` | unset | Ed25519 private signing key (hex, or a path to a file containing hex) used to mint license tokens. If unset, `/order/:tx_hash/download` returns 503. |
+| `VERIFY_KEY_PUB` | unset | **Optional, self-test only.** If set, compared against `SIGNING_KEY_SECRET`'s derived public key at startup — logs a loud error on mismatch instead of silently 401ing every download later. Should be the same public key configured on the paired `app-privategit-source` instance. |
+| `RUST_LOG` | `info` | Standard `tracing-subscriber` env filter |
 
 ## Build
 
@@ -29,4 +47,8 @@ cargo build --release
 ```
 
 Binary lands at `$CARGO_TARGET_DIR/release/app-privategit-marketplace`
-(global target: `/srv/foundry/cargo-target/release/`).
+(this workspace's shared target dir: `/srv/foundry/cargo-target/<user>/release/`).
+
+## License
+
+AGPL-3.0-or-later. See the repository root `LICENSE`.
