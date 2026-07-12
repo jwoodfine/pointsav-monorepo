@@ -212,10 +212,23 @@ const LANG_SWITCH_GLYPH: &str = r##"<svg class="sw-lang-switch__glyph" viewBox="
 /// (the equivalent page in the other language — callers resolve this since only
 /// they know whether the current page has a translated sibling or must fall back
 /// to the other language's `/software` home).
-pub fn lang_switch(lang: Lang, target_href: &str) -> Markup {
+///
+/// Below the 768px breakpoint the masthead instance collapses to icon-only (its
+/// text label is hidden via CSS) — verified live on home.pointsav.com, which
+/// does the same at its own breakpoint. Pass `in_drawer: true` for the mobile
+/// nav drawer's own copy, which keeps its label and a bigger, easier tap target
+/// regardless of viewport — same icon-collapses-but-drawer-keeps-label split
+/// home.pointsav.com uses (`.m-masthead .m-lang-switch__label` vs.
+/// `.m-drawer .m-lang-switch`).
+pub fn lang_switch(lang: Lang, target_href: &str, in_drawer: bool) -> Markup {
     let other = lang.other();
+    let class = if in_drawer {
+        "sw-lang-switch sw-lang-switch--drawer"
+    } else {
+        "sw-lang-switch"
+    };
     html! {
-        a."sw-lang-switch" href=(target_href) lang=(other.code()) hreflang=(other.code())
+        a class=(class) href=(target_href) lang=(other.code()) hreflang=(other.code())
             rel="alternate" aria-label=(lang.toggle_label()) {
             (PreEscaped(LANG_SWITCH_GLYPH))
             span."sw-lang-switch__label" { (lang.toggle_label()) }
@@ -243,14 +256,24 @@ mod tests {
 
     #[test]
     fn lang_switch_toggles_to_the_other_language_with_its_own_hreflang() {
-        let html = lang_switch(Lang::En, "/es/software").into_string();
+        let html = lang_switch(Lang::En, "/es/software", false).into_string();
         assert!(html.contains(r#"href="/es/software""#));
         assert!(html.contains(r#"hreflang="es""#));
         assert!(html.contains("Español"));
 
-        let html_es = lang_switch(Lang::Es, "/software").into_string();
+        let html_es = lang_switch(Lang::Es, "/software", false).into_string();
         assert!(html_es.contains(r#"href="/software""#));
         assert!(html_es.contains(r#"hreflang="en""#));
         assert!(html_es.contains("English"));
+    }
+
+    #[test]
+    fn drawer_variant_carries_the_modifier_class_masthead_variant_does_not() {
+        let masthead = lang_switch(Lang::En, "/es/software", false).into_string();
+        assert!(masthead.contains(r#"class="sw-lang-switch""#));
+        assert!(!masthead.contains("sw-lang-switch--drawer"));
+
+        let drawer = lang_switch(Lang::En, "/es/software", true).into_string();
+        assert!(drawer.contains(r#"class="sw-lang-switch sw-lang-switch--drawer""#));
     }
 }
