@@ -14,8 +14,6 @@
 
 use maud::{html, Markup};
 
-use super::surface::SoftwareSurface;
-
 /// The full self-contained accessibility page (`GET /page/accessibility`).
 pub fn accessibility_markup() -> Markup {
     html! {
@@ -54,11 +52,6 @@ pub fn accessibility_markup() -> Markup {
             p {
                 "Report accessibility issues to " a href="mailto:open.source@pointsav.com" { "open.source@pointsav.com" } "."
             }
-
-            hr;
-
-            p."sw-legal__copyright" { "\u{00a9} 2026 Woodfine Capital Projects Inc. All rights reserved." }
-            p."sw-legal__trademark" { (SoftwareSurface::Marketplace.trademark_line()) }
         }
     }
 }
