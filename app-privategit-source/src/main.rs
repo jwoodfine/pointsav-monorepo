@@ -67,8 +67,19 @@ fn product_requires_license(releases_dir: &str, product: &str) -> bool {
 /// or `\`), or a segment embedding a separator at all (axum percent-decodes `%2F`
 /// into a literal `/` within what matchit treated as a single path parameter, so a
 /// segment containing `/` is never legitimate product/version/platform input).
+///
+/// Also rejects control characters (`< 0x20`, e.g. a NUL from `%00`) directly —
+/// live adversarial probing this session found `..%00`-style segments clear the
+/// four-item blocklist above and reach `File::open`, relying only on Rust's
+/// refusal of interior NUL at the syscall boundary (not this gate) to fail safe.
+/// The gate itself must be the defense, not an accident of the standard library.
 fn is_safe_segment(s: &str) -> bool {
-    !s.is_empty() && !s.contains('/') && !s.contains('\\') && s != ".." && s != "."
+    !s.is_empty()
+        && !s.contains('/')
+        && !s.contains('\\')
+        && s != ".."
+        && s != "."
+        && !s.chars().any(|c| (c as u32) < 0x20)
 }
 
 fn release_path(releases_dir: &str, parts: &[&str]) -> PathBuf {
@@ -86,11 +97,12 @@ async fn stream_file(path: PathBuf, content_type: &'static str) -> Response {
             let body = Body::from_stream(stream);
             (StatusCode::OK, [(header::CONTENT_TYPE, content_type)], body).into_response()
         }
-        Err(_) => (
-            StatusCode::NOT_FOUND,
-            Json(json!({"error": "not found", "path": path.display().to_string()})),
-        )
-            .into_response(),
+        Err(_) => {
+            // Never echo the server's real filesystem path to the client (live-confirmed
+            // disclosure this session) — log it instead, where it's actually useful.
+            tracing::debug!(path = %path.display(), "stream_file: not found");
+            (StatusCode::NOT_FOUND, Json(json!({"error": "not found"}))).into_response()
+        }
     }
 }
 
@@ -382,12 +394,14 @@ async fn binary(
                 (
                     StatusCode::OK,
                     [
-                        (header::CONTENT_TYPE, "application/octet-stream"),
+                        (
+                            header::CONTENT_TYPE,
+                            HeaderValue::from_static("application/octet-stream"),
+                        ),
                         (
                             header::CONTENT_DISPOSITION,
-                            Box::leak(
-                                format!("attachment; filename=\"{filename}\"").into_boxed_str(),
-                            ),
+                            HeaderValue::from_str(&format!("attachment; filename=\"{filename}\""))
+                                .unwrap_or_else(|_| HeaderValue::from_static("attachment")),
                         ),
                     ],
                     body,
@@ -462,10 +476,14 @@ async fn binary(
             (
                 StatusCode::OK,
                 [
-                    (header::CONTENT_TYPE, "application/octet-stream"),
+                    (
+                        header::CONTENT_TYPE,
+                        HeaderValue::from_static("application/octet-stream"),
+                    ),
                     (
                         header::CONTENT_DISPOSITION,
-                        Box::leak(format!("attachment; filename=\"{filename}\"").into_boxed_str()),
+                        HeaderValue::from_str(&format!("attachment; filename=\"{filename}\""))
+                            .unwrap_or_else(|_| HeaderValue::from_static("attachment")),
                     ),
                 ],
                 body,
@@ -1620,6 +1638,18 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn router_rejects_nul_byte_in_segment() {
+        let scratch = scratch_dir("router-traversal-nul");
+        fs::create_dir_all(scratch.join("prod/0.0.1")).unwrap();
+        fs::write(scratch.join("prod/MANIFEST.json"), r#"{"requires_license": false}"#).unwrap();
+        let state = test_state(&scratch, None, None);
+
+        let resp = oneshot_get(state, "/releases/prod/..%00/linux-x86_64").await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
     async fn router_serves_legitimate_open_binary_unaffected() {
         let scratch = scratch_dir("router-legit");
         fs::create_dir_all(scratch.join("prod/0.0.1")).unwrap();
@@ -1630,5 +1660,32 @@ mod tests {
         let resp = oneshot_get(state, "/releases/prod/0.0.1/linux-x86_64").await;
         assert_eq!(resp.status(), StatusCode::OK);
         let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // ── is_safe_segment: direct table, not just exercised through router tests ────
+    // (gap flagged by this session's live adversarial re-verification pass)
+
+    #[test]
+    fn is_safe_segment_accepts_ordinary_identifiers() {
+        for s in ["prod", "0.0.1", "linux-x86_64", "os-console", "beta"] {
+            assert!(is_safe_segment(s), "{s:?} should be accepted");
+        }
+    }
+
+    #[test]
+    fn is_safe_segment_rejects_traversal_and_separators() {
+        for s in ["..", ".", "../etc", "a/b", "a\\b", "", "/etc"] {
+            assert!(!is_safe_segment(s), "{s:?} should be rejected");
+        }
+    }
+
+    #[test]
+    fn is_safe_segment_rejects_control_characters_including_nul() {
+        // Live-confirmed gap this session: a NUL-bearing segment (from `%00`) cleared
+        // the separator/`..`-only blocklist and reached `File::open`; only the OS
+        // syscall boundary's rejection of interior NUL prevented a real leak.
+        for s in ["..\u{0}", "prod\u{0}", "\u{0}", "a\tb", "a\nb", "a\rb"] {
+            assert!(!is_safe_segment(s), "{s:?} should be rejected");
+        }
     }
 }
