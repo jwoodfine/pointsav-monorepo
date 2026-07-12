@@ -68,14 +68,33 @@ drift itself. Replaced with real content 2026-07-11.
   `app-mediakit-distributions` even though `CLAUDE.md` names it as owned and it
   has a real `Cargo.toml`/`src/`. Pre-existing gap, unrelated to today's sync.
 
-## In progress
+## Done this session
 
-- [ ] `[2026-07-11 totebox@claude-code]` Full top-to-bottom audit of
+- [x] `[2026-07-11 totebox@claude-code]` Full top-to-bottom audit of
   `app-privategit-marketplace` + `app-privategit-source` (Opus fan-out + Fable
-  synthesis, report-only) — see `.agent/briefs/BRIEF-software-hyperscaler-audit.md`
-  for the method being reused, extended to full scope this round.
-- [ ] `[2026-07-11 totebox@claude-code]` Consolidated plan merging all still-open
-  items from `BRIEF-software-hyperscaler-audit.md`,
-  `BRIEF-binary-library-repositioning.md`, `BRIEF-software-ng-rewrite.md`,
-  `BRIEF-software-distribution-substrate.md`, plus this session's fresh findings
-  — pending until the audit above completes.
+  synthesis, report-only) — see
+  `.agent/briefs/BRIEF-software-consolidated-service-audit.md`. **Read this
+  before touching either crate again** — it found a HIGH-severity unauthenticated
+  path-traversal candidate in the release server (`release_path()`, no segment
+  sanitization) and confirmed the entire paid/checkout/order/download flow
+  cannot complete a single transaction today for two independent reasons
+  (price/product-matching breaks at nonzero price; `SIGNING_KEY_SECRET` env-var
+  name mismatch causes unconditional 503 on download). Both are one-line-scale
+  fixes, not rewrites, but neither is fixed yet — gated on operator review per
+  the report-only decision this session.
+
+## Next up (from the audit's Prioritized Gap List — not yet implemented)
+
+- [ ] `[2026-07-11]` Tier 1: path traversal fix + router-level integration test
+  (`release_path()` in `app-privategit-source`).
+- [ ] `[2026-07-11]` Tier 1: `SIGNING_KEY_SECRET` env-var rename in the
+  marketplace systemd unit + a startup keypair-match self-test across both
+  services.
+- [ ] `[2026-07-11]` Tier 1: real per-tier pricing + fix the amount→product
+  matching bug it currently masks, before BETA lifts (also guard the
+  empty-wallet-address invoice render).
+- [ ] `[2026-07-11]` Tier 1: align `os-console`'s catalog `edition` with a real
+  deposited version (or mint downloads through `/latest/`).
+- [ ] `[2026-07-11]` Tier 2–4 items (chromed error pages, per-version MANIFEST
+  fix, Contact-page city hardcoding, masthead nav, README rewrite, etc.) — full
+  list in the BRIEF's Prioritized Gap List, tiers 2–4.
