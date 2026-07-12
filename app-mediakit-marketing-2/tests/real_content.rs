@@ -12,7 +12,12 @@
 //! compiler; this test is the only thing that will catch a bad edit here.
 
 use app_mediakit_marketing_2::content;
+use app_mediakit_marketing_2::legal_tokens::LegalTokens;
 use std::path::Path;
+
+fn legal_tokens_dir() -> std::path::PathBuf {
+    Path::new("/srv/foundry/vendor/factory-release-engineering/tokens").to_path_buf()
+}
 
 fn content_root() -> std::path::PathBuf {
     // This crate lives at .../pointsav-monorepo/app-mediakit-marketing-2/;
@@ -38,12 +43,16 @@ fn assert_all_pages_load(content_dir: &Path, module_id: &str) {
         content_dir.display()
     );
 
+    let legal_tokens = LegalTokens::load(&legal_tokens_dir(), module_id).unwrap_or_else(|e| {
+        panic!("failed to load real legal tokens for {module_id}: {e}");
+    });
+
     for slug in &slugs {
         let page = content::load_page(content_dir, slug, None).unwrap_or_else(|e| {
             panic!("{module_id}/{slug} (EN) failed to parse: {e}");
         });
         let markup = app_mediakit_marketing_2::ui::page_shell(
-            &app_mediakit_marketing_2::ui::Tenant::by_module_id(module_id),
+            &app_mediakit_marketing_2::ui::Tenant::by_module_id(module_id, &legal_tokens),
             &page,
             module_id,
             "/",

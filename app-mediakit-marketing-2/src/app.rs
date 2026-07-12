@@ -19,6 +19,7 @@ use maud::Markup;
 use crate::config::Config;
 use crate::content;
 use crate::error::MarketingError;
+use crate::legal_tokens::LegalTokens;
 use crate::mcp::{self, RpcRequest};
 use crate::pending::Queue;
 use crate::ui::{page_shell, Tenant};
@@ -30,16 +31,21 @@ pub struct AppStateInner {
     /// environment (not a clap flag) to match the retired engine's contract.
     pub google_verify: Option<String>,
     pub pending: Queue,
+    /// Canonical trademark/copyright facts, loaded once at startup from
+    /// `factory-release-engineering`. See `crate::legal_tokens`.
+    pub legal_tokens: LegalTokens,
 }
 
 pub type AppState = Arc<AppStateInner>;
 
 pub fn build_state(cfg: &Config) -> Result<AppState, MarketingError> {
+    let legal_tokens = LegalTokens::load(&cfg.legal_tokens_dir, &cfg.module_id)?;
     Ok(Arc::new(AppStateInner {
         content_dir: cfg.content_dir.clone(),
         module_id: cfg.module_id.clone(),
         google_verify: std::env::var("SERVICE_MARKETING_GOOGLE_VERIFY").ok(),
         pending: Queue::open(&cfg.state_dir)?,
+        legal_tokens,
     }))
 }
 
@@ -102,7 +108,7 @@ fn render_slug(
     lang: Option<&str>,
 ) -> Result<Markup, MarketingError> {
     let page = content::load_page(&state.content_dir, slug, lang)?;
-    let tenant = Tenant::by_module_id(&state.module_id);
+    let tenant = Tenant::by_module_id(&state.module_id, &state.legal_tokens);
     let (en_path, es_path) = slug_paths(slug);
     Ok(page_shell(
         &tenant,
@@ -126,7 +132,7 @@ fn slug_paths(slug: &str) -> (String, Option<String>) {
 }
 
 async fn robots_txt(State(state): State<AppState>) -> Response {
-    let tenant = Tenant::by_module_id(&state.module_id);
+    let tenant = Tenant::by_module_id(&state.module_id, &state.legal_tokens);
     let body = format!(
         "User-agent: *\nAllow: /\nSitemap: {}/sitemap.xml\n",
         tenant.canonical_base
@@ -135,7 +141,7 @@ async fn robots_txt(State(state): State<AppState>) -> Response {
 }
 
 async fn sitemap_xml(State(state): State<AppState>) -> Response {
-    let tenant = Tenant::by_module_id(&state.module_id);
+    let tenant = Tenant::by_module_id(&state.module_id, &state.legal_tokens);
     let mut slugs = content::list_slugs(&state.content_dir);
     slugs.sort();
     let mut body = String::from(r#"<?xml version="1.0" encoding="UTF-8"?>"#);

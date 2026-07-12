@@ -14,11 +14,12 @@
 use maud::{html, Markup, PreEscaped, DOCTYPE};
 
 use crate::content::{Page, Section};
+use crate::legal_tokens::LegalTokens;
 
 /// Pick a UI string by page language. Chrome-level "furniture" strings only
 /// (nav labels, button labels, boilerplate) — never legal/disclosure text,
 /// which is routed to project-editorial for professional translation rather
-/// than drafted here (see `Tenant::trademark_line`/`disclosure_slots`).
+/// than drafted here (see `Tenant::trademark_line_en`/`disclosure_slots`).
 fn t<'a>(lang: &str, en: &'a str, es: &'a str) -> &'a str {
     if lang == "es" {
         es
@@ -102,13 +103,20 @@ pub struct Tenant {
     /// the tenant's masthead `nav_links` external entries.
     pub footer_network: Vec<NavLink>,
     pub cities: Vec<&'static str>,
-    /// Always "Woodfine Capital Projects Inc." per TRADEMARK.md v1.1 —
-    /// never the tenant's own operating entity, on either brand's site.
-    pub copyright_holder: &'static str,
-    /// Verbatim canonical sentence per TRADEMARK.md — identical on both
-    /// brands' sites (operator call 2026-07-02; an earlier per-brand
-    /// shorter-subset design for PointSav was superseded).
-    pub trademark_line: &'static str,
+    /// `"© 2026 Woodfine Capital Projects Inc."` — always Woodfine Capital
+    /// Projects Inc. per TRADEMARK.md v1.1, never the tenant's own operating
+    /// entity, on either brand's site. Loaded from the canonical
+    /// `legal-tokens-<brand>.yaml` by `by_module_id()` (Phase 1, 2026-07-11);
+    /// see `crate::legal_tokens`.
+    pub copyright_line: String,
+    /// Verbatim canonical sentence per TRADEMARK.md, English. Loaded from
+    /// the canonical `legal-tokens-<brand>.yaml` by `by_module_id()`.
+    pub trademark_line_en: String,
+    /// Spanish counterpart of `trademark_line_en` — same canonical source.
+    /// Rendered on `/es/` pages instead of the English line (fixed
+    /// 2026-07-11; previously the English line rendered unconditionally on
+    /// every page regardless of language).
+    pub trademark_line_es: String,
     pub disclosure_slots: Vec<DisclosureSlot>,
     /// Real canonical favicon SVG (FABLE audit 2026-07-02 found NEITHER
     /// tenant shipped a favicon link at all — not just PointSav).
@@ -186,15 +194,24 @@ impl Tenant {
                 NavLink::external("Manifest", "Manifiesto", "https://github.com/woodfine/woodfine-fleet-deployment"),
             ],
             cities: vec!["Vancouver", "New York"],
-            copyright_holder: "Woodfine Capital Projects Inc.",
-            // Verbatim canonical sentence per TRADEMARK.md (2026-07-02 correction —
-            // "Woodfine Management Corp\u{2122}" was wrong, canonical mark is
-            // "MCorp\u{2122}"; "Capability Geometry\u{2122}" was missing entirely).
-            trademark_line: "Woodfine Capital Projects\u{2122}, MCorp\u{2122}, \
+            // Fallback values only — `by_module_id()` overlays these with the
+            // canonical `legal-tokens-<brand>.yaml` at runtime (Phase 1,
+            // 2026-07-11). Kept here so `Tenant::woodfine()` still works
+            // standalone in tests that don't need live tokens.
+            copyright_line: "\u{00a9} 2026 Woodfine Capital Projects Inc.".to_string(),
+            trademark_line_en: "Woodfine Capital Projects\u{2122}, MCorp\u{2122}, \
                 PointSav Digital Systems\u{2122}, Totebox Orchestration\u{2122}, Totebox \
                 Archive\u{2122}, and Capability Geometry\u{2122} are trademarks of Woodfine \
                 Capital Projects Inc., used in Canada, the United States, Latin America, and \
-                Europe. All other trademarks are the property of their respective owners.",
+                Europe. All other trademarks are the property of their respective owners."
+                .to_string(),
+            trademark_line_es: "Woodfine Capital Projects\u{2122}, MCorp\u{2122}, \
+                PointSav Digital Systems\u{2122}, Totebox Orchestration\u{2122}, Totebox \
+                Archive\u{2122} y Capability Geometry\u{2122} son marcas comerciales de Woodfine \
+                Capital Projects Inc., utilizadas en Canadá, los Estados Unidos, América Latina y \
+                Europa. Todas las demás marcas comerciales son propiedad de sus respectivos \
+                titulares."
+                .to_string(),
             // Full legal text — moved here 2026-07-02 from a separate,
             // always-visible `type: prose` home-page section (operator
             // feedback: it read as a duplicate of this same accordion).
@@ -366,15 +383,25 @@ impl Tenant {
             // Berlin dropped 2026-07-02 per operator call (production has it,
             // but the operator wants it off both sites going forward).
             cities: vec!["Vancouver", "New York"],
-            copyright_holder: "Woodfine Capital Projects Inc.",
-            // Full canonical roster per TRADEMARK.md, same as Woodfine's —
-            // operator call 2026-07-02, superseding the earlier shorter-
-            // subset design (architecture addendum 2026-06-24).
-            trademark_line: "Woodfine Capital Projects\u{2122}, MCorp\u{2122}, \
+            // Fallback values only — `by_module_id()` overlays these with the
+            // canonical `legal-tokens-<brand>.yaml` at runtime (Phase 1,
+            // 2026-07-11). Full canonical roster per TRADEMARK.md, same as
+            // Woodfine's — operator call 2026-07-02, superseding the earlier
+            // shorter-subset design (architecture addendum 2026-06-24).
+            copyright_line: "\u{00a9} 2026 Woodfine Capital Projects Inc.".to_string(),
+            trademark_line_en: "Woodfine Capital Projects\u{2122}, MCorp\u{2122}, \
                 PointSav Digital Systems\u{2122}, Totebox Orchestration\u{2122}, Totebox \
                 Archive\u{2122}, and Capability Geometry\u{2122} are trademarks of Woodfine \
                 Capital Projects Inc., used in Canada, the United States, Latin America, and \
-                Europe. All other trademarks are the property of their respective owners.",
+                Europe. All other trademarks are the property of their respective owners."
+                .to_string(),
+            trademark_line_es: "Woodfine Capital Projects\u{2122}, MCorp\u{2122}, \
+                PointSav Digital Systems\u{2122}, Totebox Orchestration\u{2122}, Totebox \
+                Archive\u{2122} y Capability Geometry\u{2122} son marcas comerciales de Woodfine \
+                Capital Projects Inc., utilizadas en Canadá, los Estados Unidos, América Latina y \
+                Europa. Todas las demás marcas comerciales son propiedad de sus respectivos \
+                titulares."
+                .to_string(),
             // Full legal text — moved here 2026-07-02 from a separate,
             // always-visible `type: prose` home-page section (same reason
             // as Woodfine's, see comment above).
@@ -518,11 +545,21 @@ impl Tenant {
         }
     }
 
-    pub fn by_module_id(id: &str) -> Self {
-        match id {
+    /// Selects the tenant's chrome, then overlays the copyright/trademark
+    /// fields with the canonical `legal-tokens-<brand>.yaml` (Phase 1,
+    /// 2026-07-11) — the loaded tokens are the source of truth; the
+    /// hardcoded values in `woodfine()`/`pointsav()` above are fallback
+    /// values only, used when a caller constructs a `Tenant` directly
+    /// without tokens (existing unit tests).
+    pub fn by_module_id(id: &str, tokens: &LegalTokens) -> Self {
+        let mut tenant = match id {
             "pointsav" => Self::pointsav(),
             _ => Self::woodfine(),
-        }
+        };
+        tenant.copyright_line = tokens.copyright_line();
+        tenant.trademark_line_en = tokens.trademark_line_en().to_string();
+        tenant.trademark_line_es = tokens.trademark_line_es().to_string();
+        tenant
     }
 }
 
@@ -741,17 +778,37 @@ fn footer(tenant: &Tenant, lang: &str) -> Markup {
                         }
                     }
                     p.m-footer__copyright {
-                        // Matches canonical TRADEMARK.md ("Copyright © 2026 Woodfine
-                        // Capital Projects Inc.") — not the "2011–2026" range the old,
-                        // now-retired production engine renders; that range has no
-                        // founding-year record in the DataGraph and isn't in the
-                        // canonical doc, so it isn't carried into this rewrite
-                        // (flagged 2026-07-02, reconciled in favor of TRADEMARK.md).
-                        "\u{00a9} 2026 " (tenant.copyright_holder) " " (t(lang, "All rights reserved.", "Todos los derechos reservados."))
+                        // Loaded from the canonical legal-tokens-<brand>.yaml
+                        // (Phase 1, 2026-07-11) — not hardcoded here anymore.
+                        // Not the "2011–2026" range the old, now-retired
+                        // production engine renders; that range has no
+                        // founding-year record in the DataGraph and isn't in
+                        // the canonical doc (flagged 2026-07-02, reconciled
+                        // in favor of TRADEMARK.md).
+                        (tenant.copyright_line) " " (t(lang, "All rights reserved.", "Todos los derechos reservados."))
                     }
-                    // Trademark line: same pending-professional-translation note as the
-                    // disclosure slots above — verbatim legal text, not machine-localized.
-                    p.m-footer__trademark { (tenant.trademark_line) }
+                    // Persistent one-line disclaimer — always visible regardless of
+                    // whether the "Important information" accordion above is open or
+                    // collapsed, so a screenshot or print of the page is never bare
+                    // of any disclosure at all. Same wording register the sibling
+                    // knowledge wikis already ship (project-knowledge relay,
+                    // 2026-07-02, "Apollo Academy" pattern) — one legal voice across
+                    // the site family. Only rendered if there's an accordion above to
+                    // point to.
+                    @if !tenant.disclosure_slots.is_empty() {
+                        p.m-footer__notice {
+                            (t(
+                                lang,
+                                "Provided for information only — not an offer, solicitation, or advice. See Important information above.",
+                                "Proporcionado únicamente con fines informativos — no constituye una oferta, solicitud ni asesoramiento. Consulte Información importante arriba.",
+                            ))
+                        }
+                    }
+                    // Trademark line: loaded from the canonical
+                    // legal-tokens-<brand>.yaml, both languages (Phase 1,
+                    // 2026-07-11) — previously the English line rendered
+                    // unconditionally on every page regardless of language.
+                    p.m-footer__trademark { (t(lang, &tenant.trademark_line_en, &tenant.trademark_line_es)) }
                 }
             }
         }
@@ -1139,15 +1196,17 @@ mod tests {
     use crate::content::load_page;
 
     #[test]
-    fn both_tenants_carry_the_full_canonical_trademark_roster() {
-        // Both brands carry the identical canonical sentence per TRADEMARK.md
-        // (operator call 2026-07-02, superseding the earlier shorter-subset
-        // design for PointSav). "MCorp" is the correct mark, not "Woodfine
-        // Management Corp"; "Capability Geometry" must be present on both.
+    fn both_tenants_carry_the_full_canonical_trademark_roster_fallback() {
+        // Fallback values (used when a Tenant is constructed without live
+        // tokens, as here) — both brands carry the identical canonical
+        // sentence per TRADEMARK.md. "MCorp" is the correct mark, not
+        // "Woodfine Management Corp"; "Capability Geometry" must be present
+        // on both. See `by_module_id_overlays_trademark_and_copyright_from_tokens`
+        // below for the runtime-token-overlay path this fallback exists for.
         let w = Tenant::woodfine();
         let p = Tenant::pointsav();
-        assert_eq!(w.trademark_line, p.trademark_line);
-        for line in [w.trademark_line, p.trademark_line] {
+        assert_eq!(w.trademark_line_en, p.trademark_line_en);
+        for line in [&w.trademark_line_en, &p.trademark_line_en] {
             assert!(line.contains("MCorp"));
             assert!(line.contains("Capability Geometry"));
             assert!(line.contains("PointSav Digital Systems"));
@@ -1157,13 +1216,56 @@ mod tests {
     }
 
     #[test]
-    fn both_tenants_share_the_same_copyright_holder() {
-        // Per TRADEMARK.md v1.1: the copyright holder is always Woodfine
-        // Capital Projects Inc., even on the PointSav-branded site.
+    fn both_tenants_share_the_same_copyright_holder_fallback() {
+        // Fallback values — per TRADEMARK.md v1.1 the copyright holder is
+        // always Woodfine Capital Projects Inc., even on the PointSav-branded
+        // site.
         let w = Tenant::woodfine();
         let p = Tenant::pointsav();
-        assert_eq!(w.copyright_holder, "Woodfine Capital Projects Inc.");
-        assert_eq!(p.copyright_holder, "Woodfine Capital Projects Inc.");
+        assert!(w.copyright_line.contains("Woodfine Capital Projects Inc."));
+        assert!(p.copyright_line.contains("Woodfine Capital Projects Inc."));
+    }
+
+    fn write_test_tokens(dir: &std::path::Path, module_id: &str, holder: &str, year: i32, trademark_en: &str, trademark_es: &str) {
+        let contents = format!(
+            "schema: foundry-legal-tokens-v1\nbrand: {module_id}\ncopyright:\n  holder: \"{holder}\"\n  year_current: {year}\nwebsite:\n  footer_trademark_en: \"{trademark_en}\"\n  footer_trademark_es: \"{trademark_es}\"\n"
+        );
+        std::fs::write(dir.join(format!("legal-tokens-{module_id}.yaml")), contents).unwrap();
+    }
+
+    #[test]
+    fn by_module_id_overlays_trademark_and_copyright_from_tokens() {
+        let dir = tempfile::tempdir().unwrap();
+        write_test_tokens(
+            dir.path(),
+            "woodfine",
+            "Overlay Test Holder Inc.",
+            2099,
+            "Overlay Mark\u{2122}",
+            "marca de sobreposición",
+        );
+        let tokens = LegalTokens::load(dir.path(), "woodfine").unwrap();
+        let tenant = Tenant::by_module_id("woodfine", &tokens);
+
+        // The overlay replaced the hardcoded fallback — this is the whole
+        // point of Phase 1: these values come from the token file, not from
+        // the &'static str constants in woodfine()/pointsav() above.
+        assert_eq!(tenant.copyright_line, "\u{00a9} 2099 Overlay Test Holder Inc.");
+        assert_eq!(tenant.trademark_line_en, "Overlay Mark\u{2122}");
+        assert_eq!(tenant.trademark_line_es, "marca de sobreposición");
+        assert_ne!(tenant.trademark_line_en, Tenant::woodfine().trademark_line_en);
+    }
+
+    #[test]
+    fn by_module_id_selects_correct_base_chrome_per_tenant() {
+        let dir = tempfile::tempdir().unwrap();
+        write_test_tokens(dir.path(), "pointsav", "X", 2026, "x", "y");
+        let tokens = LegalTokens::load(dir.path(), "pointsav").unwrap();
+        let tenant = Tenant::by_module_id("pointsav", &tokens);
+        // module_id, nav_links, etc. still come from Tenant::pointsav()'s
+        // chrome shape — only the legal-text fields are overlaid.
+        assert_eq!(tenant.module_id, "pointsav");
+        assert_eq!(tenant.site_title, "PointSav Digital Systems");
     }
 
     #[test]

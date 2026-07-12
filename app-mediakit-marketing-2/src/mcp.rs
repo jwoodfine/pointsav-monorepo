@@ -181,6 +181,18 @@ mod tests {
             module_id: "woodfine".to_string(),
             google_verify: None,
             pending,
+            legal_tokens: crate::legal_tokens::LegalTokens {
+                schema: "foundry-legal-tokens-v1".to_string(),
+                brand: "woodfine".to_string(),
+                copyright: crate::legal_tokens::Copyright {
+                    holder: "Test Holder Inc.".to_string(),
+                    year_current: 2026,
+                },
+                website: crate::legal_tokens::Website {
+                    footer_trademark_en: "Test Mark\u{2122}".to_string(),
+                    footer_trademark_es: "Marca de prueba\u{2122}".to_string(),
+                },
+            },
         };
         (content_dir, state_dir, state)
     }

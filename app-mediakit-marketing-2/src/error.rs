@@ -23,6 +23,11 @@ pub enum MarketingError {
 
     #[error(transparent)]
     Io(#[from] std::io::Error),
+
+    /// Missing/malformed canonical legal-tokens YAML — fails startup loudly
+    /// rather than falling back to stale hardcoded text.
+    #[error(transparent)]
+    LegalTokens(#[from] crate::legal_tokens::LegalTokensError),
 }
 
 impl IntoResponse for MarketingError {
@@ -32,6 +37,7 @@ impl IntoResponse for MarketingError {
             MarketingError::ContentDirMissing(_) => StatusCode::INTERNAL_SERVER_ERROR,
             MarketingError::Manifest { .. } => StatusCode::INTERNAL_SERVER_ERROR,
             MarketingError::Io(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            MarketingError::LegalTokens(_) => StatusCode::INTERNAL_SERVER_ERROR,
         };
         (status, self.to_string()).into_response()
     }
