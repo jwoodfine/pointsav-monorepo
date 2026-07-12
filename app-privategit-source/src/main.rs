@@ -62,6 +62,15 @@ fn product_requires_license(releases_dir: &str, product: &str) -> bool {
         .unwrap_or(true)
 }
 
+/// Rejects any path segment capable of escaping `releases_dir` before it reaches
+/// `release_path`'s `PathBuf::push` — a bare `..`, an absolute segment (leading `/`
+/// or `\`), or a segment embedding a separator at all (axum percent-decodes `%2F`
+/// into a literal `/` within what matchit treated as a single path parameter, so a
+/// segment containing `/` is never legitimate product/version/platform input).
+fn is_safe_segment(s: &str) -> bool {
+    !s.is_empty() && !s.contains('/') && !s.contains('\\') && s != ".." && s != "."
+}
+
 fn release_path(releases_dir: &str, parts: &[&str]) -> PathBuf {
     let mut p = PathBuf::from(releases_dir);
     for part in parts {
@@ -268,6 +277,12 @@ async fn product_index(
     State(state): State<Arc<AppState>>,
     Path(product): Path<String>,
 ) -> (StatusCode, Json<Value>) {
+    if !is_safe_segment(&product) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "invalid product identifier"})),
+        );
+    }
     let base = release_path(&state.releases_dir, &[&product]);
     if !base.exists() {
         return (
@@ -292,6 +307,13 @@ async fn manifest(
     State(state): State<Arc<AppState>>,
     Path((product, version)): Path<(String, String)>,
 ) -> Response {
+    if !is_safe_segment(&product) || !is_safe_segment(&version) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "invalid product or version identifier"})),
+        )
+            .into_response();
+    }
     // NO AUTH CHECK AT ALL — the version-dir MANIFEST.json is served raw.
     let path = release_path(&state.releases_dir, &[&product, &version, "MANIFEST.json"]);
     stream_file(path, "application/json").await
@@ -302,6 +324,13 @@ async fn latest_redirect(
     Path((product, platform)): Path<(String, String)>,
     Query(query): Query<BinaryQuery>,
 ) -> Response {
+    if !is_safe_segment(&product) || !is_safe_segment(&platform) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "invalid product or platform identifier"})),
+        )
+            .into_response();
+    }
     match latest_version_with_platform(&state.releases_dir, &product, &platform) {
         Some(version) => {
             let target = match &query.token {
@@ -325,6 +354,13 @@ async fn binary(
     Path((product, version, platform)): Path<(String, String, String)>,
     Query(query): Query<BinaryQuery>,
 ) -> Response {
+    if !is_safe_segment(&product) || !is_safe_segment(&version) || !is_safe_segment(&platform) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "invalid product, version, or platform identifier"})),
+        )
+            .into_response();
+    }
     // 1. Detached .sig files are unauthenticated — no license required at all.
     if let Some(base_platform) = platform.strip_suffix(".sig") {
         let path = release_path(
@@ -578,8 +614,56 @@ async fn install_script(
     State(state): State<Arc<AppState>>,
     Path(product): Path<String>,
 ) -> Response {
+    if !is_safe_segment(&product) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({"error": "invalid product identifier"})),
+        )
+            .into_response();
+    }
     let path = release_path(&state.releases_dir, &[&product, "install.sh"]);
     stream_file(path, "text/x-shellscript").await
+}
+
+// ── Router ────────────────────────────────────────────────────────────────────
+
+/// Extracted from `main()` so router-level integration tests can drive real
+/// requests through actual routing (matchit segment matching + percent-decoding)
+/// instead of calling handler functions directly — the only way to prove a
+/// path-traversal fix actually holds through the real request path.
+fn build_router(state: Arc<AppState>) -> Router {
+    Router::new()
+        .route("/healthz", get(healthz))
+        .route("/releases/", get(releases_index))
+        .route("/releases/:product/", get(product_index))
+        .route("/releases/:product/install.sh", get(install_script))
+        .route("/releases/:product/:version/MANIFEST", get(manifest))
+        .route("/releases/:product/latest/:platform", get(latest_redirect))
+        .route("/releases/:product/:version/:platform", get(binary))
+        .route("/git/*path", get(git_stub).post(git_stub))
+        .route("/verify-key", post(verify_key_endpoint))
+        .route("/verify-key.pub", get(verify_key_pub))
+        .route(
+            "/admin/reload-revocation-list",
+            post(reload_revocation_list),
+        )
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("strict-transport-security"),
+            HeaderValue::from_static(HSTS_VALUE),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("x-content-type-options"),
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("x-frame-options"),
+            HeaderValue::from_static("DENY"),
+        ))
+        .layer(SetResponseHeaderLayer::overriding(
+            HeaderName::from_static("referrer-policy"),
+            HeaderValue::from_static("strict-origin-when-cross-origin"),
+        ))
+        .with_state(state)
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -632,38 +716,7 @@ async fn main() -> Result<()> {
         revoked_tokens,
     });
 
-    let app = Router::new()
-        .route("/healthz", get(healthz))
-        .route("/releases/", get(releases_index))
-        .route("/releases/:product/", get(product_index))
-        .route("/releases/:product/install.sh", get(install_script))
-        .route("/releases/:product/:version/MANIFEST", get(manifest))
-        .route("/releases/:product/latest/:platform", get(latest_redirect))
-        .route("/releases/:product/:version/:platform", get(binary))
-        .route("/git/*path", get(git_stub).post(git_stub))
-        .route("/verify-key", post(verify_key_endpoint))
-        .route("/verify-key.pub", get(verify_key_pub))
-        .route(
-            "/admin/reload-revocation-list",
-            post(reload_revocation_list),
-        )
-        .layer(SetResponseHeaderLayer::overriding(
-            HeaderName::from_static("strict-transport-security"),
-            HeaderValue::from_static(HSTS_VALUE),
-        ))
-        .layer(SetResponseHeaderLayer::overriding(
-            HeaderName::from_static("x-content-type-options"),
-            HeaderValue::from_static("nosniff"),
-        ))
-        .layer(SetResponseHeaderLayer::overriding(
-            HeaderName::from_static("x-frame-options"),
-            HeaderValue::from_static("DENY"),
-        ))
-        .layer(SetResponseHeaderLayer::overriding(
-            HeaderName::from_static("referrer-policy"),
-            HeaderValue::from_static("strict-origin-when-cross-origin"),
-        ))
-        .with_state(state);
+    let app = build_router(state);
 
     tracing::info!("app-privategit-source listening on {bind_addr}");
     let listener = tokio::net::TcpListener::bind(&bind_addr).await?;
@@ -1513,6 +1566,69 @@ mod tests {
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
         let body = body_json(resp).await;
         assert_eq!(body["error"], "token-revoked");
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // ── Router-level: proves the traversal fix holds through REAL routing
+    // (matchit segment matching + axum's percent-decoding), not just the handler
+    // function called directly — this is the gap S16 flagged as untested.
+
+    async fn oneshot_get(state: Arc<AppState>, uri: &str) -> Response {
+        use http_body_util::BodyExt;
+        use tower::ServiceExt;
+        let router = build_router(state);
+        let request = axum::http::Request::builder()
+            .uri(uri)
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let resp = router.oneshot(request).await.unwrap();
+        let (parts, body) = resp.into_parts();
+        let bytes = body.collect().await.unwrap().to_bytes();
+        Response::from_parts(parts, axum::body::Body::from(bytes))
+    }
+
+    #[tokio::test]
+    async fn router_rejects_dot_dot_traversal_in_binary_route() {
+        let scratch = scratch_dir("router-traversal-dotdot");
+        // A file OUTSIDE releases_dir a traversal attempt would try to read.
+        let secret_path = scratch.parent().unwrap().join("secret-router-test.txt");
+        fs::write(&secret_path, b"top secret").unwrap();
+        fs::create_dir_all(scratch.join("prod/0.0.1")).unwrap();
+        fs::write(scratch.join("prod/MANIFEST.json"), r#"{"requires_license": false}"#).unwrap();
+        let state = test_state(&scratch, None, None);
+
+        let resp = oneshot_get(
+            state,
+            "/releases/prod/..%2f..%2fsecret-router-test.txt/linux-x86_64",
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let _ = fs::remove_file(&secret_path);
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn router_rejects_encoded_slash_in_product_segment() {
+        let scratch = scratch_dir("router-traversal-slash");
+        fs::create_dir_all(scratch.join("prod/0.0.1")).unwrap();
+        fs::write(scratch.join("prod/MANIFEST.json"), r#"{"requires_license": false}"#).unwrap();
+        let state = test_state(&scratch, None, None);
+
+        // %2F decodes to a literal '/' inside what matchit treated as one segment.
+        let resp = oneshot_get(state, "/releases/..%2Fetc/0.0.1/passwd").await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn router_serves_legitimate_open_binary_unaffected() {
+        let scratch = scratch_dir("router-legit");
+        fs::create_dir_all(scratch.join("prod/0.0.1")).unwrap();
+        fs::write(scratch.join("prod/MANIFEST.json"), r#"{"requires_license": false}"#).unwrap();
+        fs::write(scratch.join("prod/0.0.1/linux-x86_64"), b"real-binary-bytes").unwrap();
+        let state = test_state(&scratch, None, None);
+
+        let resp = oneshot_get(state, "/releases/prod/0.0.1/linux-x86_64").await;
+        assert_eq!(resp.status(), StatusCode::OK);
         let _ = fs::remove_dir_all(&scratch);
     }
 }
