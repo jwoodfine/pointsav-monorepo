@@ -10,11 +10,12 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::{Path as AxumPath, State};
-use axum::http::header;
+use axum::http::{header, HeaderName, HeaderValue};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{get, post};
 use axum::Router;
 use maud::Markup;
+use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::config::Config;
 use crate::content;
@@ -34,6 +35,15 @@ pub struct AppStateInner {
     /// Canonical trademark/copyright facts, loaded once at startup from
     /// `factory-release-engineering`. See `crate::legal_tokens`.
     pub legal_tokens: LegalTokens,
+    /// Per-process CSP nonce for the one inline `<script>` this engine emits
+    /// (the JSON-LD block — see `ui::page_shell`). Generated once at startup
+    /// rather than per-request: this engine has no user-generated-content
+    /// rendering path (all content is trusted YAML behind the F12 approval
+    /// queue, not public form submissions), so the marginal protection of a
+    /// per-request nonce over a per-process one is low, and a startup nonce
+    /// lets the CSP header stay a static `SetResponseHeaderLayer` value
+    /// instead of per-response middleware.
+    pub csp_nonce: String,
 }
 
 pub type AppState = Arc<AppStateInner>;
@@ -46,7 +56,27 @@ pub fn build_state(cfg: &Config) -> Result<AppState, MarketingError> {
         google_verify: std::env::var("SERVICE_MARKETING_GOOGLE_VERIFY").ok(),
         pending: Queue::open(&cfg.state_dir)?,
         legal_tokens,
+        csp_nonce: uuid::Uuid::new_v4().to_string(),
     }))
+}
+
+/// Content-Security-Policy value for this process's lifetime. `script-src`
+/// allows only same-origin files and the one nonce'd inline JSON-LD block —
+/// no `'unsafe-inline'`/`'unsafe-eval'` for scripts. `style-src` allows
+/// `'unsafe-inline'`: three call sites in `ui.rs` set an inline `style`
+/// attribute with a runtime-computed CSS custom property (grid/icon column
+/// counts, one per-icon scale hack pending removal) — CSP nonces don't cover
+/// inline style *attributes* (only `<style>` blocks), and converting these
+/// three to an enumerated class set is a real but separable refactor, not a
+/// fast-path fix. CSS-only injection risk (no code execution) is materially
+/// lower than script injection, which is why this asymmetry is an accepted
+/// trade-off here, not an oversight.
+fn content_security_policy(nonce: &str) -> String {
+    format!(
+        "default-src 'self'; script-src 'self' 'nonce-{nonce}'; style-src 'self' 'unsafe-inline'; \
+         img-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'; \
+         frame-ancestors 'none'"
+    )
 }
 
 pub fn router(state: AppState, enable_mcp: bool) -> Router {
@@ -73,7 +103,30 @@ pub fn router(state: AppState, enable_mcp: bool) -> Router {
             .route("/api/pending/{id}/approve", post(approve_pending));
     }
 
-    router.with_state(state)
+    // Security headers, site-wide. Not `Strict-Transport-Security` — this
+    // dev/local listener serves plain HTTP, and browsers ignore HSTS over
+    // http:// anyway; it belongs at the production TLS-termination layer
+    // (see BRIEF-production-server-separation.md), not this app's router.
+    let csp = HeaderValue::from_str(&content_security_policy(&state.csp_nonce))
+        .expect("CSP value is always valid ASCII header content");
+    router
+        .layer(SetResponseHeaderLayer::if_not_present(
+            HeaderName::from_static("content-security-policy"),
+            csp,
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::X_CONTENT_TYPE_OPTIONS,
+            HeaderValue::from_static("nosniff"),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::X_FRAME_OPTIONS,
+            HeaderValue::from_static("DENY"),
+        ))
+        .layer(SetResponseHeaderLayer::if_not_present(
+            header::REFERRER_POLICY,
+            HeaderValue::from_static("strict-origin-when-cross-origin"),
+        ))
+        .with_state(state)
 }
 
 async fn healthz() -> &'static str {
@@ -117,6 +170,7 @@ fn render_slug(
         &en_path,
         es_path.as_deref(),
         state.google_verify.as_deref(),
+        &state.csp_nonce,
     ))
 }
 

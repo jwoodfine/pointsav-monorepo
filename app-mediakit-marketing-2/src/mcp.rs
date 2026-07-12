@@ -193,6 +193,7 @@ mod tests {
                     footer_trademark_es: "Marca de prueba\u{2122}".to_string(),
                 },
             },
+            csp_nonce: "test-nonce".to_string(),
         };
         (content_dir, state_dir, state)
     }

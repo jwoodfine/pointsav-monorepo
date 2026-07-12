@@ -58,6 +58,7 @@ fn assert_all_pages_load(content_dir: &Path, module_id: &str) {
             "/",
             Some("/es"),
             None,
+            "test-nonce",
         );
         assert!(markup.into_string().contains("<!DOCTYPE html>"));
 
