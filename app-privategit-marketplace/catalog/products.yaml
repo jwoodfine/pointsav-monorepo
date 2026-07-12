@@ -5,10 +5,10 @@ installers:
   - id: os-console
     name: PointSav Console OS
     description: Hosted application (Type II) — graphical terminal on existing OS
-    edition: "0.2.4"
-    platform: "macOS · Win · Linux"
-    size_mb: 412
-    path: os-console/0.2.4
+    edition: "0.1.6"
+    platform: "Linux x86_64"
+    size_mb: 7
+    path: os-console/0.1.6
     license_tier: agpl
     price_usdc: 0
 
