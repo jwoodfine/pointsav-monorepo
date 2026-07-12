@@ -202,19 +202,18 @@ async fn sitemap_xml(State(state): State<AppState>) -> Response {
     body.push_str(r#"<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"#);
     for slug in &slugs {
         let (en_path, es_path) = slug_paths(slug);
-        body.push_str(&format!(
-            "<url><loc>{}{}</loc></url>",
-            tenant.canonical_base, en_path
-        ));
-        // `home` gained its own `/es` route 2026-07-12, so it's included
-        // here like every other slug now (previously excluded because
-        // `es_path` was `None` for it).
+        let lastmod = page_lastmod(&state.content_dir, slug, None);
+        push_sitemap_url(&mut body, tenant.canonical_base, &en_path, lastmod.as_deref());
+        // Audit finding: ES routes were live, indexable (index,follow,
+        // self-canonical), and declared as hreflang alternates, but excluded
+        // from the sitemap entirely. `home` gained its own `/es` route
+        // 2026-07-12 (before that, `es_path` was `None` for it and it was
+        // correctly excluded) — every slug with a real `page.es.yaml` now
+        // gets its ES variant listed here too.
         if let Some(es_path) = es_path {
             if state.content_dir.join(slug).join("page.es.yaml").is_file() {
-                body.push_str(&format!(
-                    "<url><loc>{}{}</loc></url>",
-                    tenant.canonical_base, es_path
-                ));
+                let es_lastmod = page_lastmod(&state.content_dir, slug, Some("es"));
+                push_sitemap_url(&mut body, tenant.canonical_base, &es_path, es_lastmod.as_deref());
             }
         }
     }
@@ -224,6 +223,50 @@ async fn sitemap_xml(State(state): State<AppState>) -> Response {
         body,
     )
         .into_response()
+}
+
+fn push_sitemap_url(body: &mut String, canonical_base: &str, path: &str, lastmod: Option<&str>) {
+    body.push_str(&format!("<url><loc>{canonical_base}{path}</loc>"));
+    if let Some(lastmod) = lastmod {
+        body.push_str(&format!("<lastmod>{lastmod}</lastmod>"));
+    }
+    body.push_str("</url>");
+}
+
+/// `YYYY-MM-DD` from the content manifest's filesystem mtime — a real,
+/// verifiable freshness signal (when the file was actually last edited) per
+/// the audit finding that sitemap entries carried no `lastmod` at all.
+fn page_lastmod(content_dir: &std::path::Path, slug: &str, lang: Option<&str>) -> Option<String> {
+    let filename = match lang {
+        Some(lang) => format!("page.{lang}.yaml"),
+        None => "page.yaml".to_string(),
+    };
+    let modified = std::fs::metadata(content_dir.join(slug).join(filename))
+        .and_then(|m| m.modified())
+        .ok()?;
+    let since_epoch = modified.duration_since(std::time::UNIX_EPOCH).ok()?;
+    let days = (since_epoch.as_secs() / 86400) as i64;
+    let (y, m, d) = civil_date_from_days(days);
+    Some(format!("{y:04}-{m:02}-{d:02}"))
+}
+
+/// Days-since-Unix-epoch → (year, month, day). Howard Hinnant's
+/// `civil_from_days` algorithm ("chrono-Compatible Low-Level Date
+/// Algorithms") — used instead of pulling in `chrono`/`time` for one date
+/// field. Correctness is verified against known reference dates in the test
+/// below, not just trusted.
+fn civil_date_from_days(days: i64) -> (i64, u32, u32) {
+    let z = days + 719468;
+    let era = if z >= 0 { z } else { z - 146096 } / 146097;
+    let doe = (z - era * 146097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+    let y = yoe as i64 + era * 400;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = (doy - (153 * mp + 2) / 5 + 1) as u32;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 } as u32;
+    let y = if m <= 2 { y + 1 } else { y };
+    (y, m, d)
 }
 
 // ---------------------------------------------------------------- P5: MCP
@@ -257,4 +300,54 @@ async fn approve_pending(
 ) -> Result<Response, MarketingError> {
     state.pending.approve(&id, &state.content_dir)?;
     Ok(Json(serde_json::json!({ "status": "approved", "id": id })).into_response())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn civil_date_from_days_matches_known_reference_dates() {
+        assert_eq!(civil_date_from_days(0), (1970, 1, 1));
+        assert_eq!(civil_date_from_days(-1), (1969, 12, 31));
+        assert_eq!(civil_date_from_days(10957), (2000, 1, 1));
+        assert_eq!(civil_date_from_days(19723), (2024, 1, 1));
+        // 2024 is a leap year — Feb 29 exists and Mar 1 follows it directly.
+        assert_eq!(civil_date_from_days(19723 + 59), (2024, 2, 29));
+        assert_eq!(civil_date_from_days(19723 + 60), (2024, 3, 1));
+    }
+
+    #[test]
+    fn page_lastmod_returns_none_for_missing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(page_lastmod(dir.path(), "nonexistent", None), None);
+    }
+
+    #[test]
+    fn page_lastmod_reads_real_mtime_for_existing_file() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("home")).unwrap();
+        std::fs::write(dir.path().join("home/page.yaml"), "title: Home\n").unwrap();
+        let lastmod = page_lastmod(dir.path(), "home", None).unwrap();
+        // Format check (YYYY-MM-DD) rather than an exact date — the file was
+        // just written by this test, so "today" is the only correct answer,
+        // and asserting the literal date would make this test time-bomb.
+        assert_eq!(lastmod.len(), 10);
+        assert_eq!(lastmod.chars().nth(4), Some('-'));
+        assert_eq!(lastmod.chars().nth(7), Some('-'));
+    }
+
+    #[test]
+    fn push_sitemap_url_includes_lastmod_only_when_present() {
+        let mut with_lastmod = String::new();
+        push_sitemap_url(&mut with_lastmod, "https://example.com", "/page/contact", Some("2026-07-11"));
+        assert_eq!(
+            with_lastmod,
+            "<url><loc>https://example.com/page/contact</loc><lastmod>2026-07-11</lastmod></url>"
+        );
+
+        let mut without_lastmod = String::new();
+        push_sitemap_url(&mut without_lastmod, "https://example.com", "/", None);
+        assert_eq!(without_lastmod, "<url><loc>https://example.com/</loc></url>");
+    }
 }

@@ -230,7 +230,7 @@ async fn robots_and_sitemap_are_served() {
 }
 
 #[tokio::test]
-async fn sitemap_includes_es_routes() {
+async fn sitemap_includes_es_routes_and_lastmod() {
     // fixture() writes both contact/page.yaml and contact/page.es.yaml —
     // the ES route is live and indexable, so it belongs in the sitemap.
     // home gained its own /es route 2026-07-12 (operator call, reverses
@@ -240,6 +240,7 @@ async fn sitemap_includes_es_routes() {
     assert!(body.contains("<loc>https://home.woodfinegroup.com/page/contact</loc>"));
     assert!(body.contains("<loc>https://home.woodfinegroup.com/es/page/contact</loc>"));
     assert!(body.contains("<loc>https://home.woodfinegroup.com/es</loc>"));
+    assert!(body.contains("<lastmod>"));
 }
 
 #[tokio::test]

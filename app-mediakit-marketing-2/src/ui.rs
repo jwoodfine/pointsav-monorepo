@@ -1138,10 +1138,36 @@ pub fn page_shell(
     } else {
         page.description.as_str()
     };
-    let ld_json = format!(
-        r#"{{"@context":"https://schema.org","@type":"{}","name":"{}","url":"{}","description":"{}"}}"#,
-        tenant.ld_json_type, tenant.og_site_name, tenant.canonical_base, ld_description,
-    );
+    // Two nodes via @graph, not one: previously the single node reused the
+    // *page's* description as the *entity's* description (so /page/contact
+    // declared an Organization described as "Contact Woodfine Capital
+    // Projects.") and PointSav never emitted an Organization node at all —
+    // both audit findings. The Organization node is now identical on every
+    // page of a tenant (name/url/description never change); the WebPage
+    // node carries the per-page facts and points back to it. `serde_json`
+    // (not `format!`) so description/title text is properly escaped rather
+    // than trusted to never contain a `"` or `</script>`.
+    let organization_id = format!("{}/#organization", tenant.canonical_base);
+    let ld_json = serde_json::json!({
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": tenant.ld_json_type,
+                "@id": organization_id,
+                "name": tenant.og_site_name,
+                "url": tenant.canonical_base,
+                "description": tenant.ld_json_description,
+            },
+            {
+                "@type": "WebPage",
+                "name": page_title,
+                "description": ld_description,
+                "url": canonical_url,
+                "isPartOf": { "@id": organization_id },
+            },
+        ],
+    })
+    .to_string();
     let mut seen_h1 = false;
     html! {
         (DOCTYPE)
@@ -1421,6 +1447,45 @@ sections:
         assert!(!masthead_html.contains("m-lang-switch"));
         let drawer_html = drawer(&Tenant::woodfine(), "en", "/", None).into_string();
         assert!(!drawer_html.contains("m-lang-switch"));
+    }
+
+    #[test]
+    fn json_ld_emits_organization_and_webpage_nodes_for_both_tenants() {
+        // Audit findings: PointSav never emitted an Organization node at
+        // all, and the single node's "description" was overwritten with the
+        // *page's* description rather than the entity's own — both fixed by
+        // the Organization + WebPage @graph split.
+        let dir = tempfile::tempdir().unwrap();
+        let page_dir = dir.path().join("contact");
+        std::fs::create_dir_all(&page_dir).unwrap();
+        std::fs::write(
+            page_dir.join("page.yaml"),
+            "title: Contact\nslug: contact\ndescription: Contact page description.\nsections:\n  - type: hero\n    headline: Hi\n",
+        )
+        .unwrap();
+        let page = load_page(dir.path(), "contact", None).unwrap();
+
+        for tenant in [Tenant::woodfine(), Tenant::pointsav()] {
+            let html = page_shell(&tenant, &page, tenant.module_id, "/page/contact", None, None, "n").into_string();
+            let ld_json_start = html.find(r#"application/ld+json""#).unwrap();
+            let ld_json = &html[ld_json_start..];
+            let parsed: serde_json::Value = {
+                let script_start = ld_json.find('>').unwrap() + 1;
+                let script_end = ld_json.find("</script>").unwrap();
+                serde_json::from_str(&ld_json[script_start..script_end]).unwrap()
+            };
+            let graph = parsed["@graph"].as_array().expect("@graph is an array");
+            assert_eq!(graph.len(), 2);
+            let org = &graph[0];
+            assert_eq!(org["@type"], tenant.ld_json_type);
+            // Organization's own description, NOT the page's — the bug this
+            // fixed.
+            assert_eq!(org["description"], tenant.ld_json_description);
+            let webpage = &graph[1];
+            assert_eq!(webpage["@type"], "WebPage");
+            assert_eq!(webpage["description"], "Contact page description.");
+            assert_eq!(webpage["isPartOf"]["@id"], org["@id"]);
+        }
     }
 
     #[test]
