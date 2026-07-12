@@ -176,7 +176,7 @@ fn catalog_style() -> Markup {
 .sw-cat-badge--tier{background:#eef3ff;color:#234ed8;}
 .sw-cat-install{margin-top:auto;}
 .sw-cat-cmd{display:flex;align-items:stretch;background:#0e1117;border-radius:6px;overflow:hidden;}
-.sw-cat-cmd__text{flex:1;color:#e6edf3;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.4;padding:9px 11px;overflow-x:auto;white-space:nowrap;}
+.sw-cat-cmd__text{flex:1;min-width:0;color:#e6edf3;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;line-height:1.4;padding:9px 11px;overflow-x:auto;white-space:nowrap;}
 .sw-cat-cmd__copy{border:0;background:#234ed8;color:#fff;font-size:11px;font-weight:600;padding:0 14px;cursor:pointer;letter-spacing:.04em;flex:0 0 auto;}
 .sw-cat-cmd__copy:hover{background:#173ab1;}
 .sw-cat-hint{font-size:11px;color:#98a2b3;margin:7px 0 0;}
@@ -195,6 +195,22 @@ fn catalog_style() -> Markup {
 @media (max-width:860px){.sw-cat-body{grid-template-columns:1fr;}.sw-cat-rail{position:static;flex-direction:row;flex-wrap:wrap;gap:8px;}}
 @media (max-width:768px){.sw-cat-grid{grid-template-columns:1fr;}.sw-cat-wrap{padding:28px 16px 48px;}.sw-cat-pay__cta{display:flex;width:100%;padding:13px 16px;font-size:14px;}}"#;
     html! { style { (PreEscaped(css)) } }
+}
+
+/// Vanilla-JS active-state toggle for the shelf rail (`.sw-cat-rail a`). The rail links
+/// are plain in-page anchor jumps — without this, clicking "Commercial" or "Open Source"
+/// gives no visual feedback at all (only "All products" ever carried `.is-current`,
+/// hardcoded). Click-based, not scroll-spy — simplest fix for the reported symptom.
+fn rail_script() -> Markup {
+    let js = r#"(function(){
+document.querySelectorAll('.sw-cat-rail a').forEach(function(link){
+  link.addEventListener('click',function(){
+    document.querySelectorAll('.sw-cat-rail a').forEach(function(l){l.classList.remove('is-current');});
+    link.classList.add('is-current');
+  });
+});
+})();"#;
+    html! { script { (PreEscaped(js)) } }
 }
 
 /// Vanilla-JS copy-to-clipboard for every `[data-sw-clip]` control. Explicitly in scope
@@ -326,7 +342,7 @@ pub fn catalog_markup(catalog: &crate::Catalog, source_base_url: &str) -> Markup
                     }
                 }
                 div."sw-cat-main" {
-                    div."sw-cat-shelf sw-cat-shelf--commercial" {
+                    div."sw-cat-shelf sw-cat-shelf--commercial" id="commercial" {
                         (tier_section("proprietary", "Proprietary", &proprietary))
                         (tier_section("fsl", "FSL-1.1-ALv2", &fsl))
                         (tier_section("agpl", "AGPL-3.0-or-later", &agpl))
@@ -349,6 +365,7 @@ pub fn catalog_markup(catalog: &crate::Catalog, source_base_url: &str) -> Markup
             }
         }
         (clipboard_script())
+        (rail_script())
     }
 }
 

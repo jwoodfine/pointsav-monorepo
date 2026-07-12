@@ -17,8 +17,6 @@
 
 use maud::{html, Markup};
 
-use super::surface::SoftwareSurface;
-
 /// The full self-contained contact page (`GET /page/contact`).
 pub fn contact_markup() -> Markup {
     html! {
@@ -45,14 +43,6 @@ pub fn contact_markup() -> Markup {
                 "We do not publish a guaranteed response-time commitment for this "
                 "channel."
             }
-
-            h2 { "4. Offices" }
-            p { "Vancouver \u{00b7} New York \u{00b7} Berlin." }
-
-            hr;
-
-            p."sw-legal__copyright" { "\u{00a9} 2026 Woodfine Capital Projects Inc. All rights reserved." }
-            p."sw-legal__trademark" { (SoftwareSurface::Marketplace.trademark_line()) }
         }
     }
 }

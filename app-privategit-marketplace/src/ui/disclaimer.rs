@@ -19,8 +19,6 @@
 
 use maud::{html, Markup};
 
-use super::surface::SoftwareSurface;
-
 /// The condensed "Important information" disclosure-slot content, rendered
 /// inside the footer's collapsed-by-default accordion
 /// (`layout::footer`) — matches the `app-mediakit-marketing-2`
@@ -129,11 +127,6 @@ pub fn disclaimer_markup() -> Markup {
                 "in some jurisdictions. You are responsible for determining whether "
                 "your use of this site complies with the laws of your jurisdiction."
             }
-
-            hr;
-
-            p."sw-legal__copyright" { "\u{00a9} 2026 Woodfine Capital Projects Inc. All rights reserved." }
-            p."sw-legal__trademark" { (SoftwareSurface::Marketplace.trademark_line()) }
         }
     }
 }

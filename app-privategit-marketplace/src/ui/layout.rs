@@ -83,14 +83,12 @@ fn chrome_style() -> Markup {
 .sw-footer__disclosure:not([open]) .sw-footer__slot{{display:block!important;}}
 }}
 .sw-footer__cities{{margin-top:20px;padding-top:20px;border-top:1px solid var(--sw-footer-divider);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--sw-footer-fg-muted);}}
+.sw-footer__badge-row{{text-align:right;}}
 .sw-footer__badge{{display:inline-flex;align-items:center;gap:6px;margin-top:14px;padding:5px 10px;background:#fff;border:1px solid var(--sw-footer-divider);border-radius:3px;text-decoration:none;color:var(--sw-footer-fg);}}
 .sw-footer__badge-glyph{{display:inline-flex;color:var(--sw-accent);}}
 .sw-footer__badge-text{{display:flex;flex-direction:column;line-height:1.1;}}
 .sw-footer__badge-label{{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--sw-footer-fg-muted);}}
 .sw-footer__badge-name{{font-size:12px;font-weight:700;color:var(--sw-footer-fg);}}
-.sw-footer__meta{{margin-top:10px;font-size:12px;}}
-.sw-footer__meta a{{color:var(--sw-footer-fg-muted);text-decoration:none;}}
-.sw-footer__meta a:hover{{color:var(--sw-accent);}}
 .sw-footer__legal{{margin-top:20px;padding-top:18px;border-top:1px solid var(--sw-footer-divider);font-size:11.5px;line-height:1.6;}}
 .sw-footer__copyright{{color:var(--sw-footer-fg-muted);margin:0 0 8px;}}
 .sw-footer__trademark{{margin:0;color:var(--sw-footer-fg-muted);max-width:80ch;}}
@@ -282,20 +280,15 @@ pub fn footer(surface: SoftwareSurface) -> Markup {
                 // linking to its public source the same way the Network column's
                 // own `Source` link does — no dedicated marketing page exists for
                 // it yet, so this reuses the one real, live destination.
-                a."sw-footer__badge" href="https://github.com/pointsav" target="_blank" rel="noopener"
-                    aria-label="Powered by PrivateGit (opens in new tab)" {
-                    span."sw-footer__badge-glyph" aria-hidden="true" { (PreEscaped(BADGE_GLYPH)) }
-                    span."sw-footer__badge-text" {
-                        span."sw-footer__badge-label" { "Powered by" }
-                        span."sw-footer__badge-name" { "PrivateGit" }
+                div."sw-footer__badge-row" {
+                    a."sw-footer__badge" href="https://github.com/pointsav" target="_blank" rel="noopener"
+                        aria-label="Powered by PrivateGit (opens in new tab)" {
+                        span."sw-footer__badge-glyph" aria-hidden="true" { (PreEscaped(BADGE_GLYPH)) }
+                        span."sw-footer__badge-text" {
+                            span."sw-footer__badge-label" { "Powered by" }
+                            span."sw-footer__badge-name" { "PrivateGit" }
+                        }
                     }
-                }
-                p."sw-footer__meta" {
-                    a href="/page/contact" { "Contact us" }
-                    span aria-hidden="true" { " \u{00b7} " }
-                    a href="/page/disclaimer" { "Disclaimer" }
-                    span aria-hidden="true" { " \u{00b7} " }
-                    a href="/page/privacy" { "Privacy" }
                 }
                 div."sw-footer__legal" {
                     p."sw-footer__copyright" {
