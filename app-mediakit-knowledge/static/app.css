@@ -557,6 +557,20 @@ button:disabled { cursor: default; }
   margin-inline: auto;
   padding: var(--k-gutter-lg) var(--k-gutter) var(--k-gutter);
 }
+.k-footer__brand {
+  margin-bottom: var(--k-gutter-lg);
+}
+.k-footer__brand-name {
+  margin: 0;
+  font-weight: var(--k-weight-semibold);
+  font-size: var(--k-text-sm);
+  color: var(--k-ink);
+}
+.k-footer__brand-tagline {
+  margin: var(--k-space-1) 0 0;
+  color: var(--k-ink-muted);
+  font-size: var(--k-text-xs);
+}
 .k-footer__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -581,7 +595,7 @@ button:disabled { cursor: default; }
 .k-footer__link:visited { color: var(--k-link-visited); }
 .k-footer__link:focus-visible { outline: var(--k-focus-outline); outline-offset: 2px; border-radius: var(--k-radius-xs); }
 
-/* Base row — copyright + cities (left) · badges (right). */
+/* Base row — cities (left) · badges (right). */
 .k-footer__base {
   display: flex;
   flex-wrap: wrap;
@@ -594,11 +608,15 @@ button:disabled { cursor: default; }
   color: var(--k-ink-muted);
   font-size: var(--k-text-xs);
 }
-.k-footer__meta {
-  display: flex;
-  flex-direction: column;               /* cities above the copyright line */
-  align-items: flex-start;
-  gap: var(--k-space-3);
+.k-footer__disclaimer {
+  margin: var(--k-space-3) 0 0;
+  color: var(--k-ink-muted);
+  font-size: var(--k-text-xs);
+  max-width: 72ch;
+}
+/* Copyright + trademark — last block in the footer. */
+.k-footer__legal {
+  margin-top: var(--k-space-3);
 }
 .k-footer__copyright { margin: 0; color: var(--k-ink-muted); }
 .k-footer__trademark {
@@ -609,12 +627,6 @@ button:disabled { cursor: default; }
   font-size: var(--k-text-2xs);
   line-height: var(--k-leading-snug);
   max-width: 70ch;
-}
-.k-footer__disclaimer {
-  margin: var(--k-space-3) 0 0;
-  color: var(--k-ink-muted);
-  font-size: var(--k-text-xs);
-  max-width: 72ch;
 }
 
 /* --- Important Information band (above the footer) ------------------------- */
@@ -668,7 +680,8 @@ button:disabled { cursor: default; }
   align-items: center;
   gap: var(--k-space-3);
   font-weight: var(--k-weight-medium);
-  letter-spacing: var(--k-tracking-wide);
+  text-transform: uppercase;
+  letter-spacing: var(--k-tracking-caps);
   color: var(--k-ink-secondary);
 }
 .k-footer__cities-sep { color: var(--k-border); }
