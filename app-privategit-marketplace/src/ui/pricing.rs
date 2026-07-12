@@ -23,45 +23,84 @@
 //! pricing on a real storefront page was a real accuracy problem independent of
 //! the naming mismatch — removed rather than relabeled.
 
+use crate::ui::Lang;
 use crate::{Catalog, LicenseTier};
 use maud::{html, Markup, PreEscaped};
 
-fn tier_card(tier: LicenseTier, catalog: &Catalog) -> Markup {
+/// Tier descriptions are the one piece of chrome copy that's genuinely legal/
+/// licensing-adjacent — translated here (not deferred to the
+/// factory-release-engineering pipeline) because they describe THIS crate's own
+/// four `LicenseTier` variants, not the shared Woodfine disclaimer/trademark
+/// text that pipeline is producing a canonical Spanish source for.
+fn tier_card(tier: LicenseTier, catalog: &Catalog, lang: Lang) -> Markup {
     let count = catalog
         .installers
         .iter()
         .filter(|i| i.license_tier == tier)
         .count();
-    let desc = match tier {
-        LicenseTier::Proprietary => {
+    let desc = match (tier, lang) {
+        (LicenseTier::Proprietary, Lang::En) => {
             "No source grant. The company's stated commercial moat — solo use is \
              free during BETA; aggregation or resale requires a separate \
              commercial agreement, permanently."
         }
-        LicenseTier::Fsl => {
+        (LicenseTier::Proprietary, Lang::Es) => {
+            "Sin concesi\u{f3}n de c\u{f3}digo fuente. El resguardo comercial declarado de la \
+             empresa: el uso individual es gratuito durante la fase BETA; la agregaci\u{f3}n o \
+             reventa requiere un acuerdo comercial independiente, de forma permanente."
+        }
+        (LicenseTier::Fsl, Lang::En) => {
             "Source-readable now. A two-year non-compete restriction, then \
              automatic conversion to Apache-2.0 for that release."
         }
-        LicenseTier::Agpl => {
+        (LicenseTier::Fsl, Lang::Es) => {
+            "C\u{f3}digo fuente legible desde ahora. Una restricci\u{f3}n de no competencia de \
+             dos a\u{f1}os, tras la cual se convierte autom\u{e1}ticamente a Apache-2.0 para esa \
+             versi\u{f3}n."
+        }
+        (LicenseTier::Agpl, Lang::En) => {
             "AGPL-3.0-or-later. Source is freely available under copyleft terms; \
              a purchase buys the official signed binary and commercial \
              redistribution rights, not access to the code itself."
         }
-        LicenseTier::Apache => {
+        (LicenseTier::Agpl, Lang::Es) => {
+            "AGPL-3.0-or-later. El c\u{f3}digo fuente est\u{e1} disponible libremente bajo \
+             t\u{e9}rminos copyleft; una compra adquiere el binario oficial firmado y \
+             derechos de redistribuci\u{f3}n comercial, no el acceso al c\u{f3}digo en s\u{ed}."
+        }
+        (LicenseTier::Apache, Lang::En) => {
             "A genuine, unconditional Apache-2.0 grant. No purchase, no license \
              key, no BETA gate to lift — free to use, fork, or redistribute."
         }
+        (LicenseTier::Apache, Lang::Es) => {
+            "Una concesi\u{f3}n Apache-2.0 aut\u{e9}ntica e incondicional. Sin compra, sin clave \
+             de licencia, sin fase BETA que superar: libre de usar, bifurcar o \
+             redistribuir."
+        }
+    };
+    let product_word = match (lang, count) {
+        (Lang::En, 1) => "product".to_string(),
+        (Lang::En, _) => "products".to_string(),
+        (Lang::Es, 1) => "producto".to_string(),
+        (Lang::Es, _) => "productos".to_string(),
     };
     html! {
         article."sw-pr-tier" {
             h2."sw-pr-tier__name" { (tier.label()) }
-            p."sw-pr-tier__count" { (count) " product" (if count == 1 { "" } else { "s" }) }
+            p."sw-pr-tier__count" { (count) " " (product_word) }
             p."sw-pr-tier__desc" { (desc) }
         }
     }
 }
 
-pub fn pricing_markup(catalog: &Catalog) -> Markup {
+pub fn pricing_markup(catalog: &Catalog, lang: Lang) -> Markup {
+    match lang {
+        Lang::En => pricing_markup_en(catalog),
+        Lang::Es => pricing_markup_es(catalog),
+    }
+}
+
+fn pricing_markup_en(catalog: &Catalog) -> Markup {
     html! {
         (pricing_style())
         div."sw-pr-wrap" {
@@ -80,10 +119,10 @@ pub fn pricing_markup(catalog: &Catalog) -> Markup {
                 span { "Your keys, your license" }
             }
             div."sw-pr-tiers" {
-                (tier_card(LicenseTier::Proprietary, catalog))
-                (tier_card(LicenseTier::Fsl, catalog))
-                (tier_card(LicenseTier::Agpl, catalog))
-                (tier_card(LicenseTier::Apache, catalog))
+                (tier_card(LicenseTier::Proprietary, catalog, Lang::En))
+                (tier_card(LicenseTier::Fsl, catalog, Lang::En))
+                (tier_card(LicenseTier::Agpl, catalog, Lang::En))
+                (tier_card(LicenseTier::Apache, catalog, Lang::En))
             }
             p."sw-pr-beta-note" {
                 "Every product is currently free during BETA, regardless of tier — future \
@@ -98,6 +137,51 @@ pub fn pricing_markup(catalog: &Catalog) -> Markup {
             }
             p."sw-pr-agpl" {
                 "Source: "
+                a href="https://github.com/pointsav/pointsav-monorepo" {
+                    "github.com/pointsav/pointsav-monorepo"
+                }
+            }
+        }
+    }
+}
+
+fn pricing_markup_es(catalog: &Catalog) -> Markup {
+    html! {
+        (pricing_style())
+        div."sw-pr-wrap" {
+            h1."sw-pr-title" { "Precios" }
+            p."sw-pr-lede" {
+                "Cómprelo una vez. Ejecútelo donde quiera. Sea suyo para siempre. Sin \
+                 suscripción, sin dependencia de la nube, sin interruptor de apagado remoto."
+            }
+            div."sw-pr-trust" {
+                span { "Compatible con air-gap" }
+                span aria-hidden="true" { "\u{b7}" }
+                span { "Sin telemetr\u{ed}a" }
+                span aria-hidden="true" { "\u{b7}" }
+                span { "Funciona sin conexi\u{f3}n" }
+                span aria-hidden="true" { "\u{b7}" }
+                span { "Sus claves, su licencia" }
+            }
+            div."sw-pr-tiers" {
+                (tier_card(LicenseTier::Proprietary, catalog, Lang::Es))
+                (tier_card(LicenseTier::Fsl, catalog, Lang::Es))
+                (tier_card(LicenseTier::Agpl, catalog, Lang::Es))
+                (tier_card(LicenseTier::Apache, catalog, Lang::Es))
+            }
+            p."sw-pr-beta-note" {
+                "Todos los productos son actualmente gratuitos durante la fase BETA, sin \
+                 importar el nivel de licencia; a\u{fa}n no se ha fijado un precio futuro para \
+                 ning\u{fa}n producto. Consulte la ficha de cada producto en la p\u{e1}gina de "
+                a href="/es/software" { "Productos" }
+                " para conocer su precio actual."
+            }
+            p."sw-pr-tax" {
+                "No se cobran impuestos: PointSav Digital Systems opera por debajo del \
+                 umbral de peque\u{f1}o proveedor del GST."
+            }
+            p."sw-pr-agpl" {
+                "C\u{f3}digo fuente: "
                 a href="https://github.com/pointsav/pointsav-monorepo" {
                     "github.com/pointsav/pointsav-monorepo"
                 }
@@ -201,7 +285,7 @@ mod tests {
 
     #[test]
     fn pricing_page_shows_all_four_tiers_with_live_counts() {
-        let html = pricing_markup(&fixture()).into_string();
+        let html = pricing_markup(&fixture(), Lang::En).into_string();
         assert!(html.contains("Proprietary"));
         assert!(html.contains("1 product<"));
         assert!(html.contains("FSL-1.1-ALv2"));
@@ -217,9 +301,23 @@ mod tests {
 
     #[test]
     fn pricing_page_carries_beta_tax_and_agpl_notes() {
-        let html = pricing_markup(&fixture()).into_string();
+        let html = pricing_markup(&fixture(), Lang::En).into_string();
         assert!(html.contains("currently free during BETA"));
         assert!(html.contains("No tax collected"));
         assert!(html.contains("github.com/pointsav/pointsav-monorepo"));
+    }
+
+    #[test]
+    fn spanish_pricing_page_translates_title_and_tiers_without_fabricating_a_price() {
+        let html = pricing_markup(&fixture(), Lang::Es).into_string();
+        assert!(html.contains("<h1 class=\"sw-pr-title\">Precios</h1>"));
+        assert!(html.contains("Proprietary")); // tier identifiers stay untranslated (legal labels)
+        assert!(html.contains("1 producto"));
+        assert!(html.contains("2 productos"));
+        assert!(html.contains("href=\"/es/software\""));
+        assert!(
+            !html.contains("sw-pr-tier__amt"),
+            "ES page must not display a fabricated per-tier dollar figure either"
+        );
     }
 }

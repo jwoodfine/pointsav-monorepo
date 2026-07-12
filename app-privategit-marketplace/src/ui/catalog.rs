@@ -32,6 +32,7 @@
 //! `tool-wallet/src/main.rs` (`$1.00 USDC = 1_000_000 units`). Displayed dollars are
 //! `price_usdc as f64 / 1_000_000.0`.
 
+use crate::ui::Lang;
 use crate::LicenseTier;
 use maud::{html, Markup, PreEscaped};
 
@@ -50,16 +51,17 @@ fn install_command(source_base_url: &str, id: &str) -> String {
 /// A dark terminal-style install-command block with a copy-to-clipboard button.
 /// The button carries the exact command in `data-sw-clip`; the vanilla-JS snippet at
 /// the foot of the page copies it. maud escapes the attribute value.
-fn install_block(command: &str) -> Markup {
+fn install_block(command: &str, lang: Lang) -> Markup {
+    let l = lang.catalog_labels();
     html! {
         div."sw-cat-install" {
             div."sw-cat-cmd" {
                 code."sw-cat-cmd__text" { (command) }
                 button."sw-cat-cmd__copy" type="button"
-                    data-sw-clip=(command) data-sw-label="Copy"
-                    aria-label="Copy install command to clipboard" { "Copy" }
+                    data-sw-clip=(command) data-sw-label=(l.copy)
+                    aria-label=(l.copy_aria) { (l.copy) }
             }
-            p."sw-cat-hint" { "Linux x86_64 · verifies SHA256 against the per-version MANIFEST" }
+            p."sw-cat-hint" { (l.install_hint) }
         }
     }
 }
@@ -83,12 +85,13 @@ fn tier_badge(tier: LicenseTier) -> Markup {
 /// original "BETA · free" wording — per `BRIEF-software-licensing-structure.md`
 /// §4, all of them genuinely are in a $0 BETA state with real future pricing yet
 /// to be decided, not a placeholder that will never resolve.
-fn free_product_card(i: &crate::Installer, source_base_url: &str) -> Markup {
+fn free_product_card(i: &crate::Installer, source_base_url: &str, lang: Lang) -> Markup {
     let command = install_command(source_base_url, &i.id);
+    let l = lang.catalog_labels();
     let free_label = if i.license_tier == LicenseTier::Apache {
-        "Free \u{00b7} open source"
+        l.free_open_source
     } else {
-        "BETA \u{00b7} free"
+        l.beta_free
     };
     html! {
         article."sw-cat-card" {
@@ -102,7 +105,7 @@ fn free_product_card(i: &crate::Installer, source_base_url: &str) -> Markup {
                 span."sw-cat-badge" { (i.platform) }
                 span."sw-cat-badge" { (i.size_mb) " MB" }
             }
-            (install_block(&command))
+            (install_block(&command, lang))
         }
     }
 }
@@ -114,9 +117,11 @@ fn free_product_card(i: &crate::Installer, source_base_url: &str) -> Markup {
 /// instead of the bare `GET /v1/wallet/address` JSON response — closing the first
 /// raw-JSON hop the audit flagged. That JSON endpoint still exists unchanged as
 /// the underlying data source; this is just where a human clicking the button lands.
-fn paid_product_card(i: &crate::Installer) -> Markup {
+fn paid_product_card(i: &crate::Installer, lang: Lang) -> Markup {
     let dollars = i.price_usdc as f64 / 1_000_000.0;
     let checkout_href = format!("/checkout/{}", i.id);
+    let l = lang.catalog_labels();
+    let pay_aria = l.pay_aria_fmt.replace("{}", &i.name);
     html! {
         article."sw-cat-card" {
             span."sw-cat-card__id" { (i.id) }
@@ -130,14 +135,14 @@ fn paid_product_card(i: &crate::Installer) -> Markup {
             }
             div."sw-cat-price" {
                 span."sw-cat-price__amt" { "$" (format!("{dollars:.2}")) }
-                span."sw-cat-price__unit" { "USDC \u{2014} own it forever, no subscription" }
+                span."sw-cat-price__unit" { (l.price_unit) }
                 div."sw-cat-pay" {
                     a."sw-cat-pay__cta" href=(checkout_href)
-                        rel="nofollow" aria-label=(format!("Pay for {} with Polygon USDC", i.name)) {
+                        rel="nofollow" aria-label=(pay_aria) {
                         span."sw-cat-pay__mark" aria-hidden="true" { "\u{25C8}" }
-                        "Pay with Polygon USDC"
+                        (l.pay_cta)
                     }
-                    p."sw-cat-pay__meta" { "Polygon PoS \u{00b7} native USDC \u{00b7} a permanent, portable record you hold" }
+                    p."sw-cat-pay__meta" { (l.pay_meta) }
                 }
             }
         }
@@ -229,20 +234,23 @@ document.querySelectorAll('.sw-cat-rail a').forEach(function(link){
 /// Vanilla-JS copy-to-clipboard for every `[data-sw-clip]` control. Explicitly in scope
 /// for this phase (unlike P2's broader JS-drawer deferral). Small, dependency-free,
 /// and degrades silently where the Clipboard API is unavailable.
-fn clipboard_script() -> Markup {
-    let js = r#"(function(){
-document.querySelectorAll('[data-sw-clip]').forEach(function(btn){
-  btn.addEventListener('click',function(){
+fn clipboard_script(lang: Lang) -> Markup {
+    let copied = lang.catalog_labels().copied;
+    let js = format!(
+        r#"(function(){{
+document.querySelectorAll('[data-sw-clip]').forEach(function(btn){{
+  btn.addEventListener('click',function(){{
     var text=btn.getAttribute('data-sw-clip');
-    if(!navigator.clipboard){return;}
-    navigator.clipboard.writeText(text).then(function(){
+    if(!navigator.clipboard){{return;}}
+    navigator.clipboard.writeText(text).then(function(){{
       var label=btn.getAttribute('data-sw-label')||btn.textContent;
-      btn.textContent='Copied';
-      setTimeout(function(){btn.textContent=label;},1500);
-    }).catch(function(){});
-  });
-});
-})();"#;
+      btn.textContent='{copied}';
+      setTimeout(function(){{btn.textContent=label;}},1500);
+    }}).catch(function(){{}});
+  }});
+}});
+}})();"#
+    );
     html! { script { (PreEscaped(js)) } }
 }
 
@@ -281,7 +289,8 @@ document.querySelectorAll('[data-sw-clip]').forEach(function(btn){
 ///
 /// The returned [`Markup`] is meant to be wrapped by `layout::render_page`, which supplies
 /// the masthead + footer chrome.
-pub fn catalog_markup(catalog: &crate::Catalog, source_base_url: &str) -> Markup {
+pub fn catalog_markup(catalog: &crate::Catalog, source_base_url: &str, lang: Lang) -> Markup {
+    let l = lang.catalog_labels();
     let proprietary: Vec<_> = catalog
         .installers
         .iter()
@@ -316,9 +325,9 @@ pub fn catalog_markup(catalog: &crate::Catalog, source_base_url: &str) -> Markup
                     div."sw-cat-grid" {
                         @for i in products {
                             @if i.price_usdc == 0 {
-                                (free_product_card(i, source_base_url))
+                                (free_product_card(i, source_base_url, lang))
                             } @else {
-                                (paid_product_card(i))
+                                (paid_product_card(i, lang))
                             }
                         }
                     }
@@ -331,28 +340,22 @@ pub fn catalog_markup(catalog: &crate::Catalog, source_base_url: &str) -> Markup
         (catalog_style())
         (json_ld_script())
         div."sw-cat-wrap" {
-            p."sw-cat-eyebrow" { "The Binary Library" }
-            h1."sw-cat-intro" { "Products" }
-            p."sw-cat-lede" {
-                "Buy it once. Run it anywhere. Own it forever. No subscription, no cloud \
-                 dependency, no kill switch. Buying your first component here is also your \
-                 key to the rest of the stack\u{2014}the components of an orchestration, not \
-                 an app store. This catalog is rendered directly from the release catalog\
-                 \u{2014}what you see here is exactly what the download API serves."
-            }
+            p."sw-cat-eyebrow" { (l.eyebrow) }
+            h1."sw-cat-intro" { (l.title) }
+            p."sw-cat-lede" { (l.lede) }
             div."sw-cat-body" {
                 nav."sw-cat-rail" aria-label="Catalog shelves" {
-                    p."sw-cat-rail__h" { "Shelves" }
+                    p."sw-cat-rail__h" { (l.shelves_h) }
                     a href="#commercial" {
-                        "Commercial" span."sw-cat-rail__count" { (commercial_count) }
+                        (l.commercial) span."sw-cat-rail__count" { (commercial_count) }
                     }
                     @if !apache.is_empty() {
                         a href="#open-source" {
-                            "Open Source / Community" span."sw-cat-rail__count" { (apache.len()) }
+                            (l.open_source) span."sw-cat-rail__count" { (apache.len()) }
                         }
                     }
-                    a href="/software" class="is-current" {
-                        "All products" span."sw-cat-rail__count" { (total_count) }
+                    a href=(lang.localize("/software")) class="is-current" {
+                        (l.all_products) span."sw-cat-rail__count" { (total_count) }
                     }
                 }
                 div."sw-cat-main" {
@@ -363,13 +366,7 @@ pub fn catalog_markup(catalog: &crate::Catalog, source_base_url: &str) -> Markup
                     }
                     @if !apache.is_empty() {
                         div."sw-cat-shelfsplit" {
-                            p."sw-cat-shelfsplit__text" {
-                                "Two shelves, one catalog. The Commercial shelf above is the ratified, \
-                                 paid-or-BETA os-* product line. The Open Source shelf below lists \
-                                 components that have been relicensed to a genuine, unconditional \
-                                 Apache-2.0 grant\u{2014}free permanently, not a BETA gate awaiting a \
-                                 future price."
-                            }
+                            p."sw-cat-shelfsplit__text" { (l.shelfsplit_text) }
                         }
                         div."sw-cat-shelf sw-cat-shelf--opensource" {
                             (tier_section("open-source", "Open Source \u{00b7} Community", &apache))
@@ -378,7 +375,7 @@ pub fn catalog_markup(catalog: &crate::Catalog, source_base_url: &str) -> Markup
                 }
             }
         }
-        (clipboard_script())
+        (clipboard_script(lang))
         (rail_script())
     }
 }
@@ -441,7 +438,7 @@ mod tests {
 
     #[test]
     fn known_products_appear_in_rendered_markup() {
-        let html = catalog_markup(&fixture(), BASE).into_string();
+        let html = catalog_markup(&fixture(), BASE, Lang::En).into_string();
         // Known ids and names from the fixture drive the cards (no drift possible).
         assert!(html.contains("os-mediakit"));
         assert!(html.contains("MediaKit OS"));
@@ -471,8 +468,10 @@ mod tests {
 
     #[test]
     fn software_page_carries_valid_software_application_json_ld() {
-        let html = catalog_markup(&fixture(), BASE).into_string();
-        let start = html.find(r#"<script type="application/ld+json">"#).expect("JSON-LD script tag missing");
+        let html = catalog_markup(&fixture(), BASE, Lang::En).into_string();
+        let start = html
+            .find(r#"<script type="application/ld+json">"#)
+            .expect("JSON-LD script tag missing");
         let after_open = &html[start..];
         let json_start = after_open.find('>').unwrap() + 1;
         let json_end = after_open.find("</script>").unwrap();
@@ -485,7 +484,7 @@ mod tests {
 
     #[test]
     fn paid_product_renders_pricing_cta_and_no_install_command() {
-        let html = catalog_markup(&fixture(), BASE).into_string();
+        let html = catalog_markup(&fixture(), BASE, Lang::En).into_string();
         // Non-zero price_usdc -> price display + Polygon USDC CTA.
         assert!(html.contains("$19.00"));
         assert!(html.contains("Pay with Polygon USDC"));
@@ -499,7 +498,7 @@ mod tests {
 
     #[test]
     fn free_products_render_curl_install_commands() {
-        let html = catalog_markup(&fixture(), BASE).into_string();
+        let html = catalog_markup(&fixture(), BASE, Lang::En).into_string();
         // price_usdc == 0 -> BETA/free, real curl-pipe-sh command with the right id.
         assert!(html
             .contains("curl -fsSL https://example.invalid/releases/os-mediakit/install.sh | bash"));
@@ -511,7 +510,7 @@ mod tests {
     #[test]
     fn empty_catalog_renders_shell_without_sections() {
         let empty = Catalog { installers: vec![] };
-        let html = catalog_markup(&empty, BASE).into_string();
+        let html = catalog_markup(&empty, BASE, Lang::En).into_string();
         // Page shell still renders…
         assert!(html.contains("sw-cat-intro"));
         // …but no product section.
@@ -527,7 +526,7 @@ mod tests {
         // (tool-wallet, app-*, soft-* never reach this struct at all — they were
         // removed from products.yaml in Phase 1), and cards are grouped by
         // `license_tier`, never by an id-prefix family grid.
-        let html = catalog_markup(&fixture(), BASE).into_string();
+        let html = catalog_markup(&fixture(), BASE, Lang::En).into_string();
         assert!(!html.contains("tool-wallet"));
         assert!(!html.contains("Wallet &amp; Tools"));
         assert!(!html.contains("Knowledge &amp; Source"));
@@ -557,7 +556,7 @@ mod tests {
 
     #[test]
     fn open_source_tier_renders_in_distinct_shelf_section() {
-        let html = catalog_markup(&fixture_with_open_source(), BASE).into_string();
+        let html = catalog_markup(&fixture_with_open_source(), BASE, Lang::En).into_string();
         // Own section, own id — never folded into "FSL" (the pre-Phase-3 2-way
         // partition would have silently misfiled Apache under the FSL heading).
         assert!(html.contains(r#"id="open-source""#));
@@ -583,7 +582,7 @@ mod tests {
         // — the stylesheet always defines `.sw-cat-shelfsplit`/`.sw-cat-shelf--
         // opensource` regardless of whether either element actually renders, so a
         // bare substring check would pass even if this regressed to always-render.
-        let html = catalog_markup(&fixture(), BASE).into_string();
+        let html = catalog_markup(&fixture(), BASE, Lang::En).into_string();
         assert!(!html.contains(r#"id="open-source""#));
         assert!(!html.contains(r#"class="sw-cat-shelfsplit""#));
         assert!(!html.contains(r#"class="sw-cat-shelf sw-cat-shelf--opensource""#));
@@ -595,7 +594,7 @@ mod tests {
         // A permanently-free Apache-2.0 grant is not a "BETA" gate awaiting a future
         // price (Phase 1's `load_catalog` guarantees `price_usdc == 0` is the only
         // legal value here) — the badge copy must not imply one.
-        let html = catalog_markup(&fixture_with_open_source(), BASE).into_string();
+        let html = catalog_markup(&fixture_with_open_source(), BASE, Lang::En).into_string();
         assert!(html.contains("Free \u{00b7} open source"));
         // The existing FSL/AGPL fixture items still say "BETA · free" —
         // unaffected by the Apache-specific badge text.
@@ -608,10 +607,30 @@ mod tests {
         // established, already-shipped "buy it once… own it forever" lede is
         // extended, not replaced (that copy is referenced/tested elsewhere and is
         // load-bearing brand voice, not a placeholder to discard).
-        let html = catalog_markup(&fixture(), BASE).into_string();
+        let html = catalog_markup(&fixture(), BASE, Lang::En).into_string();
         assert!(html.contains("The Binary Library"));
         assert!(html.contains("Buy it once. Run it anywhere. Own it forever."));
         assert!(html.contains("components of an orchestration, not"));
         assert!(html.contains("an app store"));
+    }
+
+    #[test]
+    fn spanish_catalog_page_translates_chrome_but_not_product_data() {
+        let html = catalog_markup(&fixture(), BASE, Lang::Es).into_string();
+        // Chrome strings translated.
+        assert!(html.contains("La Biblioteca Binaria"));
+        assert!(html.contains("<h1 class=\"sw-cat-intro\">Productos</h1>"));
+        assert!(html.contains("Estantes"));
+        assert!(html.contains("Comercial"));
+        assert!(html.contains("Todos los productos"));
+        assert!(html.contains("BETA \u{b7} gratis"));
+        assert!(html.contains("Copiar"));
+        assert!(html.contains("href=\"/es/software\" class=\"is-current\""));
+        // Product name/description text (from products.yaml) is untouched — no
+        // translation source exists for it yet (MVL scope, not silently invented).
+        assert!(html.contains("MediaKit OS"));
+        assert!(html.contains("Sovereign media workstation image."));
+        // Legal tier identifiers stay untranslated on both languages.
+        assert!(html.contains("FSL-1.1-ALv2"));
     }
 }

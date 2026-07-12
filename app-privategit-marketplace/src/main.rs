@@ -32,7 +32,7 @@ const CSP_VALUE: &str = "default-src 'self'; script-src 'self' 'unsafe-inline'; 
     base-uri 'self'";
 
 mod ui;
-use ui::SoftwareSurface;
+use ui::{Lang, SoftwareSurface};
 
 // ── State ─────────────────────────────────────────────────────────────────────
 //
@@ -736,7 +736,10 @@ enum KeypairSelftestOutcome {
     Mismatch { actual: String, expected: String },
 }
 
-fn keypair_selftest_check(signing_key: &SigningKey, verify_key_pub: Option<&str>) -> KeypairSelftestOutcome {
+fn keypair_selftest_check(
+    signing_key: &SigningKey,
+    verify_key_pub: Option<&str>,
+) -> KeypairSelftestOutcome {
     let Some(expected) = verify_key_pub else {
         return KeypairSelftestOutcome::Skipped;
     };
@@ -767,7 +770,9 @@ fn keypair_selftest(signing_key: &SigningKey) {
     let verify_key_pub = std::env::var("VERIFY_KEY_PUB").ok();
     match keypair_selftest_check(signing_key, verify_key_pub.as_deref()) {
         KeypairSelftestOutcome::Skipped => {
-            tracing::info!("keypair self-test skipped — VERIFY_KEY_PUB not provided to this process");
+            tracing::info!(
+                "keypair self-test skipped — VERIFY_KEY_PUB not provided to this process"
+            );
         }
         KeypairSelftestOutcome::Invalid => {
             tracing::error!("keypair self-test FAILED — VERIFY_KEY_PUB set but unreadable/invalid");
@@ -815,6 +820,12 @@ async fn root() -> Response {
     (StatusCode::FOUND, [(header::LOCATION, "/software")]).into_response()
 }
 
+// GET /es -> 302 Found redirect to /es/software. Mirrors `root()`, and mirrors
+// home.pointsav.com/home.woodfinegroup.com's own reciprocal `/` <-> `/es` pattern.
+async fn root_es() -> Response {
+    (StatusCode::FOUND, [(header::LOCATION, "/es/software")]).into_response()
+}
+
 // GET /software — dynamic product catalog.
 //
 // Replaces the P1 static-HTML read (`software.html` + `wrap_static_html`). The page is
@@ -822,15 +833,41 @@ async fn root() -> Response {
 // can never drift from `products.yaml` again (the bug this phase fixes). The Sovereign
 // Editorial chrome is supplied by `ui::render_page`.
 async fn software_page(State(state): State<Arc<AppState>>) -> Response {
+    render_software_page(&state, Lang::En).await
+}
+
+// GET /es/software — MVL Spanish variant (operator-approved 2026-07-12). Same catalog
+// data, chrome/labels translated via `Lang::Es` — see `ui::lang` module docs.
+async fn software_page_es(State(state): State<Arc<AppState>>) -> Response {
+    render_software_page(&state, Lang::Es).await
+}
+
+async fn render_software_page(state: &AppState, lang: Lang) -> Response {
     match load_catalog(&state.catalog_path) {
         Ok(catalog) => {
-            let content = ui::catalog_markup(&catalog, &state.source_base_url);
+            let content = ui::catalog_markup(&catalog, &state.source_base_url, lang);
+            let (title, description) = match lang {
+                Lang::En => (
+                    "Products — PointSav Software".to_string(),
+                    "Browse PointSav's software catalog — licensed binaries, release packages, \
+                     and installation manifests for the PointSav platform's applications and tooling."
+                        .to_string(),
+                ),
+                Lang::Es => (
+                    "Productos — PointSav Software".to_string(),
+                    "Explore el cat\u{e1}logo de software de PointSav — binarios con licencia, \
+                     paquetes de versi\u{f3}n y manifiestos de instalaci\u{f3}n para las \
+                     aplicaciones y herramientas de la plataforma PointSav."
+                        .to_string(),
+                ),
+            };
             let body = ui::render_page(
                 SoftwareSurface::Marketplace,
-                "Products — PointSav Software",
-                "Browse PointSav's software catalog — licensed binaries, release packages, \
-                 and installation manifests for the PointSav platform's applications and tooling.",
-                "/software",
+                lang,
+                &title,
+                &description,
+                &lang.localize("/software"),
+                true,
                 content,
             )
             .into_string();
@@ -858,21 +895,61 @@ async fn software_page(State(state): State<Arc<AppState>>) -> Response {
 // CONTENT (dropping fictional wallet-connect/tax/fake-product copy) but not this
 // handler's logic.
 async fn licensing_page(State(state): State<Arc<AppState>>) -> Response {
-    serve_chrome_page(&state.static_dir.join("licensing.html"))
+    serve_chrome_page(
+        &state.static_dir.join("licensing.html"),
+        Lang::En,
+        "/licensing",
+    )
+}
+
+// GET /es/licensing — MVL Spanish variant, reads the separately-maintained
+// `licensing.es.html` static file (translated content, own `<head>` tags — same
+// pattern as the English file, not templated through `render_page`).
+async fn licensing_page_es(State(state): State<Arc<AppState>>) -> Response {
+    serve_chrome_page(
+        &state.static_dir.join("licensing.es.html"),
+        Lang::Es,
+        "/es/licensing",
+    )
 }
 
 // GET /pricing — Phase 4. Catalog-driven (like `software_page`), not a static file,
 // so it can never drift into fiction the way `licensing.html` had.
 async fn pricing_page(State(state): State<Arc<AppState>>) -> Response {
+    render_pricing_page(&state, Lang::En).await
+}
+
+// GET /es/pricing — MVL Spanish variant (operator-approved 2026-07-12).
+async fn pricing_page_es(State(state): State<Arc<AppState>>) -> Response {
+    render_pricing_page(&state, Lang::Es).await
+}
+
+async fn render_pricing_page(state: &AppState, lang: Lang) -> Response {
     match load_catalog(&state.catalog_path) {
         Ok(catalog) => {
-            let content = ui::pricing_markup(&catalog);
+            let content = ui::pricing_markup(&catalog, lang);
+            let (title, description) = match lang {
+                Lang::En => (
+                    "Pricing — PointSav Software".to_string(),
+                    "License pricing and tier structure for PointSav software — Proprietary, FSL, \
+                     AGPL, and Apache tiers, currently free during public BETA."
+                        .to_string(),
+                ),
+                Lang::Es => (
+                    "Precios — PointSav Software".to_string(),
+                    "Estructura de precios y niveles de licencia del software de PointSav — \
+                     niveles Proprietary, FSL, AGPL y Apache, actualmente gratuitos durante la \
+                     fase BETA p\u{fa}blica."
+                        .to_string(),
+                ),
+            };
             let body = ui::render_page(
                 SoftwareSurface::Marketplace,
-                "Pricing — PointSav Software",
-                "License pricing and tier structure for PointSav software — Proprietary, FSL, \
-                 AGPL, and Apache tiers, currently free during public BETA.",
-                "/pricing",
+                lang,
+                &title,
+                &description,
+                &lang.localize("/pricing"),
+                true,
                 content,
             )
             .into_string();
@@ -902,10 +979,12 @@ async fn pricing_page(State(state): State<Arc<AppState>>) -> Response {
 async fn disclaimer_page() -> Response {
     let body = ui::render_page(
         SoftwareSurface::Marketplace,
+        Lang::En,
         "Disclaimer — PointSav Software",
         "Legal disclaimer for software.pointsav.com — no warranty, licensing terms, and \
          payment/jurisdictional notices for PointSav software purchases.",
         "/page/disclaimer",
+        false,
         ui::disclaimer_markup(),
     )
     .into_string();
@@ -921,9 +1000,11 @@ async fn disclaimer_page() -> Response {
 async fn privacy_page() -> Response {
     let body = ui::render_page(
         SoftwareSurface::Marketplace,
+        Lang::En,
         "Privacy — PointSav Software",
         "Privacy policy for software.pointsav.com — what data this site collects and how it's used.",
         "/page/privacy",
+        false,
         ui::privacy_markup(),
     )
     .into_string();
@@ -939,9 +1020,11 @@ async fn privacy_page() -> Response {
 async fn accessibility_page() -> Response {
     let body = ui::render_page(
         SoftwareSurface::Marketplace,
+        Lang::En,
         "Accessibility — PointSav Software",
         "Accessibility statement for software.pointsav.com.",
         "/page/accessibility",
+        false,
         ui::accessibility_markup(),
     )
     .into_string();
@@ -978,6 +1061,11 @@ async fn sitemap_xml() -> Response {
         "/page/disclaimer",
         "/page/privacy",
         "/page/accessibility",
+        // MVL Spanish variants (operator-approved 2026-07-12) — only the three
+        // translated pages; the rest have no /es/* sibling yet.
+        "/es/software",
+        "/es/pricing",
+        "/es/licensing",
     ];
     let urls: String = pages
         .iter()
@@ -1000,10 +1088,12 @@ async fn sitemap_xml() -> Response {
 async fn contact_page() -> Response {
     let body = ui::render_page(
         SoftwareSurface::Marketplace,
+        Lang::En,
         "Contact us — PointSav Software",
         "Contact PointSav Digital Systems for support with software licenses, downloads, \
          and security disclosures.",
         "/page/contact",
+        false,
         ui::contact_markup(),
     )
     .into_string();
@@ -1027,12 +1117,14 @@ async fn product_detail_page(
                 let content = ui::product_detail_markup(installer, &state.source_base_url);
                 let body = ui::render_page(
                     SoftwareSurface::Marketplace,
+                    Lang::En,
                     &format!("{} — PointSav Software", installer.name),
                     &format!(
                         "{} — {} Licensed binary download, install command, and version/checksum details.",
                         installer.name, installer.description
                     ),
                     &format!("/software/{}", installer.id),
+                    false,
                     content,
                 )
                 .into_string();
@@ -1064,10 +1156,11 @@ async fn product_detail_page(
 
 // Read the prerendered static page from disk (P1 logic, unchanged) and wrap it in
 // the Sovereign Editorial chrome (navy masthead + near-black footer) before serving.
-fn serve_chrome_page(path: &PathBuf) -> Response {
-    match fs::read_to_string(path) {
+fn serve_chrome_page(file_path: &PathBuf, lang: Lang, url_path: &str) -> Response {
+    match fs::read_to_string(file_path) {
         Ok(raw) => {
-            let body = ui::wrap_static_html(&raw, SoftwareSurface::Marketplace);
+            let body =
+                ui::wrap_static_html(&raw, SoftwareSurface::Marketplace, lang, url_path, true);
             (
                 StatusCode::OK,
                 [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
@@ -1076,7 +1169,7 @@ fn serve_chrome_page(path: &PathBuf) -> Response {
                 .into_response()
         }
         Err(e) => {
-            tracing::error!("failed to read static page {}: {e}", path.display());
+            tracing::error!("failed to read static page {}: {e}", file_path.display());
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
@@ -1241,9 +1334,14 @@ async fn checkout_page(
                 let content = ui::checkout_markup(installer, &state.polygon_wallet_address);
                 let body = ui::render_page(
                     SoftwareSurface::Marketplace,
+                    Lang::En,
                     &format!("Checkout — {} — PointSav Software", installer.name),
-                    &format!("Pay with Polygon USDC to mint a license for {}.", installer.name),
+                    &format!(
+                        "Pay with Polygon USDC to mint a license for {}.",
+                        installer.name
+                    ),
                     &format!("/checkout/{}", installer.id),
+                    false,
                     content,
                 )
                 .into_string();
@@ -1314,9 +1412,11 @@ async fn order_status_page(
     };
     let body = ui::render_page(
         SoftwareSurface::Marketplace,
+        Lang::En,
         "Order status — PointSav Software",
         "Check a PointSav software purchase by transaction hash.",
         &format!("/order/{tx_hash}"),
+        false,
         content,
     )
     .into_string();
@@ -1456,6 +1556,11 @@ async fn main() -> Result<()> {
         .route("/software/:product_id", get(product_detail_page))
         .route("/licensing", get(licensing_page))
         .route("/pricing", get(pricing_page))
+        // MVL Spanish variants (operator-approved 2026-07-12) — see `ui::lang` module docs.
+        .route("/es", get(root_es))
+        .route("/es/software", get(software_page_es))
+        .route("/es/licensing", get(licensing_page_es))
+        .route("/es/pricing", get(pricing_page_es))
         .route("/page/disclaimer", get(disclaimer_page))
         .route("/page/privacy", get(privacy_page))
         .route("/page/accessibility", get(accessibility_page))
