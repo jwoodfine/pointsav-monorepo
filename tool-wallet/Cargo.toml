@@ -12,6 +12,7 @@ description = "Polygon USDC payment watcher — verifies inbound license payment
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+serde_yaml = "0.9"
 reqwest = { version = "0.12", features = ["rustls-tls", "json"], default-features = false }
 anyhow = "1"
 hex = "0.4"
