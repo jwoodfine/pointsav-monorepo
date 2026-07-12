@@ -245,8 +245,16 @@ document.addEventListener('keydown', (e) => {
 // here rather than hardcoded per-call — the whole draw-on system tunes
 // from one place. Falls back to the same values the tokens currently hold
 // if a future page renders this before tokens.css has loaded.
-function readMotionTokens() {
-  const cs = getComputedStyle(document.documentElement);
+// Round 10 (2026-07-11) fix: takes the element to animate and reads ITS
+// computed style, not document.documentElement's. Per-container overrides
+// (e.g. .bim-method-figure's slower narrative pace, set in bim-planroom.css)
+// are real CSS custom properties that inherit down to the SVG — but only
+// getComputedStyle(that element) picks them up. Reading the root element's
+// style here meant every such override was silently dead: every plan
+// diagram sitewide always animated at the one global default, confirmed
+// live (the intended ~900ms/90ms Method-page pace was actually ~120ms).
+function readMotionTokens(el) {
+  const cs = getComputedStyle(el || document.documentElement);
   const duration = (cs.getPropertyValue('--bim-motion-drawon-duration') || '600ms').trim() || '600ms';
   const easing = (cs.getPropertyValue('--bim-motion-drawon-easing') || 'ease').trim() || 'ease';
   const stagger = parseInt(cs.getPropertyValue('--bim-motion-drawon-stagger'), 10);
@@ -263,7 +271,7 @@ function drawOnAnimate(svg) {
   if (!svg || svg.dataset.drawnOn === '1') return;
   svg.dataset.drawnOn = '1';
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const motion = readMotionTokens();
+  const motion = readMotionTokens(svg);
   const shapes = svg.querySelectorAll('path, rect, line, circle, polyline, polygon');
   shapes.forEach((el, i) => {
     const stroke = el.getAttribute('stroke');
@@ -274,28 +282,47 @@ function drawOnAnimate(svg) {
     if (!len || !isFinite(len)) return;
     el.style.strokeDasharray = String(len);
     el.style.strokeDashoffset = String(len);
-    el.style.transition = 'stroke-dashoffset ' + motion.duration + ' ' + motion.easing;
-    el.style.transitionDelay = Math.min(i, motion.staggerCap) * motion.stagger + 'ms';
     // Once the draw-on completes, drop the inline dash properties this
     // function set so the element falls back to its real CSS/attribute
     // stroke-dasharray (e.g. a containment line's dashed pattern) instead
     // of staying solid forever — without this, every dashed element this
     // function ever touches permanently loses its dash after animating once.
-    el.addEventListener('transitionend', () => {
+    const cleanup = () => {
       el.style.removeProperty('stroke-dasharray');
       el.style.removeProperty('stroke-dashoffset');
       el.style.removeProperty('transition');
-      el.style.removeProperty('transition-delay');
-    }, { once: true });
-    // Two nested rAFs: the first commits the dashoffset-at-full-length
-    // style so the browser has actually painted that starting state before
-    // the second rAF flips it to 0 — setting both in the same frame would
-    // let the browser coalesce them and skip straight to the end state.
-    requestAnimationFrame(() => {
+    };
+    el.addEventListener('transitionend', cleanup, { once: true });
+    // Fallback: `transitionend` never fires if the tab is backgrounded
+    // mid-transition (rAF/transitions can stall while hidden) — without
+    // this, the element is stuck permanently solid. durationMs falls back
+    // to 600 if --bim-motion-drawon-duration is ever an unparseable value.
+    const durationMs = parseFloat(motion.duration) || 600;
+    const delayMs = Math.min(i, motion.staggerCap) * motion.stagger;
+    setTimeout(cleanup, delayMs + durationMs + 200);
+    // Round 10 (2026-07-12) bug fix: stagger via setTimeout, NOT CSS
+    // transition-delay. Diagnosed live: a staggered transition-delay gets
+    // cancelled (transitioncancel, elapsed=0) by any intervening style
+    // recalc during its delay window — confirmed via controlled A/B test
+    // (0ms delay: 10/10 shapes animated; 90ms stagger: only 1/10 did,
+    // and 0/10 via a real scroll-into-view, where scroll-behavior:smooth
+    // was itself enough to cancel even the one zero-delay survivor). Every
+    // plan diagram sitewide was silently snapping to fully-drawn instead of
+    // animating in, for any i>0 shape. Setting the transition and flipping
+    // the value together, already delayed by JS instead of CSS, leaves no
+    // pending delayed transition for anything else to interrupt.
+    setTimeout(() => {
+      el.style.transition = 'stroke-dashoffset ' + motion.duration + ' ' + motion.easing;
+      // Two nested rAFs: the first commits the dashoffset-at-full-length
+      // style so the browser has actually painted that starting state before
+      // the second rAF flips it to 0 — setting both in the same frame would
+      // let the browser coalesce them and skip straight to the end state.
       requestAnimationFrame(() => {
-        el.style.strokeDashoffset = '0';
+        requestAnimationFrame(() => {
+          el.style.strokeDashoffset = '0';
+        });
       });
-    });
+    }, delayMs);
   });
 }
 

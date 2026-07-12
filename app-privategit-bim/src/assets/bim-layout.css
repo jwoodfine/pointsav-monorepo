@@ -945,47 +945,26 @@ h1, h2 {
   height: 1.25rem;
 }
 
-/* Round 6 (2026-07-10): "the drafting conceit stops at the cards" — the
-   footer was generic SaaS chrome (cohesion-audit gap #3). Recomposed the
-   cities/license/platform row as a real drawing title block: a bordered
-   frame divided into labeled compartments, each a stamped field (label
-   above, value below), the same convention as the title block on every
-   real architectural or engineering drawing sheet. Content is untouched —
-   this is presentation only; the governed license/trademark copy below
-   stays exactly as-is, running text, the way a title block's own notes
-   area coexists with its stamped fields. Cities left, badges right,
-   reversing nothing from the 2026-07-06 decision — same order, new frame. */
+/* Cities left, badge(s) right (2026-07-06 operator decision — the badge
+   stays and is intentionally right-aligned, reversing the 2026-07-04
+   tight-grouping choice). Reverted 2026-07-11 from the Round 6 bordered
+   title-block treatment back to this floating-card layout per operator
+   instruction — the compartmentalized frame read worse than each element
+   (cities text, CC badge, PrivateGit badge) floating independently with
+   its own spacing. */
 .bim-footer__base-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: stretch;
-  gap: 0;
-  margin-bottom: 1.25rem;
-  border: 1px solid var(--bim-border-strong, #98A2B3);
-  border-radius: var(--bim-radius-sm, 4px);
-  overflow: hidden;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  margin-bottom: 1rem;
 }
 
 .bim-footer__cities {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.125rem;
-  padding: 0.625rem 1rem;
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--bim-fg-muted, #667085);
-  border-right: 1px solid var(--bim-border-strong, #98A2B3);
-}
-.bim-footer__cities::before {
-  content: "Office";
-  display: block;
-  font-family: var(--bim-font-mono);
-  font-size: 0.5625rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--bim-fg-faint, #5D6773);
 }
 .bim-footer__cities-inner { display: flex; align-items: center; gap: 0.625rem; }
 
@@ -995,19 +974,9 @@ h1, h2 {
 
 .bim-footer__badges {
   display: flex;
-  flex: 1 1 auto;
   flex-wrap: wrap;
-  gap: 0;
-  margin-left: auto;
+  gap: 0.5rem;
 }
-.bim-footer__badges > * {
-  border: none !important;
-  border-right: 1px solid var(--bim-border-strong, #98A2B3) !important;
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  transform: none !important;
-}
-.bim-footer__badges > *:last-child { border-right: none !important; }
 
 /* Card treatment (2026-07-09 audit): the CC-BY-ND and "Powered by PointSav"
    badges used to be the flattest thing on the page — ~4px radius (well,
