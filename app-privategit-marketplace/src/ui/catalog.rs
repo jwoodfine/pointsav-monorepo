@@ -197,6 +197,18 @@ fn catalog_style() -> Markup {
     html! { style { (PreEscaped(css)) } }
 }
 
+/// `SoftwareApplication` JSON-LD for `/software` (SEO — `BRIEF-seo-cross-site-strategy.md`
+/// "close total gaps" phase). Valid anywhere in the document, not just `<head>`, per
+/// Google's structured-data guidance, so this stays self-contained in the catalog markup
+/// rather than threading an optional parameter through `layout::render_page` for the one
+/// page that needs it.
+fn json_ld_script() -> Markup {
+    let json = r#"{"@context":"https://schema.org","@type":"SoftwareApplication","name":"PointSav Software Marketplace","applicationCategory":"BusinessApplication","provider":{"@type":"Organization","@id":"https://pointsav.com/#organization"}}"#;
+    html! {
+        script type="application/ld+json" { (PreEscaped(json)) }
+    }
+}
+
 /// Vanilla-JS active-state toggle for the shelf rail (`.sw-cat-rail a`). The rail links
 /// are plain in-page anchor jumps — without this, clicking "Commercial" or "Open Source"
 /// gives no visual feedback at all (only "All products" ever carried `.is-current`,
@@ -316,6 +328,7 @@ pub fn catalog_markup(catalog: &crate::Catalog, source_base_url: &str) -> Markup
 
     html! {
         (catalog_style())
+        (json_ld_script())
         div."sw-cat-wrap" {
             p."sw-cat-eyebrow" { "The Binary Library" }
             h1."sw-cat-intro" { "Products" }
@@ -453,6 +466,20 @@ mod tests {
         assert!(html.contains("v1.2.0"));
         assert!(html.contains("linux-x86_64"));
         assert!(html.contains("812 MB"));
+    }
+
+    #[test]
+    fn software_page_carries_valid_software_application_json_ld() {
+        let html = catalog_markup(&fixture(), BASE).into_string();
+        let start = html.find(r#"<script type="application/ld+json">"#).expect("JSON-LD script tag missing");
+        let after_open = &html[start..];
+        let json_start = after_open.find('>').unwrap() + 1;
+        let json_end = after_open.find("</script>").unwrap();
+        let json_text = &after_open[json_start..json_end];
+        let parsed: serde_json::Value =
+            serde_json::from_str(json_text).expect("JSON-LD must be valid JSON");
+        assert_eq!(parsed["@type"], "SoftwareApplication");
+        assert_eq!(parsed["@context"], "https://schema.org");
     }
 
     #[test]

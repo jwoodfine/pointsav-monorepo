@@ -312,7 +312,27 @@ pub fn footer(surface: SoftwareSurface) -> Markup {
 /// (e.g. the dynamic product catalog in `ui::catalog`). The `/software` route uses this
 /// so its cards can never drift from `products.yaml`. `/licensing` keeps using
 /// [`wrap_static_html`] because it is a static legal document, not catalog data.
-pub fn render_page(surface: SoftwareSurface, title: &str, content: Markup) -> Markup {
+/// Canonical public host — used to build `og:url`/`twitter:*`/`rel=canonical`
+/// absolute URLs. This is the real public site, not this dev host's `127.0.0.1`
+/// bind address (see `CLAUDE.md`'s foundry-prod/foundry-workspace split).
+const SITE_URL: &str = "https://software.pointsav.com";
+
+/// Site-default social preview image. **Open question, not silently resolved**:
+/// no real 1200×630 asset exists yet for this property (flagged by
+/// project-editorial's SEO draft) — this path is where one should land once
+/// produced; until then `og:image`/`twitter:image` point at a real, live URL
+/// that 404s honestly rather than a fabricated-looking placeholder path.
+const OG_IMAGE_PATH: &str = "/static/og-default.png";
+
+pub fn render_page(
+    surface: SoftwareSurface,
+    title: &str,
+    description: &str,
+    path: &str,
+    content: Markup,
+) -> Markup {
+    let url = format!("{SITE_URL}{path}");
+    let image = format!("{SITE_URL}{OG_IMAGE_PATH}");
     html! {
         (DOCTYPE)
         html lang="en" {
@@ -320,6 +340,18 @@ pub fn render_page(surface: SoftwareSurface, title: &str, content: Markup) -> Ma
                 meta charset="utf-8";
                 meta name="viewport" content="width=device-width, initial-scale=1";
                 title { (title) }
+                meta name="description" content=(description);
+                link rel="canonical" href=(url);
+                meta property="og:type" content="website";
+                meta property="og:site_name" content="PointSav Software";
+                meta property="og:title" content=(title);
+                meta property="og:description" content=(description);
+                meta property="og:url" content=(url);
+                meta property="og:image" content=(image);
+                meta name="twitter:card" content="summary";
+                meta name="twitter:title" content=(title);
+                meta name="twitter:description" content=(description);
+                meta name="twitter:image" content=(image);
                 (chrome_style())
             }
             body {
@@ -413,11 +445,25 @@ mod tests {
     #[test]
     fn render_page_wraps_content_in_full_chrome() {
         let page =
-            render_page(SURFACE, "Test Title", html! { p { "probe content" } }).into_string();
+            render_page(
+                SURFACE,
+                "Test Title",
+                "Test description",
+                "/test",
+                html! { p { "probe content" } },
+            )
+            .into_string();
 
         assert!(page.starts_with("<!DOCTYPE html>"));
         assert!(page.contains("<title>Test Title</title>"));
         assert!(page.contains("probe content"));
+
+        // SEO meta/OG/Twitter tags (BRIEF-seo-cross-site-strategy.md gap closure).
+        assert!(page.contains(r#"<meta name="description" content="Test description">"#));
+        assert!(page.contains(r#"<link rel="canonical" href="https://software.pointsav.com/test">"#));
+        assert!(page.contains(r#"<meta property="og:title" content="Test Title">"#));
+        assert!(page.contains(r#"<meta property="og:url" content="https://software.pointsav.com/test">"#));
+        assert!(page.contains(r#"<meta name="twitter:card" content="summary">"#));
 
         // Masthead markers.
         assert!(page.contains("sw-masthead"));
