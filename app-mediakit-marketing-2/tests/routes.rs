@@ -80,6 +80,55 @@ async fn get(app: &axum::Router, uri: &str) -> (StatusCode, String) {
 }
 
 #[tokio::test]
+async fn security_headers_present_on_every_response() {
+    let (_c, _s, app) = fixture("woodfine", false);
+    let response = app
+        .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let headers = response.headers();
+    assert_eq!(headers.get("x-content-type-options").unwrap(), "nosniff");
+    assert_eq!(headers.get("x-frame-options").unwrap(), "DENY");
+    assert_eq!(
+        headers.get("referrer-policy").unwrap(),
+        "strict-origin-when-cross-origin"
+    );
+    let csp = headers
+        .get("content-security-policy")
+        .unwrap()
+        .to_str()
+        .unwrap();
+    assert!(csp.contains("default-src 'self'"));
+    assert!(csp.contains("script-src 'self' 'nonce-"));
+    assert!(!csp.contains("script-src 'self' 'unsafe-inline'"));
+    assert!(csp.contains("frame-ancestors 'none'"));
+}
+
+#[tokio::test]
+async fn csp_nonce_matches_the_inline_json_ld_script_tag() {
+    let (_c, _s, app) = fixture("woodfine", false);
+    let response = app
+        .clone()
+        .oneshot(Request::builder().uri("/").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let csp = response
+        .headers()
+        .get("content-security-policy")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
+    let nonce = csp
+        .split("'nonce-")
+        .nth(1)
+        .and_then(|s| s.split('\'').next())
+        .expect("CSP header carries a nonce");
+    let (_status, body) = get(&app, "/").await;
+    assert!(body.contains(&format!(r#"nonce="{nonce}""#)));
+}
+
+#[tokio::test]
 async fn home_renders_with_no_bundler_dom_swap_pattern() {
     let (_c, _s, app) = fixture("woodfine", false);
     let (status, body) = get(&app, "/").await;

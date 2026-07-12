@@ -1103,6 +1103,7 @@ pub fn page_shell(
     en_path: &str,
     es_path: Option<&str>,
     google_verify: Option<&str>,
+    csp_nonce: &str,
 ) -> Markup {
     // Empty page.title (home pages only, by content-file convention) means
     // "this is the site's own front door" -- skip the "Page — Site" prefix
@@ -1166,7 +1167,7 @@ pub fn page_shell(
                 meta name="twitter:card" content="summary";
                 meta name="twitter:title" content=(page_title);
                 meta name="twitter:description" content=(page.description);
-                script type="application/ld+json" { (PreEscaped(&ld_json)) }
+                script type="application/ld+json" nonce=(csp_nonce) { (PreEscaped(&ld_json)) }
                 @if let Some(token) = google_verify {
                     meta name="google-site-verification" content=(token);
                 }
@@ -1288,15 +1289,7 @@ sections:
         )
         .unwrap();
         let page = load_page(dir.path(), "home", None).unwrap();
-        let html = page_shell(
-            &Tenant::woodfine(),
-            &page,
-            "woodfine",
-            "/",
-            Some("/es"),
-            None,
-        )
-        .into_string();
+        let html = page_shell(&Tenant::woodfine(), &page, "woodfine", "/", Some("/es"), None, "test-nonce").into_string();
         assert_eq!(html.matches("<h1").count(), 1);
         assert!(html.contains("<h2"));
     }
@@ -1321,7 +1314,7 @@ sections:
         )
         .unwrap();
         let page = load_page(dir.path(), "home", None).unwrap();
-        let html = page_shell(&Tenant::woodfine(), &page, "woodfine", "/", Some("/es"), None).into_string();
+        let html = page_shell(&Tenant::woodfine(), &page, "woodfine", "/", Some("/es"), None, "test-nonce").into_string();
         assert!(html.contains(r#"class="m-hero__cta" href="/page/contact""#));
         assert!(html.contains("Contact Us"));
     }
@@ -1346,7 +1339,7 @@ sections:
         )
         .unwrap();
         let page = load_page(dir.path(), "home", None).unwrap();
-        let html = page_shell(&Tenant::pointsav(), &page, "pointsav", "/", Some("/es"), None).into_string();
+        let html = page_shell(&Tenant::pointsav(), &page, "pointsav", "/", Some("/es"), None, "test-nonce").into_string();
         assert!(html.contains(r#"target="_blank""#));
         assert!(html.contains("m-card__link-glyph"));
     }
@@ -1362,7 +1355,7 @@ sections:
         )
         .unwrap();
         let page = load_page(dir.path(), "home", None).unwrap();
-        let html = page_shell(&Tenant::woodfine(), &page, "woodfine", "/", Some("/es"), None).into_string();
+        let html = page_shell(&Tenant::woodfine(), &page, "woodfine", "/", Some("/es"), None, "test-nonce").into_string();
         assert!(!html.contains("m-hero__cta"));
     }
 
@@ -1377,15 +1370,7 @@ sections:
         )
         .unwrap();
         let page = load_page(dir.path(), "home", None).unwrap();
-        let html = page_shell(
-            &Tenant::woodfine(),
-            &page,
-            "woodfine",
-            "/",
-            Some("/es"),
-            None,
-        )
-        .into_string();
+        let html = page_shell(&Tenant::woodfine(), &page, "woodfine", "/", Some("/es"), None, "test-nonce").into_string();
         assert!(!html.contains("__bundler"));
         assert!(html.contains("<!DOCTYPE html>"));
         assert!(html.contains(r#"lang="en""#));
