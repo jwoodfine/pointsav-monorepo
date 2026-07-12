@@ -150,6 +150,16 @@
   .bim-header__nav, .bim-header__search { display: none; }
   .bim-header__hamburger { display: inline-flex; }
 
+  /* With nav + search hidden, .bim-header__inner's flex-start layout (a
+     deliberate desktop choice — see bim-layout.css's own comment on why
+     space-between was rejected there) leaves only the brand and the
+     theme-toggle/hamburger group, which then sit side by side right next
+     to the brand instead of at the row's far edge. Right-justify just this
+     group on mobile — desktop's flex-start behavior is untouched. */
+  .bim-header__right {
+    margin-left: auto;
+  }
+
   /* Only render the backdrop/panel boxes when the <details> is open — a
      closed <details>'s non-<summary> children are already display:none per
      the UA stylesheet, but that default is easy to accidentally beat with

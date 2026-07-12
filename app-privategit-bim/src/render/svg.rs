@@ -963,7 +963,7 @@ pub fn render_method_zone_svg() -> String {
     let total_m = D_HABITAT_M + D_MAGAZINE_M + D_CORRIDOR_M; // 11.5
 
     let mut s = String::with_capacity(8192);
-    s.push_str("<svg class=\"bim-method-diagram\" viewBox=\"0 0 340 190\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Cross-section of a Key Plan's depth zones, measured from the facade inward: Habitat is the 6.0-metre daylight perimeter, Magazine the 3.5 metres of flexible depth behind it, and Corridor the 2.0-metre circulation strip at the interior edge — a chained dimension shows the three depths summing to 11.5 metres\">");
+    s.push_str("<svg class=\"bim-method-diagram\" viewBox=\"0 0 340 190\" xmlns=\"http://www.w3.org/2000/svg\" role=\"img\" aria-label=\"Cross-section of a Key Plan's depth zones, measured from the facade inward: Habitat is the 6.0-metre daylight perimeter, Magazine the 3.5 metres of flexible depth behind it, and Corridor the 2.0-metre circulation strip at the building centreline, where this Key Plan's zones mirror their twin from the opposite facade — a chained dimension shows the three depths summing to 11.5 metres\">");
     s.push_str("<rect width=\"340\" height=\"190\" fill=\"var(--bim-bg-surface)\"/>");
 
     // Zone washes first — the 0.9/0.55/0.25 opacity ramp is the daylight
@@ -1053,21 +1053,21 @@ pub fn render_method_zone_svg() -> String {
     // band-letter grammar; per-segment depths beside their own dimension
     // segments, unit carried once on the total.
     s.push_str(&format!(
-        "<text x=\"{cx:.1}\" y=\"15\" font-size=\"5.5\" fill=\"{caption}\" class=\"bim-plan-mono\" text-anchor=\"middle\" letter-spacing=\"1.1\">FACADE</text>\
-<text x=\"{cx:.1}\" y=\"176\" font-size=\"5.5\" fill=\"{caption}\" class=\"bim-plan-mono\" text-anchor=\"middle\" letter-spacing=\"1.1\">INTERIOR</text>\
-<text x=\"28\" y=\"{z1y:.1}\" font-size=\"5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--zone\" text-anchor=\"end\">H</text>\
-<text x=\"28\" y=\"{z2y:.1}\" font-size=\"5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--zone\" text-anchor=\"end\">M</text>\
-<text x=\"28\" y=\"{z3y:.1}\" font-size=\"5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--zone\" text-anchor=\"end\">C</text>\
-<text x=\"{cx:.1}\" y=\"{n1:.1}\" font-size=\"8\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">Habitat</text>\
-<text x=\"{cx:.1}\" y=\"{d1:.1}\" font-size=\"5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" letter-spacing=\"0.8\">{dhab:.1} M · DAYLIGHT PERIMETER</text>\
-<text x=\"{cx:.1}\" y=\"{n2:.1}\" font-size=\"8\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">Magazine</text>\
-<text x=\"{cx:.1}\" y=\"{d2:.1}\" font-size=\"5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" letter-spacing=\"0.8\">{dmag:.1} M · FLEXIBLE DEPTH</text>\
-<text x=\"{cx:.1}\" y=\"{n3:.1}\" font-size=\"8\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">Corridor</text>\
-<text x=\"{cx:.1}\" y=\"{d3:.1}\" font-size=\"5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" letter-spacing=\"0.8\">{dcor:.1} M · CIRCULATION</text>\
-<text x=\"{sx:.1}\" y=\"{s1y:.1}\" transform=\"rotate(-90 {sx:.1} {s1y:.1})\" font-size=\"6\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">{dhab:.1}</text>\
-<text x=\"{sx:.1}\" y=\"{s2y:.1}\" transform=\"rotate(-90 {sx:.1} {s2y:.1})\" font-size=\"6\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">{dmag:.1}</text>\
-<text x=\"{sx:.1}\" y=\"{s3y:.1}\" transform=\"rotate(-90 {sx:.1} {s3y:.1})\" font-size=\"6\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">{dcor:.1}</text>\
-<text x=\"{tx:.1}\" y=\"{mid_y:.1}\" transform=\"rotate(-90 {tx:.1} {mid_y:.1})\" font-size=\"7\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">{total_m:.1} m</text>",
+        "<text x=\"{cx:.1}\" y=\"15\" font-size=\"6.25\" fill=\"{caption}\" class=\"bim-plan-mono\" text-anchor=\"middle\" letter-spacing=\"1.1\">FACADE</text>\
+<text x=\"{cx:.1}\" y=\"176\" font-size=\"6.25\" fill=\"{caption}\" class=\"bim-plan-mono\" text-anchor=\"middle\" letter-spacing=\"1.1\">CENTRELINE</text>\
+<text x=\"28\" y=\"{z1y:.1}\" font-size=\"5.75\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--zone\" text-anchor=\"end\">H</text>\
+<text x=\"28\" y=\"{z2y:.1}\" font-size=\"5.75\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--zone\" text-anchor=\"end\">M</text>\
+<text x=\"28\" y=\"{z3y:.1}\" font-size=\"5.75\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--zone\" text-anchor=\"end\">C</text>\
+<text x=\"{cx:.1}\" y=\"{n1:.1}\" font-size=\"9\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">Habitat</text>\
+<text x=\"{cx:.1}\" y=\"{d1:.1}\" font-size=\"5.75\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" letter-spacing=\"0.8\">{dhab:.1} M · DAYLIGHT PERIMETER</text>\
+<text x=\"{cx:.1}\" y=\"{n2:.1}\" font-size=\"9\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">Magazine</text>\
+<text x=\"{cx:.1}\" y=\"{d2:.1}\" font-size=\"5.75\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" letter-spacing=\"0.8\">{dmag:.1} M · FLEXIBLE DEPTH</text>\
+<text x=\"{cx:.1}\" y=\"{n3:.1}\" font-size=\"9\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">Corridor</text>\
+<text x=\"{cx:.1}\" y=\"{d3:.1}\" font-size=\"5.75\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" letter-spacing=\"0.8\">{dcor:.1} M · CIRCULATION</text>\
+<text x=\"{sx:.1}\" y=\"{s1y:.1}\" transform=\"rotate(-90 {sx:.1} {s1y:.1})\" font-size=\"6.75\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">{dhab:.1}</text>\
+<text x=\"{sx:.1}\" y=\"{s2y:.1}\" transform=\"rotate(-90 {sx:.1} {s2y:.1})\" font-size=\"6.75\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">{dmag:.1}</text>\
+<text x=\"{sx:.1}\" y=\"{s3y:.1}\" transform=\"rotate(-90 {sx:.1} {s3y:.1})\" font-size=\"6.75\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">{dcor:.1}</text>\
+<text x=\"{tx:.1}\" y=\"{mid_y:.1}\" transform=\"rotate(-90 {tx:.1} {mid_y:.1})\" font-size=\"8\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">{total_m:.1} m</text>",
         z1y = (y0 + y1) / 2.0 + 2.0,   // 63.0
         z2y = (y1 + y2) / 2.0 + 2.0,   // 120.0
         z3y = (y2 + yb) / 2.0 + 2.0,   // 153.0
@@ -1205,15 +1205,15 @@ pub fn render_containment_model_svg() -> String {
     // the strip of space between its edge and the next frame in — because
     // the center of every frame is occupied by the frame it contains.
     s.push_str(&format!(
-        "<text x=\"24\" y=\"29\" font-size=\"7\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"start\" font-weight=\"600\">Building</text>\
-<text x=\"46\" y=\"49\" font-size=\"7\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"start\" font-weight=\"600\">Floor Plate</text>\
-<text x=\"68\" y=\"69\" font-size=\"7\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"start\" font-weight=\"600\">Tile</text>\
-<text x=\"90\" y=\"89\" font-size=\"7\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"start\" font-weight=\"600\">Key Plan</text>\
-<text x=\"180\" y=\"131.5\" font-size=\"7.5\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">Object</text>\
-<text x=\"180\" y=\"152\" font-size=\"4.5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" letter-spacing=\"1\">STANDALONE PART</text>\
-<text x=\"90\" y=\"11\" font-size=\"4.5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"start\" letter-spacing=\"0.8\">SAME STEP AT EVERY SCALE</text>\
-<text x=\"180\" y=\"268\" font-size=\"5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" letter-spacing=\"0.8\">FRAMES ARE PURE SPACE — EACH CONTAINS THE NEXT WITHOUT REMAINDER.</text>\
-<text x=\"180\" y=\"278\" font-size=\"5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" letter-spacing=\"0.8\">OBJECTS ARE STANDALONE PARTS — CONTAINED IN A KEY PLAN, NEVER AGGREGATED UPWARD.</text>"
+        "<text x=\"24\" y=\"29\" font-size=\"8\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"start\" font-weight=\"600\">Building</text>\
+<text x=\"46\" y=\"49\" font-size=\"8\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"start\" font-weight=\"600\">Floor Plate</text>\
+<text x=\"68\" y=\"69\" font-size=\"8\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"start\" font-weight=\"600\">Tile</text>\
+<text x=\"90\" y=\"89\" font-size=\"8\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"start\" font-weight=\"600\">Key Plan</text>\
+<text x=\"180\" y=\"131.5\" font-size=\"8.5\" fill=\"{pen}\" class=\"bim-plan-mono\" text-anchor=\"middle\" font-weight=\"600\">Object</text>\
+<text x=\"180\" y=\"152\" font-size=\"5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" letter-spacing=\"1\">STANDALONE PART</text>\
+<text x=\"90\" y=\"11\" font-size=\"5\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"start\" letter-spacing=\"0.8\">SAME STEP AT EVERY SCALE</text>\
+<text x=\"180\" y=\"268\" font-size=\"5.75\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" letter-spacing=\"0.7\">FRAMES ARE PURE SPACE — EACH CONTAINS THE NEXT WITHOUT REMAINDER.</text>\
+<text x=\"180\" y=\"278\" font-size=\"5.75\" fill=\"{caption}\" class=\"bim-plan-mono bim-plan-mono--dim\" text-anchor=\"middle\" letter-spacing=\"0.7\">OBJECTS ARE STANDALONE PARTS — CONTAINED IN A KEY PLAN, NEVER AGGREGATED UPWARD.</text>"
     ));
 
     s.push_str("</svg>");
