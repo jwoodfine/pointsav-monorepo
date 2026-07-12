@@ -25,6 +25,16 @@
   --bim-accent-hover:     #1D5795;  /* --m-navy-600 — link hover, focus ring */
   --bim-accent-subtle:    #E8EEF5;  /* --m-navy-100 — selection bg / navy wash / zone fills */
 
+  /* Round 10 (2026-07-11): theme-correct pen pair for diagram line-work.
+     --bim-accent/--bim-accent-active swap perceived hierarchy between
+     light and dark (accent-active is a near-white highlight in dark mode,
+     not a "secondary" step) — using them directly for primary/secondary
+     diagram strokes was the root cause of a real dark-mode contrast
+     failure (2.1:1, fails WCAG). Diagram code should use these aliases,
+     never the raw accent tokens, for line-work. */
+  --bim-pen-primary:      var(--bim-accent);
+  --bim-pen-secondary:    var(--bim-accent-active);
+
   --bim-fg:               #111827;  /* --m-ink-900 — body text on light */
   --bim-fg-secondary:     #54595D;  /* --m-ink-550 — muted text, captions, provenance lines */
   --bim-fg-muted:         #6B7280;  /* --m-ink-500 / --m-ink-muted — AA-safe small text on light */
@@ -106,6 +116,14 @@
   --bim-accent-active:    #B4C5D5;
   --bim-accent-hover:     #B4C5D5;  /* --m-slate-300 — brightened hover, still in-palette */
   --bim-accent-subtle:    rgba(29, 87, 149, 0.22);
+
+  /* Round 10 (2026-07-11): roles swap in dark mode — --bim-accent-active
+     (#B4C5D5) is the bright, high-contrast step here, not --bim-accent
+     (#1D5795), so the "primary" pen must point at the token that's
+     actually primary-weight in this theme. This is the fix for the
+     dark-mode diagram-text contrast failure. */
+  --bim-pen-primary:      var(--bim-accent-active);
+  --bim-pen-secondary:    var(--bim-accent);
 
   --bim-fg:               #B4C5D5;  /* --m-slate-300 — dark-mode ink + drawing line-work */
   --bim-fg-secondary:     #B4C5D5;
