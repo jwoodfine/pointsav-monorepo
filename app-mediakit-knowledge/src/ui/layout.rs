@@ -220,6 +220,12 @@ pub fn footer(tenant: Tenant) -> Markup {
     html! {
         footer."k-footer" role="contentinfo" {
             div."k-footer__inner" {
+                // Brand re-anchor — repeats the site identity once the masthead
+                // has scrolled off-screen on a long article.
+                div."k-footer__brand" {
+                    p."k-footer__brand-name" { (tenant.home_label()) }
+                    p."k-footer__brand-tagline" { (tenant.tagline()) }
+                }
                 div."k-footer__grid" {
                     div."k-footer__col" {
                         h2."k-footer__col-title" { "Browse" }
@@ -251,17 +257,12 @@ pub fn footer(tenant: Tenant) -> Markup {
                         }
                     }
                 }
-                // Base row — copyright + cities on the left, badges on the right.
+                // Base row — cities on the left, badges on the right.
                 div."k-footer__base" {
-                    div."k-footer__meta" {
-                        div."k-footer__cities" {
-                            @for (i, city) in tenant.cities().iter().enumerate() {
-                                @if i > 0 { span."k-footer__cities-sep" aria-hidden="true" { "|" } }
-                                span { (city) }
-                            }
-                        }
-                        p."k-footer__copyright" {
-                            "\u{00a9} 2026 " (tenant.copyright_holder())
+                    div."k-footer__cities" {
+                        @for (i, city) in tenant.cities().iter().enumerate() {
+                            @if i > 0 { span."k-footer__cities-sep" aria-hidden="true" { "|" } }
+                            span { (city) }
                         }
                     }
                     div."k-footer__badges" {
@@ -298,11 +299,17 @@ pub fn footer(tenant: Tenant) -> Markup {
                 }
                 // Persistent one-line disclaimer (always visible; the band expands it).
                 p."k-footer__disclaimer" { (tenant.disclaimer_line()) }
-                // Trademark notice — verbatim from canonical TRADEMARK.md. The marks
-                // are reserved independently of the CC BY 4.0 content licence, so no
-                // blanket "all rights reserved" (content is openly licensed).
-                p."k-footer__trademark" {
-                    "Woodfine Capital Projects\u{2122}, MCorp\u{2122}, PointSav Digital Systems\u{2122}, Totebox Orchestration\u{2122}, Totebox Archive\u{2122}, and Capability Geometry\u{2122} are trademarks of Woodfine Capital Projects Inc., used in Canada, the United States, Latin America, and Europe. All other trademarks are the property of their respective owners."
+                // Copyright + trademark — last.
+                div."k-footer__legal" {
+                    p."k-footer__copyright" {
+                        "\u{00a9} 2026 " (tenant.copyright_holder())
+                    }
+                    // Trademark notice — verbatim from canonical TRADEMARK.md. The marks
+                    // are reserved independently of the CC BY 4.0 content licence, so no
+                    // blanket "all rights reserved" (content is openly licensed).
+                    p."k-footer__trademark" {
+                        "Woodfine Capital Projects\u{2122}, MCorp\u{2122}, PointSav Digital Systems\u{2122}, Totebox Orchestration\u{2122}, Totebox Archive\u{2122}, and Capability Geometry\u{2122} are trademarks of Woodfine Capital Projects Inc., used in Canada, the United States, Latin America, and Europe. All other trademarks are the property of their respective owners."
+                    }
                 }
             }
         }
