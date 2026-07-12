@@ -22,6 +22,8 @@ use super::tokens;
 
 const SEARCH_ICON: &str = r##"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>"##;
 
+const HAMBURGER_ICON: &str = r##"<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" focusable="false"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>"##;
+
 const BADGE_GLYPH: &str = r##"<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 5.5A1.5 1.5 0 0 1 4.5 4h15A1.5 1.5 0 0 1 21 5.5v13A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5v-13zM6 8v8l3.2-2.4L6 8zm7 6.5h5V13h-5v1.5zm0-3h5V10h-5v1.5z"/></svg>"##;
 
 // ── Scoped chrome stylesheet ────────────────────────────────────────────────────
@@ -54,6 +56,11 @@ fn chrome_style() -> Markup {
 .sw-search__input{{flex:1;background:transparent;border:0;color:#fff;padding:8px 12px;font-size:13px;outline:none;}}
 .sw-search__input::placeholder{{color:rgba(255,255,255,.6);}}
 .sw-search__btn{{background:transparent;border:0;color:rgba(255,255,255,.85);padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;}}
+.sw-nav-toggle-input{{display:none;}}
+.sw-hamburger{{display:none;background:transparent;border:0;color:var(--sw-on-chrome);padding:6px;cursor:pointer;align-items:center;}}
+.sw-mobile-nav{{display:none;background:var(--sw-topnav-bg);}}
+.sw-mobile-nav a{{display:block;padding:12px 24px;color:var(--sw-on-chrome);text-decoration:none;font-size:14px;border-top:1px solid rgba(255,255,255,.12);}}
+.sw-mobile-nav a:hover{{background:rgba(255,255,255,.06);}}
 .sw-footer{{background:var(--sw-footer-bg);color:var(--sw-footer-fg);width:100%;}}
 .sw-footer__inner{{max-width:1280px;margin:0 auto;padding:48px 24px 28px;box-sizing:border-box;}}
 .sw-footer__top{{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:32px;}}
@@ -102,6 +109,8 @@ fn chrome_style() -> Markup {
 .sw-search{{display:none;}}
 .sw-masthead__inner{{gap:12px;}}
 .sw-footer__top{{grid-template-columns:1fr;gap:24px;}}
+.sw-hamburger{{display:inline-flex;margin-left:auto;}}
+.sw-nav-toggle-input:checked ~ .sw-mobile-nav{{display:flex;flex-direction:column;}}
 }}"#,
         topnav = tokens::TOPNAV_BG,
         on_chrome = tokens::ON_CHROME,
@@ -144,9 +153,17 @@ fn chrome_style() -> Markup {
 pub fn masthead(surface: SoftwareSurface) -> Markup {
     html! {
         header."sw-masthead" role="banner" {
+            // Pure-CSS off-canvas toggle (checkbox + general-sibling selector) — no
+            // JavaScript asset, matches this file's original intent (see the
+            // chrome-stylesheet doc comment above). Mobile-only (>768px hides both
+            // the hamburger and the panel via the same breakpoint `.sw-search` uses).
+            input."sw-nav-toggle-input" #"sw-nav-toggle" type="checkbox" aria-hidden="true";
             div."sw-masthead__inner" {
                 a."sw-wordmark" href="/" aria-label=(surface.home_label()) {
                     (surface.home_label())
+                }
+                label."sw-hamburger" for="sw-nav-toggle" aria-label="Menu" {
+                    (PreEscaped(HAMBURGER_ICON))
                 }
                 div."sw-search" {
                     form."sw-search__form" role="search" action="/software" method="get" {
@@ -159,6 +176,19 @@ pub fn masthead(surface: SoftwareSurface) -> Markup {
                         }
                     }
                 }
+            }
+            // Same 7 links as the footer's "Site" column — the only masthead-level
+            // path to Pricing/Licensing/Contact/Disclaimer/Privacy/Accessibility on
+            // mobile, where the footer is otherwise reachable only by scrolling to
+            // the bottom of the page.
+            nav."sw-mobile-nav" aria-label="Mobile navigation" {
+                a href="/software" { "Products" }
+                a href="/pricing" { "Pricing" }
+                a href="/licensing" { "Licensing" }
+                a href="/page/contact" { "Contact Us" }
+                a href="/page/disclaimer" { "Disclaimer" }
+                a href="/page/privacy" { "Privacy" }
+                a href="/page/accessibility" { "Accessibility" }
             }
         }
     }
@@ -199,6 +229,8 @@ pub fn footer(surface: SoftwareSurface) -> Markup {
                             li { a href="/licensing" { "Licensing" } }
                             li { a href="/page/contact" { "Contact Us" } }
                             li { a href="/page/disclaimer" { "Disclaimer" } }
+                            li { a href="/page/privacy" { "Privacy" } }
+                            li { a href="/page/accessibility" { "Accessibility" } }
                         }
                     }
                     div."sw-footer__col" {
@@ -514,6 +546,44 @@ mod tests {
         let c = page.find("probe content").unwrap();
         let f = page.find("<footer").unwrap();
         assert!(m < c && c < f, "chrome must bracket the content");
+    }
+
+    #[test]
+    fn masthead_mobile_nav_covers_every_page_unreachable_without_it() {
+        // Investigation this session confirmed Pricing/Licensing/Contact/Disclaimer/
+        // Privacy/Accessibility were unreachable from mobile except by scrolling to
+        // the footer (search collapses to nothing at <=768px, masthead had no nav at
+        // all). The hamburger drawer must carry the same links as the footer's Site
+        // column so nothing is orphaned on mobile.
+        let html = masthead(SURFACE).into_string();
+        assert!(html.contains(r#"class="sw-nav-toggle-input""#));
+        assert!(html.contains(r#"class="sw-hamburger""#));
+        assert!(html.contains(r#"class="sw-mobile-nav""#));
+        for href in [
+            "/software",
+            "/pricing",
+            "/licensing",
+            "/page/contact",
+            "/page/disclaimer",
+            "/page/privacy",
+            "/page/accessibility",
+        ] {
+            assert!(
+                html.contains(&format!("href=\"{href}\"")),
+                "mobile nav missing link to {href}"
+            );
+        }
+    }
+
+    #[test]
+    fn footer_site_column_links_privacy_and_accessibility() {
+        // Regression guard: an earlier cleanup pass removed a footer meta line that
+        // (unintentionally) was Privacy's only link anywhere on the site, and
+        // Accessibility had never been linked from the footer at all. Both must be
+        // reachable from the footer's Site column independent of the mobile nav.
+        let html = footer(SURFACE).into_string();
+        assert!(html.contains(r#"href="/page/privacy""#));
+        assert!(html.contains(r#"href="/page/accessibility""#));
     }
 
     #[test]
