@@ -10,11 +10,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use axum::extract::{Path as AxumPath, State};
-use axum::http::{header, HeaderName, HeaderValue};
+use axum::http::{header, HeaderName, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Json, Response};
 use axum::routing::{get, post};
 use axum::Router;
-use maud::Markup;
+use tower_http::compression::CompressionLayer;
 use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::config::Config;
@@ -133,37 +133,43 @@ async fn healthz() -> &'static str {
     "ok"
 }
 
-async fn home(State(state): State<AppState>) -> Result<Markup, MarketingError> {
+async fn home(State(state): State<AppState>) -> Response {
     render_slug(&state, "home", None)
 }
 
-async fn home_es(State(state): State<AppState>) -> Result<Markup, MarketingError> {
+async fn home_es(State(state): State<AppState>) -> Response {
     render_slug(&state, "home", Some("es"))
 }
 
-async fn page(
-    State(state): State<AppState>,
-    AxumPath(slug): AxumPath<String>,
-) -> Result<Markup, MarketingError> {
+async fn page(State(state): State<AppState>, AxumPath(slug): AxumPath<String>) -> Response {
     render_slug(&state, &slug, None)
 }
 
-async fn page_es(
-    State(state): State<AppState>,
-    AxumPath(slug): AxumPath<String>,
-) -> Result<Markup, MarketingError> {
+async fn page_es(State(state): State<AppState>, AxumPath(slug): AxumPath<String>) -> Response {
     render_slug(&state, &slug, Some("es"))
 }
 
-fn render_slug(
-    state: &AppStateInner,
-    slug: &str,
-    lang: Option<&str>,
-) -> Result<Markup, MarketingError> {
-    let page = content::load_page(&state.content_dir, slug, lang)?;
+fn render_slug(state: &AppStateInner, slug: &str, lang: Option<&str>) -> Response {
+    let page = match content::load_page(&state.content_dir, slug, lang) {
+        Ok(page) => page,
+        // Branded 404, not the bare-text default `MarketingError` response
+        // — audit finding. Other error variants (genuine server-side
+        // failures, not "this page doesn't exist") still fall through to
+        // the default response.
+        Err(MarketingError::PageNotFound(_)) => {
+            let tenant = Tenant::by_module_id(&state.module_id, &state.legal_tokens);
+            let page_lang = lang.unwrap_or("en");
+            return (
+                StatusCode::NOT_FOUND,
+                crate::ui::not_found_page(&tenant, page_lang),
+            )
+                .into_response();
+        }
+        Err(err) => return err.into_response(),
+    };
     let tenant = Tenant::by_module_id(&state.module_id, &state.legal_tokens);
     let (en_path, es_path) = slug_paths(slug);
-    Ok(page_shell(
+    page_shell(
         &tenant,
         &page,
         &state.module_id,
@@ -171,7 +177,8 @@ fn render_slug(
         es_path.as_deref(),
         state.google_verify.as_deref(),
         &state.csp_nonce,
-    ))
+    )
+    .into_response()
 }
 
 /// `home`'s ES variant lives at `/es` (not `/es/page/home`, since home

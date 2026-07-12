@@ -1048,12 +1048,20 @@ html:not(.js) .m-drawer-scrim {
 .m-footer__nav {
   display: flex;
   flex-direction: column;
-  gap: var(--m-space-2);
+  /* Was --m-space-2 (8px) — audit finding: with the 24px-tall links below,
+     that left only ~8px of gap between adjacent tappable targets. */
+  gap: var(--m-space-3);
 }
 .m-footer__nav a {
   color: var(--m-footer-link);
   text-decoration: none;
   font-size: var(--m-text-sm);
+  /* Audit finding: links measured 22px tall with no padding/min-height,
+     under the WCAG 2.5.8 24px touch-target minimum. display:inline-block
+     is needed for padding-block to actually take effect on an inline <a>. */
+  display: inline-block;
+  padding-block: 0.35rem;
+  min-block-size: 24px;
 }
 .m-footer__nav a:hover,
 .m-footer__nav a:focus-visible {
