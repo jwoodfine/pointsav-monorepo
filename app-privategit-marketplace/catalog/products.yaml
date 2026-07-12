@@ -2,15 +2,11 @@
 # SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
 
 installers:
-  - id: os-console
-    name: PointSav Console OS
-    description: Hosted application (Type II) — graphical terminal on existing OS
-    edition: "0.1.6"
-    platform: "Linux x86_64"
-    size_mb: 7
-    path: os-console/0.1.6
-    license_tier: agpl
-    price_usdc: 0
+  # os-console REMOVED 2026-07-12 — its deposited install.sh was found to leak real
+  # infrastructure details (a real GCE IP, real usernames, an embedded SSH-tunnel-back
+  # mechanism) into a publicly-reachable customer install script. Pulled from the
+  # catalog pending investigation — see NEXT.md. Do not re-add until the actual
+  # install.sh content is confirmed safe.
 
   - id: os-network-admin
     name: PointSav Network OS
