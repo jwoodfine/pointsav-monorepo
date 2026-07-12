@@ -164,7 +164,7 @@ fn catalog_style() -> Markup {
 .sw-cat-section__h{display:flex;align-items:baseline;gap:10px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#234ed8;margin:0 0 18px;padding-bottom:8px;border-bottom:2px solid #234ed8;}
 .sw-cat-section__count{color:#98a2b3;font-size:11px;letter-spacing:normal;text-transform:none;font-weight:400;}
 .sw-cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
-.sw-cat-card{border:1px solid #e4e7ec;border-radius:8px;padding:16px;display:flex;flex-direction:column;background:#fff;transition:border-color .12s ease,box-shadow .12s ease;}
+.sw-cat-card{min-width:0;border:1px solid #e4e7ec;border-radius:8px;padding:16px;display:flex;flex-direction:column;background:#fff;transition:border-color .12s ease,box-shadow .12s ease;}
 .sw-cat-card:hover{border-color:#b4c5d5;box-shadow:0 2px 8px rgba(22,70,121,.08);}
 .sw-cat-card__id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:#667085;letter-spacing:.02em;}
 .sw-cat-card__name{font-family:Georgia,"Times New Roman",serif;font-size:17px;line-height:1.2;color:#111827;margin:3px 0 6px;}
