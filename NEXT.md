@@ -178,5 +178,50 @@ should go for every maud-rendered page, vs. `licensing.html` needing its own dir
 Not implemented — new scope, awaiting either project-editorial's revised draft or an explicit
 ask to pick it up.
 
-- [ ] `[2026-07-12]` Implement the SEO pass (meta/OG/Twitter/JSON-LD/robots.txt/sitemap.xml)
-  once the draft is corrected or on explicit request — see mailbox thread above.
+- [x] `[2026-07-12]` SEO pass implemented — see below, this is now done.
+
+## 2026-07-12 — pre-production hardening pass (Command/foundry-prod handoff prep)
+
+Operator asked to fix the Tier-1 security/revenue blockers from
+`BRIEF-software-consolidated-service-audit.md` (not just report them), implement SEO,
+add mobile nav, then run a fresh full re-audit (code + genuine browser-in-the-loop via
+Playwright) before considering a Command handoff. See
+`.agent/briefs/BRIEF-software-handoff-readiness.md` for the full re-audit report.
+
+**Shipped this pass** (all with test coverage, 134 tests total across 3 crates):
+- [x] Path traversal in `release_path()` (S4, HIGH) — `is_safe_segment` gate + router-level tests
+- [x] Keypair self-test (S3) — `SIGNING_KEY_SECRET`/`VERIFY_KEY_PUB` fingerprint comparison at startup
+- [x] tool-wallet price/product-matching bug (R-blocker-1) — live catalog lookup replaces dead `PRICE_MAP`
+- [x] os-console catalog edition/size/platform alignment (S1)
+- [x] Full SEO — meta/OG/Twitter/JSON-LD/robots.txt/sitemap.xml (project-editorial's draft corrected + implemented)
+- [x] Mobile hamburger nav (7 links, matches footer Site column) + fixed 2 orphaned pages (`/page/privacy`, `/page/accessibility`)
+- [x] Re-audit found + fixed: `Box::leak` memory leak, path disclosure in 404 bodies, `is_safe_segment` NUL/control-char gap, hamburger keyboard-inaccessibility (WCAG 2.1.1 — checkbox pattern replaced with a real `<button>`)
+- [x] Both crates' READMEs rewritten (were describing a nonexistent scaffold / wrong port + phantom env vars)
+
+**SECURITY — found during this pass, not part of the plan:**
+- [ ] `[2026-07-12 HIGH]` **os-console's deposited `install.sh` leaked real infrastructure
+  details** — a real GCE IP (`34.53.65.203`), real usernames (`mathew`, `jennifer`),
+  `tenant = "woodfine"`, and an embedded SSH-tunnel-back mechanism, all in a
+  publicly-reachable customer install script. Localhost: quarantined (moved, not deleted,
+  to `/var/lib/local-software/quarantine/os-console-install.sh.leaked-20260712-161358`),
+  `os-console` pulled from the catalog (commit `6077da3c`). **Flagged to Command as HIGH
+  priority (msg-id `command-20260712-urgent-os-console-install-sh-may-leak-re`) — NOT YET
+  VERIFIED whether the same file is deposited on foundry-prod (the real public site).**
+  Do not re-add `os-console` to the catalog until the actual script content is rewritten
+  and confirmed safe — this session did not investigate where the leaking script came
+  from or author a replacement.
+
+**Still open (from the re-audit, "safe to schedule after handoff"):**
+- [ ] `og:image`/`twitter:image` reference `/static/og-default.png`, which doesn't exist —
+  every page's social share card is currently broken. Needs a real 1200×630 asset;
+  flagged, not fabricated.
+- [ ] Before any real foundry-prod push: confirm prod's systemd units set
+  `SOURCE_BIND=127.0.0.1:9201` (source defaults to test port 19201) and `VERIFY_KEY_PUB`
+  on the marketplace unit (so the keypair self-test actually runs there instead of
+  silently `Skipped`) — config verification, Command's domain, not this archive's code.
+- [ ] Chromed 404/500 + router `.fallback()` (M2); order-pending auto-refresh (M3);
+  desktop masthead product nav (M4 remainder); per-version MANIFEST dead route + the
+  product-detail SHA-fetch's hardcoded absolute URL tripping CSP on non-prod hosts
+  (S2/M10, sharpened this pass); rate limiting; Range/caching headers; RwLock poison
+  handling; unified error schema; product-detail JSON-LD/BreadcrumbList; sitemap
+  product-page entries. Full list with severity in the readiness BRIEF.
