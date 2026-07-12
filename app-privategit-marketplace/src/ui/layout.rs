@@ -78,6 +78,7 @@ body{{font-family:"Inter","Sans Fallback",system-ui,-apple-system,"Segoe UI",Ari
 .sw-lang-switch{{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;color:var(--sw-on-chrome);text-decoration:none;font-size:13px;white-space:nowrap;padding:6px 10px;border:1px solid rgba(255,255,255,.18);border-radius:6px;}}
 .sw-lang-switch:hover,.sw-lang-switch:focus-visible{{border-color:rgba(255,255,255,.4);}}
 .sw-lang-switch__glyph{{width:14px;height:14px;flex-shrink:0;}}
+.sw-lang-switch--drawer{{margin:12px 24px;align-self:flex-start;}}
 .sw-hamburger{{display:none;background:transparent;border:0;color:var(--sw-on-chrome);padding:6px;cursor:pointer;align-items:center;}}
 .sw-hamburger:focus-visible{{outline:2px solid #fff;outline-offset:2px;}}
 .sw-mobile-nav{{display:none;background:var(--sw-topnav-bg);}}
@@ -119,7 +120,7 @@ body{{font-family:"Inter","Sans Fallback",system-ui,-apple-system,"Segoe UI",Ari
 .sw-footer__badge-label{{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--sw-footer-fg-muted);}}
 .sw-footer__badge-name{{font-size:12px;font-weight:600;color:var(--sw-footer-fg);}}
 .sw-footer__legal{{margin-top:20px;padding-top:18px;border-top:1px solid var(--sw-footer-divider);font-size:11.5px;line-height:1.6;}}
-.sw-footer__copyright{{color:var(--sw-footer-fg-muted);margin:0 0 8px;}}
+.sw-footer__copyright{{color:var(--sw-footer-fg-muted);margin:0 0 12px;}}
 .sw-footer__trademark{{margin:0;color:var(--sw-footer-fg-muted);max-width:80ch;}}
 .sw-legal{{max-width:70ch;margin:0 auto;padding:40px 24px 64px;line-height:1.65;}}
 .sw-legal h1{{font-family:Georgia,"Times New Roman",serif;font-size:32px;margin:0 0 8px;}}
@@ -133,6 +134,8 @@ body{{font-family:"Inter","Sans Fallback",system-ui,-apple-system,"Segoe UI",Ari
 .sw-footer__top{{grid-template-columns:1fr;gap:24px;}}
 .sw-hamburger{{display:inline-flex;margin-left:auto;}}
 .sw-mobile-nav.sw-mobile-nav--open{{display:flex;flex-direction:column;}}
+.sw-lang-switch:not(.sw-lang-switch--drawer){{padding:6px;}}
+.sw-lang-switch:not(.sw-lang-switch--drawer) .sw-lang-switch__label{{display:none;}}
 }}"#,
         topnav = tokens::TOPNAV_BG,
         on_chrome = tokens::ON_CHROME,
@@ -202,7 +205,12 @@ pub fn masthead(surface: SoftwareSurface, lang: Lang, lang_toggle_href: &str) ->
                 // in this row — two competing auto-margins on adjacent siblings is
                 // exactly the mobile-overflow bug home.pointsav.com's own CSS
                 // comment documents having to fix after shipping this pattern first.
-                (lang_switch(lang, lang_toggle_href))
+                // Collapses to icon-only below 768px (its text label hidden via CSS,
+                // `chrome_style`'s `.sw-lang-switch__label` mobile rule) — verified
+                // live, home.pointsav.com does the same at its own breakpoint. The
+                // full-label version reappears inside the drawer below for a bigger,
+                // labeled mobile tap target, matching that site's masthead/drawer split.
+                (lang_switch(lang, lang_toggle_href, false))
                 // Real <button>, not a checkbox+label: natively focusable and
                 // Enter/Space-activatable with no extra JS, and can carry
                 // aria-expanded/aria-controls correctly. A pure-CSS checkbox
@@ -230,6 +238,10 @@ pub fn masthead(surface: SoftwareSurface, lang: Lang, lang_toggle_href: &str) ->
                 a href="/page/disclaimer" { (nav.disclaimer) }
                 a href="/page/privacy" { (nav.privacy) }
                 a href="/page/accessibility" { (nav.accessibility) }
+                // Labeled duplicate of the masthead's icon-only pill — same
+                // masthead-collapses/drawer-keeps-label split verified live on
+                // home.pointsav.com (`.m-drawer .m-lang-switch`).
+                (lang_switch(lang, lang_toggle_href, true))
             }
             (mobile_nav_script())
         }
