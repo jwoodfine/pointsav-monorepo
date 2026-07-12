@@ -828,6 +828,9 @@ async fn software_page(State(state): State<Arc<AppState>>) -> Response {
             let body = ui::render_page(
                 SoftwareSurface::Marketplace,
                 "Products — PointSav Software",
+                "Browse PointSav's software catalog — licensed binaries, release packages, \
+                 and installation manifests for the PointSav platform's applications and tooling.",
+                "/software",
                 content,
             )
             .into_string();
@@ -867,6 +870,9 @@ async fn pricing_page(State(state): State<Arc<AppState>>) -> Response {
             let body = ui::render_page(
                 SoftwareSurface::Marketplace,
                 "Pricing — PointSav Software",
+                "License pricing and tier structure for PointSav software — Proprietary, FSL, \
+                 AGPL, and Apache tiers, currently free during public BETA.",
+                "/pricing",
                 content,
             )
             .into_string();
@@ -897,6 +903,9 @@ async fn disclaimer_page() -> Response {
     let body = ui::render_page(
         SoftwareSurface::Marketplace,
         "Disclaimer — PointSav Software",
+        "Legal disclaimer for software.pointsav.com — no warranty, licensing terms, and \
+         payment/jurisdictional notices for PointSav software purchases.",
+        "/page/disclaimer",
         ui::disclaimer_markup(),
     )
     .into_string();
@@ -913,6 +922,8 @@ async fn privacy_page() -> Response {
     let body = ui::render_page(
         SoftwareSurface::Marketplace,
         "Privacy — PointSav Software",
+        "Privacy policy for software.pointsav.com — what data this site collects and how it's used.",
+        "/page/privacy",
         ui::privacy_markup(),
     )
     .into_string();
@@ -929,12 +940,55 @@ async fn accessibility_page() -> Response {
     let body = ui::render_page(
         SoftwareSurface::Marketplace,
         "Accessibility — PointSav Software",
+        "Accessibility statement for software.pointsav.com.",
+        "/page/accessibility",
         ui::accessibility_markup(),
     )
     .into_string();
     (
         StatusCode::OK,
         [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
+        body,
+    )
+        .into_response()
+}
+
+// GET /robots.txt (SEO — BRIEF-seo-cross-site-strategy.md). Allows everything except the
+// JSON `/v1/*` API surface, which is not indexable content.
+async fn robots_txt() -> Response {
+    let body = "User-agent: *\nAllow: /\nDisallow: /v1/\nSitemap: https://software.pointsav.com/sitemap.xml\n";
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
+        body,
+    )
+        .into_response()
+}
+
+// GET /sitemap.xml (SEO). Lists only this crate's real HTML pages — never `/v1/*`, and
+// never `app-privategit-source`'s `/releases/*`/`/git/*` (a different service entirely,
+// streams binaries/manifests only, no HTML to index).
+async fn sitemap_xml() -> Response {
+    let pages = [
+        "/",
+        "/software",
+        "/pricing",
+        "/licensing",
+        "/page/contact",
+        "/page/disclaimer",
+        "/page/privacy",
+        "/page/accessibility",
+    ];
+    let urls: String = pages
+        .iter()
+        .map(|p| format!("  <url><loc>https://software.pointsav.com{p}</loc></url>\n"))
+        .collect();
+    let body = format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n{urls}</urlset>\n"
+    );
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "application/xml; charset=utf-8")],
         body,
     )
         .into_response()
@@ -947,6 +1001,9 @@ async fn contact_page() -> Response {
     let body = ui::render_page(
         SoftwareSurface::Marketplace,
         "Contact us — PointSav Software",
+        "Contact PointSav Digital Systems for support with software licenses, downloads, \
+         and security disclosures.",
+        "/page/contact",
         ui::contact_markup(),
     )
     .into_string();
@@ -971,6 +1028,11 @@ async fn product_detail_page(
                 let body = ui::render_page(
                     SoftwareSurface::Marketplace,
                     &format!("{} — PointSav Software", installer.name),
+                    &format!(
+                        "{} — {} Licensed binary download, install command, and version/checksum details.",
+                        installer.name, installer.description
+                    ),
+                    &format!("/software/{}", installer.id),
                     content,
                 )
                 .into_string();
@@ -1180,6 +1242,8 @@ async fn checkout_page(
                 let body = ui::render_page(
                     SoftwareSurface::Marketplace,
                     &format!("Checkout — {} — PointSav Software", installer.name),
+                    &format!("Pay with Polygon USDC to mint a license for {}.", installer.name),
+                    &format!("/checkout/{}", installer.id),
                     content,
                 )
                 .into_string();
@@ -1251,6 +1315,8 @@ async fn order_status_page(
     let body = ui::render_page(
         SoftwareSurface::Marketplace,
         "Order status — PointSav Software",
+        "Check a PointSav software purchase by transaction hash.",
+        &format!("/order/{tx_hash}"),
         content,
     )
     .into_string();
@@ -1394,6 +1460,8 @@ async fn main() -> Result<()> {
         .route("/page/privacy", get(privacy_page))
         .route("/page/accessibility", get(accessibility_page))
         .route("/page/contact", get(contact_page))
+        .route("/robots.txt", get(robots_txt))
+        .route("/sitemap.xml", get(sitemap_xml))
         .route("/healthz", get(healthz))
         .route("/v1/products", get(v1_products))
         .route("/v1/license/:tx_hash", get(v1_license))
@@ -2801,5 +2869,37 @@ esac
         // P1 contract: 302 Found (NOT axum Redirect::to's 303).
         assert_eq!(resp.status(), StatusCode::FOUND);
         assert_eq!(resp.headers().get(header::LOCATION).unwrap(), "/software");
+    }
+
+    // ── SEO: /robots.txt + /sitemap.xml (BRIEF-seo-cross-site-strategy.md) ────────
+
+    #[tokio::test]
+    async fn robots_txt_disallows_v1_api_and_points_at_sitemap() {
+        let resp = robots_txt().await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers().get(header::CONTENT_TYPE).unwrap(),
+            "text/plain; charset=utf-8"
+        );
+        let body = body_text(resp.into_body()).await;
+        assert!(body.contains("Disallow: /v1/"));
+        assert!(body.contains("Sitemap: https://software.pointsav.com/sitemap.xml"));
+    }
+
+    #[tokio::test]
+    async fn sitemap_xml_lists_html_pages_only_not_v1_or_source_routes() {
+        let resp = sitemap_xml().await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers().get(header::CONTENT_TYPE).unwrap(),
+            "application/xml; charset=utf-8"
+        );
+        let body = body_text(resp.into_body()).await;
+        assert!(body.contains("<loc>https://software.pointsav.com/software</loc>"));
+        assert!(body.contains("<loc>https://software.pointsav.com/licensing</loc>"));
+        assert!(body.contains("<loc>https://software.pointsav.com/page/contact</loc>"));
+        assert!(!body.contains("/v1/"));
+        assert!(!body.contains("/releases/"));
+        assert!(!body.contains("/git/"));
     }
 }
