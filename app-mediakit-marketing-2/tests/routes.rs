@@ -201,6 +201,31 @@ async fn missing_page_returns_404() {
 }
 
 #[tokio::test]
+async fn missing_page_404_is_branded_not_bare_text() {
+    // Audit finding: the 404 used to be a bare unstyled string that echoed
+    // the raw requested slug and leaked the internal "page.yaml" filename.
+    let (_c, _s, app) = fixture("woodfine", false);
+    let (status, body) = get(&app, "/page/does-not-exist-xyz").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(body.starts_with("<!DOCTYPE html>"));
+    assert!(body.contains("Page not found"));
+    // The masthead/footer chrome renders (proof it went through the real
+    // chassis, not a bare string) — spot-check a footer-only marker.
+    assert!(body.contains("m-footer"));
+    // No reflected request content, no internal filename leak.
+    assert!(!body.contains("does-not-exist-xyz"));
+    assert!(!body.contains("page.yaml"));
+}
+
+#[tokio::test]
+async fn missing_page_404_localizes_to_spanish() {
+    let (_c, _s, app) = fixture("woodfine", false);
+    let (status, body) = get(&app, "/es/page/does-not-exist-xyz").await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(body.contains("Página no encontrada"));
+}
+
+#[tokio::test]
 async fn healthz_returns_ok() {
     let (_c, _s, app) = fixture("woodfine", false);
     let (status, body) = get(&app, "/healthz").await;

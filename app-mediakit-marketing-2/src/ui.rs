@@ -1224,6 +1224,56 @@ pub fn page_shell(
     }
 }
 
+/// Branded 404 page — reuses the same masthead/footer chrome as every real
+/// page. Audit finding: the previous 404 response was a bare, unstyled
+/// string ("page not found: <slug> (page.yaml)") with no masthead, footer,
+/// or brand identity, and it echoed the raw requested path while exposing
+/// the internal content-store filename. This deliberately does not include
+/// either — no reflected request content, no implementation detail.
+pub fn not_found_page(tenant: &Tenant, lang: &str) -> Markup {
+    html! {
+        (DOCTYPE)
+        html lang=(lang) data-brand=(tenant.module_id) {
+            head {
+                meta charset="utf-8";
+                meta name="viewport" content="width=device-width, initial-scale=1";
+                title { (t(lang, "Page not found", "Página no encontrada")) " \u{2014} " (tenant.site_title) }
+                meta name="robots" content="noindex, follow";
+                link rel="icon" type="image/svg+xml" href=(tenant.favicon_href);
+                link rel="stylesheet" href="/static/tokens.css";
+                link rel="stylesheet" href="/static/fonts.css";
+                link rel="stylesheet" href="/static/app.css";
+            }
+            body {
+                a.m-skiplink href="#m-main" { (t(lang, "Skip to content", "Saltar al contenido")) }
+                (masthead(tenant, lang))
+                main #m-main {
+                    section.m-hero {
+                        div.m-hero__inner {
+                            h1.m-hero__headline { (t(lang, "Page not found", "Página no encontrada")) }
+                            p.m-hero__subhead {
+                                (t(
+                                    lang,
+                                    "The page you're looking for doesn't exist or may have moved.",
+                                    "La página que busca no existe o puede haberse movido.",
+                                ))
+                            }
+                            p {
+                                a href="/" {
+                                    (t(lang, "Go to homepage", "Ir a la página de inicio"))
+                                }
+                            }
+                        }
+                    }
+                }
+                (footer(tenant, lang))
+                (drawer(tenant, lang))
+                script src="/static/app.js" {}
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
