@@ -87,14 +87,96 @@ drift itself. Replaced with real content 2026-07-11.
 
 - [ ] `[2026-07-11]` Tier 1: path traversal fix + router-level integration test
   (`release_path()` in `app-privategit-source`).
-- [ ] `[2026-07-11]` Tier 1: `SIGNING_KEY_SECRET` env-var rename in the
-  marketplace systemd unit + a startup keypair-match self-test across both
-  services.
+- [ ] `[2026-07-12]` Tier 1: `SIGNING_KEY_SECRET` env-var rename in the
+  marketplace systemd unit — **operator asked for this fix 2026-07-12; command
+  drafted (`sed` rename of `LICENSE_SIGNING_KEY` → `SIGNING_KEY_SECRET` in
+  `wallet.conf` + daemon-reload + restart) but not yet confirmed run** — verify
+  `wallet.conf` before assuming this is closed. Startup keypair-match self-test
+  across both services still separately open regardless.
 - [ ] `[2026-07-11]` Tier 1: real per-tier pricing + fix the amount→product
   matching bug it currently masks, before BETA lifts (also guard the
   empty-wallet-address invoice render).
 - [ ] `[2026-07-11]` Tier 1: align `os-console`'s catalog `edition` with a real
   deposited version (or mint downloads through `/latest/`).
 - [ ] `[2026-07-11]` Tier 2–4 items (chromed error pages, per-version MANIFEST
-  fix, Contact-page city hardcoding, masthead nav, README rewrite, etc.) — full
-  list in the BRIEF's Prioritized Gap List, tiers 2–4.
+  fix, masthead nav, README rewrite, etc.) — full list in the BRIEF's
+  Prioritized Gap List, tiers 2–4. **Contact-page city hardcoding closed
+  2026-07-12** (see below) — struck from this list.
+
+## 2026-07-12 — live-review UI fixes (operator-reported)
+
+Five concrete issues found via the operator's own visual review of the marketplace, fixed in
+`app-privategit-marketplace/src/ui/`:
+
+- [x] Shelf-rail "Commercial"/"Open Source" links gave no click feedback — worse, `href="#commercial"`
+  had no matching `id` anywhere (dead anchor; only "Open Source" actually jumped). Added
+  `id="commercial"` to the shelf wrapper and a small click-toggle script for `.is-current`
+  (`catalog.rs`).
+- [x] `/licensing` didn't match other pages' typography — `wrap_static_html()` never added the
+  `.sw-legal` class its column/heading CSS is scoped to. Added `class="sw-legal"` to
+  `static/licensing.html`'s `<main>` (one line, only call site).
+- [x] Contact + Disclaimer pages each duplicated the shared footer's copyright/trademark block
+  (and Contact's copy was additionally stale — "Vancouver · New York · Berlin" vs. the footer's
+  current Vancouver/New York). Removed both trailing blocks; footer already renders this once,
+  correctly, on every page.
+- [x] Footer's "Contact us · Disclaimer · Privacy" line removed (redundant with nav higher up);
+  "Powered by PrivateGit" badge right-justified via a new wrapper div, not a global flex change.
+
+**Correction during this work**: initially suspected "MCorp™" in `surface.rs`'s `trademark_line()`
+was a factual error vs. `legal-tokens-pointsav.yaml`. Checked the actual authoritative
+`TRADEMARK.md` directly — "MCorp™" is confirmed correct and deliberate (TRADEMARK.md's own
+canonical short-form notice names it explicitly). The YAML's rendered `statement` field is what's
+actually incomplete (drops 2 of 6 marks vs. its own `owned` list and vs. TRADEMARK.md) — flagged
+to Command/project-editorial (msg-id `command-20260712-fyi-follow-up-legal-tokens-pointsav-yaml`),
+not fixed here. Runtime legal-tokens consumption in `surface.rs` deliberately **not** wired up
+this session — holding until the YAML itself is confirmed correct, so as not to wire in a
+regression.
+
+- [ ] `[2026-07-12]` Follow-up once Command/project-editorial resolve the YAML question: wire
+  `app-privategit-marketplace` to read `legal-tokens-pointsav.yaml` for copyright/trademark text
+  at runtime (env `LEGAL_TOKENS_PATH`, fallback to hardcoded values on missing/unparseable file).
+
+### Browser-in-the-loop responsive audit (Playwright, mobile/tablet/desktop) — done, found 3 more real bugs
+
+All 9 marketplace pages screenshotted at 375/768/1440px. Confirmed the 5 fixes above render
+correctly, and found 3 additional real bugs the code-only review missed:
+
+- [x] **Mobile/tablet horizontal overflow on `/software`** (whole page rendered at 809px on a
+  375px viewport). Root cause: `.sw-cat-cmd__text` (flex item, `white-space:nowrap`) and
+  `.sw-cat-card` (CSS Grid item) both lacked `min-width:0` — flex/grid items default to
+  `min-width:auto` (their content's intrinsic width), which is exactly what causes this class of
+  overflow. Two one-line fixes (`catalog.rs`); verified via a standalone test instance on a
+  separate port (not the live service) that `document.documentElement.scrollWidth` now matches
+  the viewport exactly at all 3 sizes, zero overflowing elements.
+- [x] **Product-detail page (`/software/:id`) install-command box and badges were completely
+  unstyled** — `product_detail_style()` never defined `.sw-cat-cmd`/`.sw-cat-badge*` at all
+  (raw text, default browser button). Added the missing rules (`product_detail.rs`).
+- [x] **`/licensing` was still stuck at a fixed 1440px regardless of viewport** even after the
+  chrome-class fix above — turned out the live server was reading a completely different,
+  ancient (1216-line, May-17, hardcoded `viewport width=1440`) deployed copy at
+  `/var/lib/local-software/static/licensing.html`, not the 91-line git-tracked current file —
+  same "deployed data vs. git source" drift class as the `products.yaml` catalog bug found
+  earlier this session. Redeployed the correct file.
+
+Commits: `defd3bfc` (5 UI fixes + product-detail styles + licensing static-file content),
+`485a607a` (grid min-width fix). All 76 tests pass throughout.
+
+## 2026-07-12 — SEO draft from project-editorial needs correction, not applied
+
+`totebox@project-editorial` staged an SEO draft (msg-id
+`project-editorial-20260712-seo-draft-ready-software-pointsav-com-br`, Opus+Fable reviewed,
+part of `BRIEF-seo-cross-site-strategy.md`) targeting `app-privategit-marketplace/static/products.html`
+and a `/products` route — **neither exists**. This crate's ground-up rewrite replaced the static-
+HTML-per-page architecture the draft assumes; real routes are `/`, `/software`,
+`/software/:product_id`, `/licensing` (still a static file), `/pricing`, `/page/*`. The draft's
+actual intent (meta description/OG/Twitter tags, JSON-LD, `robots.txt`, `sitemap.xml` — all
+genuinely missing) is sound and matches a gap this session's own audit flagged (rubric SEO
+fail in `BRIEF-software-consolidated-service-audit.md`). Corrected ground truth sent back
+(msg-id `command-20260712-re-seo-draft-ready-software-pointsav-com`), including that
+`layout.rs`'s `render_page()` (line 315) is the single shared head-builder where meta tags
+should go for every maud-rendered page, vs. `licensing.html` needing its own direct edit.
+Not implemented — new scope, awaiting either project-editorial's revised draft or an explicit
+ask to pick it up.
+
+- [ ] `[2026-07-12]` Implement the SEO pass (meta/OG/Twitter/JSON-LD/robots.txt/sitemap.xml)
+  once the draft is corrected or on explicit request — see mailbox thread above.
