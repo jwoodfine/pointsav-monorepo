@@ -161,6 +161,7 @@ fn catalog_style() -> Markup {
 .sw-cat-rail a.is-current{background:#eef3ff;color:#234ed8;font-weight:600;}
 .sw-cat-rail__count{color:#98a2b3;font-size:12px;}
 .sw-cat-section{margin:0 0 48px;}
+.sw-cat-section:last-child{margin-bottom:0;}
 .sw-cat-section__h{display:flex;align-items:baseline;gap:10px;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#234ed8;margin:0 0 18px;padding-bottom:8px;border-bottom:2px solid #234ed8;}
 .sw-cat-section__count{color:#98a2b3;font-size:11px;letter-spacing:normal;text-transform:none;font-weight:400;}
 .sw-cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:16px;}
