@@ -8,10 +8,14 @@ lang: en
 sections:
   - type: hero
     headline: A fully transferable data management platform
+    # Non-breaking hyphen (U+2011) in "lock-in" — audit finding: at 1440px
+    # the subhead wrapped as "...No vendor lock-" / "in.", stranding a
+    # two-character orphan on its own line. U+2011 keeps the word from
+    # breaking there without changing how it reads.
     subhead: >-
       PointSav Digital Systems builds customer-controlled software for independent
       property operators. Runs on hardware you control. No per-seat fees.
-      No vendor lock-in.
+      No vendor lock‑in.
     cta_label: Explore the Documentation
     cta_href: https://documentation.pointsav.com/
 
