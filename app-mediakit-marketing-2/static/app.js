@@ -14,6 +14,32 @@
   var closeButtons = document.querySelectorAll("[data-m-drawer-toggle]");
   if (!drawer || !scrim) return;
 
+  // Audit finding: drawer declared aria-modal="true" but nothing actually
+  // trapped focus or hid the background — a keyboard user tabbing past the
+  // last drawer link landed on the (visually hidden) page behind the scrim,
+  // and a screen reader could still reach content the aria-modal contract
+  // claims is inert. `inert` (broadly supported; a no-op, not an error, on
+  // browsers that predate it) makes the background genuinely unreachable to
+  // both keyboard and assistive tech while the drawer is open.
+  var inertTargets = document.querySelectorAll(".m-skiplink, .m-masthead, #m-main, .m-footer");
+
+  function trapTabKey(event) {
+    if (event.key !== "Tab") return;
+    var focusable = drawer.querySelectorAll(
+      "a[href], button:not([disabled]), [tabindex]:not([tabindex='-1'])"
+    );
+    if (!focusable.length) return;
+    var first = focusable[0];
+    var last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   function openDrawer() {
     drawer.hidden = false;
     // Force layout so the transform transition runs from translateX(-100%).
@@ -22,6 +48,10 @@
     scrim.setAttribute("data-open", "");
     if (burger) burger.setAttribute("aria-expanded", "true");
     document.body.style.overflow = "hidden";
+    inertTargets.forEach(function (el) {
+      el.setAttribute("inert", "");
+    });
+    drawer.addEventListener("keydown", trapTabKey);
     var firstLink = drawer.querySelector("a, button");
     if (firstLink) firstLink.focus();
   }
@@ -31,6 +61,10 @@
     scrim.removeAttribute("data-open");
     if (burger) burger.setAttribute("aria-expanded", "false");
     document.body.style.overflow = "";
+    inertTargets.forEach(function (el) {
+      el.removeAttribute("inert");
+    });
+    drawer.removeEventListener("keydown", trapTabKey);
     window.setTimeout(function () {
       if (!drawer.hasAttribute("data-open")) drawer.hidden = true;
     }, 300); // matches --m-dur-slow

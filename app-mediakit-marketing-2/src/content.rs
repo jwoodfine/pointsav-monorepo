@@ -148,7 +148,15 @@ pub fn render_markdown(body: &str) -> String {
     options.extension.table = true;
     options.extension.strikethrough = true;
     options.extension.autolink = true;
-    comrak::markdown_to_html(body, &options)
+    let html = comrak::markdown_to_html(body, &options);
+    // Audit finding: GFM table header cells rendered as bare <th>, no
+    // scope="col" — a robustness gap for older assistive tech (most modern
+    // AT infers column headers from <thead> position, so this wasn't an
+    // outright AA failure, but explicit scope removes the ambiguity).
+    // comrak's table extension only ever emits <th> for the header row (no
+    // row-header/scope="row" support), so every <th> it produces is safely
+    // a column header — a blanket replace is correct, not just convenient.
+    html.replace("<th>", "<th scope=\"col\">")
 }
 
 #[cfg(test)]
@@ -325,6 +333,16 @@ sections:
         assert!(html.contains("<strong>bold</strong>"));
         assert!(html.contains("<del>strike</del>"));
         assert!(html.contains("<a href=\"https://example.com\""));
+    }
+
+    #[test]
+    fn table_header_cells_get_scope_col() {
+        let html = render_markdown("| Jurisdiction | Framework |\n|---|---|\n| Canada | NI 45-106 |\n");
+        assert!(html.contains("<th scope=\"col\">Jurisdiction</th>"));
+        assert!(html.contains("<th scope=\"col\">Framework</th>"));
+        // Body cells are <td>, never <th> — must not gain a scope attribute.
+        assert!(!html.contains("<td scope"));
+        assert!(html.contains("<td>Canada</td>"));
     }
 
     #[test]
