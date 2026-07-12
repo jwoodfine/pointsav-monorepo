@@ -42,12 +42,25 @@ fn fixture(module_id: &str, enable_mcp: bool) -> (TempDir, TempDir, axum::Router
     )
     .unwrap();
 
+    // Synthetic legal-tokens fixture — same isolation philosophy as
+    // content_dir/state_dir above: this test suite never depends on the
+    // real factory-release-engineering checkout. build_state() reads the
+    // file once and stores the parsed struct, so the tempdir can be dropped
+    // as soon as this function returns.
+    let legal_tokens_dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        legal_tokens_dir.path().join(format!("legal-tokens-{module_id}.yaml")),
+        "schema: foundry-legal-tokens-v1\nbrand: test\ncopyright:\n  holder: \"Test Holder Inc.\"\n  year_current: 2026\nwebsite:\n  footer_trademark_en: \"Test Mark\u{2122} is a trademark of Test Holder Inc.\"\n  footer_trademark_es: \"Test Mark\u{2122} es una marca comercial de Test Holder Inc.\"\n",
+    )
+    .unwrap();
+
     let cfg = Config {
         content_dir: content_dir.path().to_path_buf(),
         state_dir: state_dir.path().to_path_buf(),
         module_id: module_id.to_string(),
         site_title: None,
         tokens_css_path: None,
+        legal_tokens_dir: legal_tokens_dir.path().to_path_buf(),
         bind: "127.0.0.1:0".parse().unwrap(),
         enable_mcp,
     };

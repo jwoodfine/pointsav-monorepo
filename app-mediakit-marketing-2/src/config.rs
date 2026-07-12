@@ -51,6 +51,17 @@ pub enum Command {
         #[arg(long, env = "SERVICE_MARKETING_TOKENS_CSS")]
         tokens_css: Option<PathBuf>,
 
+        /// Directory holding `legal-tokens-<module_id>.yaml` — the canonical
+        /// trademark/copyright facts from factory-release-engineering. The
+        /// chrome's footer copyright/trademark lines are loaded from here at
+        /// startup instead of being hardcoded.
+        #[arg(
+            long,
+            env = "SERVICE_MARKETING_LEGAL_TOKENS_DIR",
+            default_value = "/srv/foundry/vendor/factory-release-engineering/tokens"
+        )]
+        legal_tokens_dir: PathBuf,
+
         /// HTTP bind address.
         #[arg(long, env = "SERVICE_MARKETING_BIND", default_value = "127.0.0.1:9102")]
         bind: SocketAddr,
@@ -83,6 +94,9 @@ pub struct Config {
     /// Optional external DTCG tokens.css (Style-Dictionary output). Falls
     /// back to the built-in tokens when absent/unreadable.
     pub tokens_css_path: Option<PathBuf>,
+    /// Directory holding `legal-tokens-<module_id>.yaml` (canonical
+    /// trademark/copyright facts).
+    pub legal_tokens_dir: PathBuf,
     /// HTTP bind address.
     pub bind: SocketAddr,
     /// Mount the MCP JSON-RPC endpoint at `POST /api/mcp` (P5).

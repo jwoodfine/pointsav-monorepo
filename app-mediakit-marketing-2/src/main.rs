@@ -29,6 +29,7 @@ async fn main() -> anyhow::Result<()> {
             module_id,
             site_title,
             tokens_css,
+            legal_tokens_dir,
             bind,
             enable_mcp,
         } => {
@@ -38,6 +39,7 @@ async fn main() -> anyhow::Result<()> {
                 module_id,
                 site_title,
                 tokens_css_path: tokens_css,
+                legal_tokens_dir,
                 bind,
                 enable_mcp,
             })

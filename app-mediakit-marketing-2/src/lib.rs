@@ -8,18 +8,20 @@
 //! retired engine used, preserved here as a contract, not as reused code.
 //!
 //! Module map (grows phase by phase — see the plan of record):
-//!   config   — CLI/env config (P0)
-//!   assets   — embedded static/ (P0)
-//!   error    — MarketingError + response mapping (P0)
-//!   app      — AppState + axum Router (P0, grows each phase)
-//!   content  — section-manifest load/validate/render (P1)
-//!   ui       — chrome shell + section rendering (P2/P3)
+//!   config       — CLI/env config (P0)
+//!   assets       — embedded static/ (P0)
+//!   error        — MarketingError + response mapping (P0)
+//!   app          — AppState + axum Router (P0, grows each phase)
+//!   content      — section-manifest load/validate/render (P1)
+//!   ui           — chrome shell + section rendering (P2/P3)
+//!   legal_tokens — canonical trademark/copyright loader (factory-release-engineering)
 
 pub mod app;
 pub mod assets;
 pub mod config;
 pub mod content;
 pub mod error;
+pub mod legal_tokens;
 pub mod mcp;
 pub mod pending;
 pub mod ui;
