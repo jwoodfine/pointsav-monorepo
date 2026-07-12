@@ -11,7 +11,7 @@ use axum::{
 };
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::Utc;
-use ed25519_dalek::{Signer, SigningKey};
+use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -703,6 +703,89 @@ fn load_signing_key(val: &str) -> Option<SigningKey> {
     Some(SigningKey::from_bytes(&arr))
 }
 
+/// Same hex-seed-or-file-path convention as `load_signing_key`, but for the
+/// public counterpart — used only by the startup keypair self-test below, not
+/// by any request-handling path.
+fn load_verify_key_for_selftest(val: &str) -> Option<VerifyingKey> {
+    let hex_str = if val.len() == 64 && val.chars().all(|c| c.is_ascii_hexdigit()) {
+        val.to_string()
+    } else {
+        fs::read_to_string(val).ok()?.trim().to_string()
+    };
+    let bytes = hex::decode(&hex_str).ok()?;
+    let arr: [u8; 32] = bytes.try_into().ok()?;
+    VerifyingKey::from_bytes(&arr).ok()
+}
+
+/// Startup keypair self-test (`BRIEF-software-consolidated-service-audit.md` S3):
+/// a mismatch between this marketplace's `SIGNING_KEY_SECRET` and
+/// `app-privategit-source-2`'s `VERIFY_KEY_PUB` today produces no error at
+/// all — every minted download token fails verification with a uniform 401,
+/// indistinguishable from an actual attack. If the operator has ALSO provided
+/// this process a `VERIFY_KEY_PUB` value (the same one configured on the
+/// source server — both processes typically run on the same host), compare
+/// fingerprints directly and fail loudly on mismatch rather than staying
+/// silent until the first real customer download fails.
+/// Outcome of `keypair_selftest_check` — returned rather than logged directly so
+/// the comparison logic is unit-testable without mutating process-global env vars.
+#[derive(Debug, PartialEq, Eq)]
+enum KeypairSelftestOutcome {
+    Skipped,
+    Invalid,
+    Match,
+    Mismatch { actual: String, expected: String },
+}
+
+fn keypair_selftest_check(signing_key: &SigningKey, verify_key_pub: Option<&str>) -> KeypairSelftestOutcome {
+    let Some(expected) = verify_key_pub else {
+        return KeypairSelftestOutcome::Skipped;
+    };
+    let Some(expected_vk) = load_verify_key_for_selftest(expected) else {
+        return KeypairSelftestOutcome::Invalid;
+    };
+    let actual_vk = signing_key.verifying_key();
+    if actual_vk.to_bytes() == expected_vk.to_bytes() {
+        KeypairSelftestOutcome::Match
+    } else {
+        KeypairSelftestOutcome::Mismatch {
+            actual: hex::encode(actual_vk.to_bytes()),
+            expected: hex::encode(expected_vk.to_bytes()),
+        }
+    }
+}
+
+/// Startup keypair self-test (`BRIEF-software-consolidated-service-audit.md` S3):
+/// a mismatch between this marketplace's `SIGNING_KEY_SECRET` and
+/// `app-privategit-source-2`'s `VERIFY_KEY_PUB` today produces no error at
+/// all — every minted download token fails verification with a uniform 401,
+/// indistinguishable from an actual attack. If the operator has ALSO provided
+/// this process a `VERIFY_KEY_PUB` value (the same one configured on the
+/// source server — both processes typically run on the same host), compare
+/// fingerprints directly and fail loudly on mismatch rather than staying
+/// silent until the first real customer download fails.
+fn keypair_selftest(signing_key: &SigningKey) {
+    let verify_key_pub = std::env::var("VERIFY_KEY_PUB").ok();
+    match keypair_selftest_check(signing_key, verify_key_pub.as_deref()) {
+        KeypairSelftestOutcome::Skipped => {
+            tracing::info!("keypair self-test skipped — VERIFY_KEY_PUB not provided to this process");
+        }
+        KeypairSelftestOutcome::Invalid => {
+            tracing::error!("keypair self-test FAILED — VERIFY_KEY_PUB set but unreadable/invalid");
+        }
+        KeypairSelftestOutcome::Match => {
+            tracing::info!("keypair self-test passed — SIGNING_KEY_SECRET matches VERIFY_KEY_PUB");
+        }
+        KeypairSelftestOutcome::Mismatch { actual, expected } => {
+            tracing::error!(
+                %actual,
+                %expected,
+                "keypair self-test FAILED — SIGNING_KEY_SECRET does not match VERIFY_KEY_PUB; \
+                 every download this marketplace mints will fail verification on the source server"
+            );
+        }
+    }
+}
+
 /// Mint a fresh download-auth token for `product_id`, valid through the end of
 /// today (see module doc above). The hardcoded `"linux-x86_64"` platform and
 /// single `"binary"` entitlement are known simplifications for this phase — real
@@ -1274,6 +1357,8 @@ async fn main() -> Result<()> {
         .and_then(|path| load_signing_key(&path));
     if signing_key.is_none() {
         tracing::warn!("SIGNING_KEY_SECRET not set — /order/:tx_hash/download will return 503");
+    } else if let Some(sk) = &signing_key {
+        keypair_selftest(sk);
     }
     let tx_log_path = PathBuf::from(
         std::env::var("TX_LOG_PATH")
@@ -1443,6 +1528,50 @@ esac
     /// two crates' test fixtures could interoperate if ever cross-checked.
     fn test_signing_key() -> SigningKey {
         SigningKey::from_bytes(&[42u8; 32])
+    }
+
+    /// A second, different keypair — for keypair-self-test mismatch cases.
+    fn other_signing_key() -> SigningKey {
+        SigningKey::from_bytes(&[43u8; 32])
+    }
+
+    #[test]
+    fn keypair_selftest_skipped_when_verify_key_pub_absent() {
+        assert_eq!(
+            keypair_selftest_check(&test_signing_key(), None),
+            KeypairSelftestOutcome::Skipped
+        );
+    }
+
+    #[test]
+    fn keypair_selftest_invalid_when_verify_key_pub_unreadable() {
+        assert_eq!(
+            keypair_selftest_check(&test_signing_key(), Some("not-hex-and-not-a-file")),
+            KeypairSelftestOutcome::Invalid
+        );
+    }
+
+    #[test]
+    fn keypair_selftest_matches_when_keys_correspond() {
+        let sk = test_signing_key();
+        let hex_vk = hex::encode(sk.verifying_key().to_bytes());
+        assert_eq!(
+            keypair_selftest_check(&sk, Some(&hex_vk)),
+            KeypairSelftestOutcome::Match
+        );
+    }
+
+    #[test]
+    fn keypair_selftest_mismatch_when_keys_differ() {
+        let sk = test_signing_key();
+        let wrong_hex_vk = hex::encode(other_signing_key().verifying_key().to_bytes());
+        match keypair_selftest_check(&sk, Some(&wrong_hex_vk)) {
+            KeypairSelftestOutcome::Mismatch { actual, expected } => {
+                assert_eq!(actual, hex::encode(sk.verifying_key().to_bytes()));
+                assert_eq!(expected, wrong_hex_vk);
+            }
+            other => panic!("expected Mismatch, got {other:?}"),
+        }
     }
 
     fn test_state(scratch: &std::path::Path, tool_wallet_bin: String) -> Arc<AppState> {
