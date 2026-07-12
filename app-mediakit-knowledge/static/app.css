@@ -573,6 +573,20 @@ button:disabled { cursor: default; }
   margin-inline: auto;
   padding: var(--k-gutter-lg) var(--k-gutter) var(--k-gutter);
 }
+.k-footer__brand {
+  margin-bottom: var(--k-gutter-lg);
+}
+.k-footer__brand-name {
+  margin: 0;
+  font-weight: var(--k-weight-semibold);
+  font-size: var(--k-text-sm);
+  color: var(--k-ink);
+}
+.k-footer__brand-tagline {
+  margin: var(--k-space-1) 0 0;
+  color: var(--k-ink-muted);
+  font-size: var(--k-text-xs);
+}
 .k-footer__grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -706,7 +720,8 @@ button:disabled { cursor: default; }
   align-items: center;
   gap: var(--k-space-3);
   font-weight: var(--k-weight-medium);
-  letter-spacing: var(--k-tracking-wide);
+  text-transform: uppercase;
+  letter-spacing: var(--k-tracking-caps);
   color: var(--k-ink-secondary);
 }
 .k-footer__cities-sep { color: var(--k-border); }
