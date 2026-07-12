@@ -456,14 +456,25 @@
      the white hover/focus state. */
   --m-masthead-ink-muted: #d5deea;
 
-  --m-hero-band-bg:        var(--m-slate-300);
-  --m-hero-band-ink:       var(--m-ink-900);
-  --m-hero-band-ink-muted: var(--m-ink-700);  /* 5.3:1 on slate — fixes a live contrast failure */
-  --m-hero-band-rule:      rgba(17, 24, 39, 0.25);
-  --m-hero-scrim: linear-gradient(180deg,
-                    rgb(180 197 213 / 0.0) 45%,
-                    rgb(180 197 213 / 0.55) 100%);
-  --m-focus-ring-hero:     var(--m-navy-800);
+  /* Full brand-blue hero, matching Woodfine's full-navy hero — audit
+     finding 2026-07-11: the pale-slate hero below (2026-07-01 production-
+     recon keep-list decision) left PointSav's single largest above-the-fold
+     surface carrying no brand color at all, with #234ed8 confined to the
+     57px masthead. Both the visual-brand and Fable passes flagged this
+     independently; operator confirmed replacing it rather than keeping the
+     slate. Values mirror Woodfine's own hero block above ([data-brand=
+     "woodfine"]) — same shape, PointSav's own navy-700 (#234ed8), EXCEPT
+     ink-muted: Woodfine's slate-300 passes AA on its darker navy-700
+     (#164679, 5.4:1) but measures the same failing ~3.77:1 on PointSav's
+     brighter #234ed8 that --m-masthead-ink-muted just above was fixed for —
+     reusing that same #d5deea override here instead of copying slate-300
+     verbatim, so the hero subhead doesn't ship the identical contrast bug
+     one override up. */
+  --m-hero-band-bg:        var(--m-navy-700);
+  --m-hero-band-ink:       var(--m-white);
+  --m-hero-band-ink-muted: #d5deea;
+  --m-hero-band-rule:      rgba(255, 255, 255, 0.28);
+  --m-focus-ring-hero:     var(--m-white);
 }
 
 /* ================================================================ motion safety */
