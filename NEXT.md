@@ -4,6 +4,33 @@ This file previously read as a pointer to "pointsav-monorepo/NEXT.md" — but th
 archive's root IS the monorepo (per `CLAUDE.md`), so that pointer was circular/stale
 drift itself. Replaced with real content 2026-07-11.
 
+## HIGH — 2026-07-13 — nested `pointsav-monorepo/` sub-clone diverged from archive root
+
+`self-service-promote.sh` has a hard-coded preference for the nested `pointsav-monorepo/`
+sub-clone whenever one exists (added 2026-07-08, correct at the time). As of today that
+preference is wrong: the nested clone's `cluster/project-software` HEAD (`60c2c412`) has
+diverged from and fallen behind `origin/cluster/project-software` (current tip `617f087b`
+is not even an ancestor of the nested clone's history), while the **archive root** is a
+clean, non-diverged continuation of origin containing a full session's real work (13
+commits, Spanish localization + masthead fixes) the nested clone never received. Running
+the script twice this session silently pushed the nested clone's stale content to both
+staging mirrors and wrote a `promote-queue.jsonl` entry citing the wrong HEAD.
+
+Flagged to Command (msg-id `command-20260713-correction-my-earlier-foundry-prod-reque`) —
+not resolved here. A manual corrective push from the archive root was correctly blocked
+by the destructive-action classifier as a pipeline bypass.
+
+- [ ] Get archive-root HEAD (`20db27a6`, real code up to `c1572659`) onto the staging
+  mirrors — the actual prerequisite for this session's Spanish localization/masthead
+  batch to ever reach foundry-prod.
+- [ ] `self-service-promote.sh`'s nested-clone-always-wins heuristic needs revisiting —
+  see `~/.claude/projects/.../memory/project_software_p8_cutover_and_stage6_pattern.md`
+  for the full before/after. Which repo is "the real one" can flip over time; the script
+  should probably check merge-base against origin rather than hard-coding a preference.
+- [ ] Worth checking whether other archives with a nested `pointsav-monorepo/` sub-clone
+  (project-marketing, project-design per this archive's own `.gitignore` comment) have
+  hit or could hit the same divergence.
+
 ## Drift flagged 2026-07-11 (sync + localhost catalog fix session)
 
 - [ ] `[2026-07-11 totebox@claude-code]` **CLAUDE.md stale claim**: this archive's
