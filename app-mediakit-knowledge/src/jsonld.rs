@@ -166,7 +166,15 @@ mod tests {
     #[test]
     fn article_jsonld_omits_absent_optional_fields() {
         let v = article_jsonld(
-            "Minimal", "https://x/wiki/minimal", "", None, None, None, &[], &[], "PointSav",
+            "Minimal",
+            "https://x/wiki/minimal",
+            "",
+            None,
+            None,
+            None,
+            &[],
+            &[],
+            "PointSav",
         );
         assert!(v.get("dateModified").is_none());
         assert!(v.get("description").is_none());
@@ -192,7 +200,13 @@ mod tests {
 
     #[test]
     fn breadcrumb_jsonld_without_category_has_two_items() {
-        let v = breadcrumb_jsonld("https://x/", "Home", None, "Special Page", "https://x/special/foo");
+        let v = breadcrumb_jsonld(
+            "https://x/",
+            "Home",
+            None,
+            "Special Page",
+            "https://x/special/foo",
+        );
         assert_eq!(v["itemListElement"].as_array().unwrap().len(), 2);
     }
 
