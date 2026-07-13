@@ -39,7 +39,10 @@ const MAX_BODY_BYTES: usize = 10 * 1024 * 1024;
 /// `JoinHandle` is intentionally not awaited by the caller (the task runs
 /// for the service's lifetime); callers that want graceful shutdown can
 /// abort it explicitly via the handle.
-pub fn spawn_scheduler(store: ClaimStore, registry: CitationRegistry) -> tokio::task::JoinHandle<()> {
+pub fn spawn_scheduler(
+    store: ClaimStore,
+    registry: CitationRegistry,
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         // Redirects disabled deliberately (SSRF hardening): a citation URL
         // that later starts 30x-redirecting to an internal/metadata host
@@ -78,7 +81,10 @@ pub async fn run_sweep(client: &reqwest::Client, store: &ClaimStore, registry: &
             return;
         }
     };
-    tracing::info!("citation verification sweep: checking {} cited source(s)", cited_ids.len());
+    tracing::info!(
+        "citation verification sweep: checking {} cited source(s)",
+        cited_ids.len()
+    );
     for citation_id in cited_ids {
         let Some(entry) = registry.get(&citation_id) else {
             // Cited by a claim but not (or no longer) in citations.yaml —
@@ -88,7 +94,9 @@ pub async fn run_sweep(client: &reqwest::Client, store: &ClaimStore, registry: &
         };
         let verification = verify_one(client, &citation_id, &entry.url, store).await;
         if let Err(e) = store.record_verification(&verification) {
-            tracing::error!("citation verification sweep: failed to record result for {citation_id}: {e}");
+            tracing::error!(
+                "citation verification sweep: failed to record result for {citation_id}: {e}"
+            );
         }
         if verification.status == VerificationStatus::Drifted {
             tracing::warn!("citation drift detected: {citation_id} ({})", entry.url);
@@ -105,7 +113,12 @@ pub async fn run_sweep(client: &reqwest::Client, store: &ClaimStore, registry: &
 /// fetching (the client itself also has redirects disabled — see
 /// `spawn_scheduler` — so a same-host response can't smuggle a second hop
 /// past this check).
-async fn verify_one(client: &reqwest::Client, citation_id: &str, url: &str, store: &ClaimStore) -> CitationVerification {
+async fn verify_one(
+    client: &reqwest::Client,
+    citation_id: &str,
+    url: &str,
+    store: &ClaimStore,
+) -> CitationVerification {
     let now = now_iso();
     let previous_hash = store
         .get_verification(citation_id)
@@ -122,7 +135,9 @@ async fn verify_one(client: &reqwest::Client, citation_id: &str, url: &str, stor
     };
 
     if !is_safe_url(url).await {
-        tracing::warn!("citation verification: rejecting unsafe/unresolvable URL for {citation_id}: {url}");
+        tracing::warn!(
+            "citation verification: rejecting unsafe/unresolvable URL for {citation_id}: {url}"
+        );
         return unreachable(now);
     }
 
@@ -169,11 +184,15 @@ async fn read_capped_body(resp: reqwest::Response) -> Option<Vec<u8>> {
 /// a public (non-private, non-loopback, non-link-local, non-metadata)
 /// address. Resolution failure (including an unparseable URL) is unsafe.
 async fn is_safe_url(url: &str) -> bool {
-    let Ok(parsed) = reqwest::Url::parse(url) else { return false };
+    let Ok(parsed) = reqwest::Url::parse(url) else {
+        return false;
+    };
     if parsed.scheme() != "http" && parsed.scheme() != "https" {
         return false;
     }
-    let Some(host) = parsed.host_str().map(str::to_owned) else { return false };
+    let Some(host) = parsed.host_str().map(str::to_owned) else {
+        return false;
+    };
     let port = parsed.port_or_known_default().unwrap_or(443);
     let lookup = tokio::net::lookup_host((host.as_str(), port)).await;
     let result = match lookup {
@@ -293,7 +312,13 @@ mod tests {
             .timeout(Duration::from_millis(500))
             .build()
             .unwrap();
-        let v = verify_one(&client, "test-cite", "http://127.0.0.1.invalid.example/nope", &store).await;
+        let v = verify_one(
+            &client,
+            "test-cite",
+            "http://127.0.0.1.invalid.example/nope",
+            &store,
+        )
+        .await;
         assert_eq!(v.status, VerificationStatus::Unreachable);
         assert!(v.content_hash.is_none());
     }
@@ -388,7 +413,10 @@ mod tests {
         let addr = spawn_one_shot_http_server(b"hello world".to_vec()).await;
         let client = reqwest::Client::builder().build().unwrap();
         let resp = client.get(format!("http://{addr}/")).send().await.unwrap();
-        assert_eq!(read_capped_body(resp).await.unwrap(), b"hello world".to_vec());
+        assert_eq!(
+            read_capped_body(resp).await.unwrap(),
+            b"hello world".to_vec()
+        );
     }
 
     #[tokio::test]
@@ -397,6 +425,9 @@ mod tests {
         let addr = spawn_one_shot_http_server(oversized).await;
         let client = reqwest::Client::builder().build().unwrap();
         let resp = client.get(format!("http://{addr}/")).send().await.unwrap();
-        assert!(read_capped_body(resp).await.is_none(), "oversized body should be rejected, not buffered");
+        assert!(
+            read_capped_body(resp).await.is_none(),
+            "oversized body should be rejected, not buffered"
+        );
     }
 }

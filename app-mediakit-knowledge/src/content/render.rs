@@ -101,7 +101,6 @@ pub struct Heading {
 }
 
 /// Render a Markdown body to HTML, resolving wikilinks and collecting headings.
-#[allow(deprecated)] // extension.header_ids is deprecated but still the id source
 pub fn render(body_md: &str) -> Rendered {
     let with_links = resolve_wikilinks(body_md);
 
@@ -111,14 +110,24 @@ pub fn render(body_md: &str) -> Rendered {
     opts.extension.autolink = true;
     opts.extension.tasklist = true;
     opts.extension.footnotes = true;
-    opts.extension.header_ids = Some(String::new());
+    // `header_ids` was renamed `header_id_prefix` (comrak 0.52) — the old
+    // field is deprecated and, confirmed live, no longer actually emits an
+    // `id` attribute at all (every heading came back with `id=""` until
+    // this was caught by a test failure). Empty prefix matches the
+    // pre-rename behavior (no prefix on generated ids).
+    opts.extension.header_id_prefix = Some(String::new());
     opts.render.r#unsafe = true; // content is trusted (Git-authored, reviewed)
 
     let mut plugins = Plugins::default();
     plugins.render.codefence_syntax_highlighter = Some(highlighter());
 
     let html = markdown_to_html_with_plugins(&with_links, &opts, &plugins);
-    let headings = extract_headings(&with_links);
+    // Extract headings from comrak's own rendered output (not by re-deriving
+    // ids from raw markdown) — comrak's Anchorizer disambiguates duplicate
+    // headings with numeric suffixes and strips inline markup differently
+    // than a naive slugify, so a separately-computed id silently diverges
+    // from the id actually present in the HTML the TOC links point at.
+    let headings = extract_headings_from_html(&html);
     Rendered { html, headings }
 }
 
@@ -167,7 +176,18 @@ fn resolve_wikilinks(md: &str) -> String {
                     out.push('[');
                     out.push_str(label);
                     out.push_str("](");
-                    out.push_str(&href);
+                    // CommonMark link destinations may not contain an
+                    // unescaped space unless wrapped in angle brackets — a
+                    // human-readable target like `[[Zero Container
+                    // Inference]]` would otherwise render as literal text,
+                    // not a link.
+                    if href.contains(' ') {
+                        out.push('<');
+                        out.push_str(&href);
+                        out.push('>');
+                    } else {
+                        out.push_str(&href);
+                    }
                     out.push(')');
                     i = i + 2 + close + 2;
                     continue;
@@ -191,34 +211,83 @@ fn utf8_len(b: u8) -> usize {
     }
 }
 
-/// Extract ATX headings of level 2 and 3 from Markdown source, computing the
-/// same id comrak would (via `header_ids`).
-fn extract_headings(md: &str) -> Vec<Heading> {
+/// Extract level-2/3 headings directly from comrak's rendered HTML — the
+/// `id` on each `<h2>`/`<h3>` is whatever comrak's `header_ids` Anchorizer
+/// actually assigned (including its numeric-suffix disambiguation for
+/// duplicate headings), and `text` is the tag's inner content with any
+/// nested markup (inline code, links) stripped and HTML entities decoded.
+fn extract_headings_from_html(html: &str) -> Vec<Heading> {
     let mut headings = Vec::new();
-    let mut in_fence = false;
-    for line in md.lines() {
-        let t = line.trim_start();
-        if t.starts_with("```") || t.starts_with("~~~") {
-            in_fence = !in_fence;
-            continue;
-        }
-        if in_fence {
-            continue;
-        }
-        let level = t.bytes().take_while(|&b| b == b'#').count();
-        if (2..=3).contains(&level) && t.as_bytes().get(level) == Some(&b' ') {
-            let text = t[level..].trim().to_string();
-            if text.is_empty() {
-                continue;
-            }
+    let mut rest = html;
+    loop {
+        let h2 = rest.find("<h2");
+        let h3 = rest.find("<h3");
+        let (level, pos) = match (h2, h3) {
+            (Some(p2), Some(p3)) if p3 < p2 => (3u8, p3),
+            (Some(p2), _) => (2u8, p2),
+            (None, Some(p3)) => (3u8, p3),
+            (None, None) => break,
+        };
+        let tag_onward = &rest[pos..];
+        let Some(tag_end) = tag_onward.find('>') else {
+            break;
+        };
+        let after_open = &tag_onward[tag_end + 1..];
+        let close = format!("</h{level}>");
+        let Some(close_pos) = after_open.find(&close) else {
+            break;
+        };
+        let inner = &after_open[..close_pos];
+        // comrak's header_id_prefix places the id on a nested, empty
+        // `<a id="…" class="anchor" …></a>` inside the heading (immediately
+        // before the visible text), not as an attribute on `<h2>`/`<h3>`
+        // itself — confirmed live: `<h2><a href="#x" ... id="x"></a>Text</h2>`.
+        let id = extract_attr(inner, "id").unwrap_or_default();
+        let text = decode_entities(&strip_tags(inner));
+        if !text.trim().is_empty() {
             headings.push(Heading {
-                level: level as u8,
-                id: slugify(&text),
-                text,
+                level,
+                id,
+                text: text.trim().to_string(),
             });
         }
+        rest = &after_open[close_pos + close.len()..];
     }
     headings
+}
+
+/// Extract `attr="value"` from a raw opening-tag string (e.g. `<h2 id="x">`
+/// without the trailing `>`).
+fn extract_attr(tag: &str, attr: &str) -> Option<String> {
+    let needle = format!("{attr}=\"");
+    let start = tag.find(&needle)? + needle.len();
+    let end = start + tag[start..].find('"')?;
+    Some(tag[start..end].to_string())
+}
+
+/// Strip HTML tags, keeping only text content (used to recover a heading's
+/// plain display text from its rendered, possibly inline-formatted, HTML).
+fn strip_tags(html: &str) -> String {
+    let mut out = String::with_capacity(html.len());
+    let mut in_tag = false;
+    for ch in html.chars() {
+        match ch {
+            '<' => in_tag = true,
+            '>' => in_tag = false,
+            _ if !in_tag => out.push(ch),
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Decode the small set of HTML entities comrak actually emits in text nodes.
+fn decode_entities(s: &str) -> String {
+    s.replace("&amp;", "&")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
 }
 
 /// Lowercase ASCII slug: alphanumerics kept, runs of other chars → single `-`.
@@ -283,6 +352,27 @@ mod tests {
     }
 
     #[test]
+    fn wikilink_target_with_a_space_still_renders_as_a_real_link() {
+        // Without angle-bracket wrapping, CommonMark refuses an unescaped
+        // space in a link destination and renders the literal source text
+        // instead of an <a> tag — this must not regress. comrak percent-
+        // encodes the space in the emitted href (correct, valid HTML — a
+        // real browser link), so the assertion checks for a genuine anchor
+        // tag rather than an exact (unencoded) href string.
+        let r = render("See [[Zero Container Inference]].\n");
+        assert!(
+            r.html
+                .contains("<a href=\"/wiki/Zero%20Container%20Inference\""),
+            "got: {}",
+            r.html
+        );
+        assert!(r.html.contains(">Zero Container Inference</a>"));
+        assert!(!r
+            .html
+            .contains("[Zero Container Inference](/wiki/Zero Container Inference)"));
+    }
+
+    #[test]
     fn extracts_h2_h3_headings_only() {
         let r = render("# H1\n\n## Why no containers\n\n### Detail\n\n#### Too deep\n");
         let ids: Vec<_> = r.headings.iter().map(|h| h.id.as_str()).collect();
@@ -296,6 +386,38 @@ mod tests {
         let r = render("## Real\n\n```\n## Not a heading\n```\n");
         assert_eq!(r.headings.len(), 1);
         assert_eq!(r.headings[0].id, "real");
+    }
+
+    #[test]
+    fn duplicate_headings_get_comraks_actual_disambiguated_ids() {
+        // The bug this guards: a naive local slugify produces "overview" for
+        // BOTH headings, so a TOC built from it links #overview twice (the
+        // second entry jumps to the first section). Extracting from
+        // comrak's own output picks up its Anchorizer's real -1 suffix, so
+        // the TOC ids the article() template renders always match what's
+        // actually clickable in the body.
+        let r = render("## Overview\n\ntext\n\n## Overview\n\nmore\n");
+        assert_eq!(r.headings.len(), 2);
+        assert_ne!(
+            r.headings[0].id, r.headings[1].id,
+            "duplicate headings must not collide"
+        );
+        assert!(r.html.contains(&format!(r#"id="{}""#, r.headings[0].id)));
+        assert!(r.html.contains(&format!(r#"id="{}""#, r.headings[1].id)));
+    }
+
+    #[test]
+    fn heading_with_inline_markup_gets_matching_id_and_plain_text() {
+        // A naive slugify over the raw markdown line would see the literal
+        // `[...](...)`  syntax; the real id must come from the *rendered*
+        // text, and the TOC's display text should be plain (no markup).
+        let r = render("## See [the spec](/x)\n");
+        assert_eq!(r.headings.len(), 1);
+        assert_eq!(r.headings[0].text, "See the spec");
+        assert!(
+            r.html.contains(&format!(r#"id="{}""#, r.headings[0].id)),
+            "TOC id must match a real id in the rendered HTML"
+        );
     }
 
     #[test]

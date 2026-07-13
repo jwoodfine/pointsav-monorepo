@@ -77,17 +77,22 @@ impl AppState {
         tracing::info!("indexed {} article(s)", index.article_count());
         let search = SearchIndex::build(&index).expect("build search index");
         // Load the counsel-owned Important Information text from the content repo.
-        // `primary()`, not `mounts.first()` — a latent bug for any multi-mount
-        // config (e.g. a primary + read-only guide mount in a different order):
-        // `first()` silently reads whichever mount happens to be listed first
-        // in knowledge.toml, not necessarily the editable primary one.
-        let important_info = mounts.primary().and_then(|m| {
-            std::fs::read_to_string(m.path.join("important-information.md"))
+        // Uses the primary (editable, article-owning) mount specifically —
+        // not just whichever mount happens to be listed first in
+        // knowledge.toml, since a `role="guide"` mount is a read-only
+        // secondary source, never where these counsel-owned sidecars live.
+        // Falls back to the first mount only when no mount is marked primary.
+        let primary_root = mounts
+            .primary()
+            .or_else(|| mounts.mounts.first())
+            .map(|m| m.path.clone());
+        let important_info = primary_root.as_ref().and_then(|root| {
+            std::fs::read_to_string(root.join("important-information.md"))
                 .ok()
                 .map(|text| content::render(&content::parse(&text).body_md).html)
         });
         // Per-wiki category nav + redirects from the content repo root.
-        let root = mounts.primary().map(|m| m.path.clone());
+        let root = primary_root;
         let categories = root
             .as_ref()
             .map(|r| sitedata::load_categories(r))
@@ -108,8 +113,8 @@ impl AppState {
             .unwrap_or_default();
 
         std::fs::create_dir_all(&config.site.state_dir).ok();
-        let claims = ClaimStore::open(&config.site.state_dir.join("claims.redb"))
-            .expect("open claim store");
+        let claims =
+            ClaimStore::open(&config.site.state_dir.join("claims.redb")).expect("open claim store");
         for doc in index.documents() {
             if let Ok(parsed) = content::load(doc) {
                 let extracted = content::extract_claims(&doc.slug, &parsed.body_md);
@@ -675,9 +680,17 @@ fn compute_backlinks(state: &AppState, target_slug: &str) -> Vec<BacklinkRef> {
         if doc.slug == target_slug {
             continue;
         }
-        let Ok(parsed) = content::load(doc) else { continue };
-        if wikilink_targets(&parsed.body_md).iter().any(|t| t == target_slug) {
-            out.push(BacklinkRef { slug: doc.slug.clone(), title: doc.title.clone() });
+        let Ok(parsed) = content::load(doc) else {
+            continue;
+        };
+        if wikilink_targets(&parsed.body_md)
+            .iter()
+            .any(|t| t == target_slug)
+        {
+            out.push(BacklinkRef {
+                slug: doc.slug.clone(),
+                title: doc.title.clone(),
+            });
         }
     }
     out
@@ -690,9 +703,15 @@ fn wikilink_targets(body_md: &str) -> Vec<String> {
     let mut rest = body_md;
     while let Some(start) = rest.find("[[") {
         let after_open = &rest[start + 2..];
-        let Some(end) = after_open.find("]]") else { break };
+        let Some(end) = after_open.find("]]") else {
+            break;
+        };
         let inner = &after_open[..end];
-        let target = inner.split_once('|').map(|(t, _)| t).unwrap_or(inner).trim();
+        let target = inner
+            .split_once('|')
+            .map(|(t, _)| t)
+            .unwrap_or(inner)
+            .trim();
         if !target.starts_with('#') && !target.is_empty() {
             out.push(target.to_string());
         }
@@ -720,7 +739,6 @@ async fn serve_article(
     if slug == "index" {
         return moved_301("/");
     }
-    let lang_code = if lang == Lang::Es { "es" } else { "en" };
     let Some(doc) = state.index.resolve(slug, lang) else {
         // Not a current slug — try an alias (301 to canonical), then redirects.yaml.
         if let Some(canonical) = state.index.resolve_alias(slug) {
@@ -735,6 +753,12 @@ async fn serve_article(
         );
     };
     let tenant = state.tenant;
+    // The language actually served — `doc.lang` can silently be `En` even
+    // when the request was routed as `Lang::Es` (`ContentIndex::resolve`
+    // falls back to the English doc when no `.es` counterpart exists).
+    // Stamping `<html lang>` and the toggle from the *requested* `lang`
+    // instead of this would mislabel English fallback content as Spanish.
+    let lang_code = if doc.lang == Lang::Es { "es" } else { "en" };
     let repo_root = &state.mounts.mounts[doc.mount_index].path;
     let rel = doc.path.strip_prefix(repo_root).unwrap_or(&doc.path);
 
@@ -772,16 +796,29 @@ async fn serve_article(
         .into_response();
     }
 
-    // Current view.
-    let parsed = match content::load(doc) {
-        Ok(p) => p,
-        Err(e) => {
+    // Current view. The file read + git-history walk are blocking
+    // (std::fs::read_to_string, libgit2 tree diffs) — moved off the tokio
+    // worker thread via spawn_blocking so a deep-history article can't stall
+    // unrelated requests sharing that worker.
+    let doc_owned = doc.clone();
+    let repo_root_owned = repo_root.clone();
+    let rel_owned = rel.to_path_buf();
+    let blocking_result = tokio::task::spawn_blocking(move || {
+        let parsed = content::load(&doc_owned)?;
+        let prov = crate::history::file_history(&repo_root_owned, &rel_owned, 1);
+        Ok::<_, std::io::Error>((parsed, prov))
+    })
+    .await;
+    let (parsed, prov) = match blocking_result {
+        Ok(Ok(result)) => result,
+        Ok(Err(e)) => {
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 format!("read error: {e}"),
             )
                 .into_response()
         }
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "internal error").into_response(),
     };
     let rendered = content::render_doc(&parsed);
     let title = parsed
@@ -795,23 +832,34 @@ async fn serve_article(
         .clone()
         .unwrap_or_default();
     // Provenance: the short hash of the file's most recent commit.
-    let prov = crate::history::file_history(repo_root, rel, 1);
     let sha = prov.first().map(|r| r.short_sha.as_str());
 
     // Content negotiation (Phase 3.7): `Accept: application/json` returns the
     // structured representation instead of the HTML chrome.
     if wants_json(headers) {
+        // compute_backlinks scans every document's body — also blocking
+        // filesystem work — so it's only ever done on this less-common path,
+        // and likewise moved off the async worker thread.
+        let state_owned = state.clone();
+        let slug_owned = doc.slug.clone();
+        let backlinks =
+            tokio::task::spawn_blocking(move || compute_backlinks(&state_owned, &slug_owned))
+                .await
+                .unwrap_or_default();
         let json = ArticleJson {
             frontmatter: &parsed.frontmatter,
             body_md: &parsed.body_md,
             blake3: blake3::hash(parsed.body_md.as_bytes()).to_hex().to_string(),
             revision_sha: prov.first().map(|r| r.sha.clone()),
-            backlinks: compute_backlinks(&state, &doc.slug),
+            backlinks,
         };
         return axum::Json(json).into_response();
     }
-    // Language toggle — only when a genuine counterpart exists.
-    let alt_lang: Option<(String, &str)> = if lang == Lang::Es {
+    // Language toggle — only when a genuine counterpart exists. Guards on
+    // `doc.lang` (what was actually served), not the requested `lang` —
+    // an Es request that silently fell back to English must not offer an
+    // "English" toggle pointing at the identical content it already shows.
+    let alt_lang: Option<(String, &str)> = if doc.lang == Lang::Es {
         Some((format!("/wiki/{}", doc.slug), "English"))
     } else if state
         .index
