@@ -21,7 +21,8 @@ use crate::content::Claim;
 
 const CLAIMS_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("claims");
 const CITED_BY_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("cited_by");
-const VERIFICATION_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("citation_verification");
+const VERIFICATION_TABLE: TableDefinition<&str, &[u8]> =
+    TableDefinition::new("citation_verification");
 
 /// Result of the most recent re-fetch/re-hash check of one `citations.yaml`
 /// entry (Phase 3.4 — continuous citation verification).
@@ -112,10 +113,14 @@ impl ClaimStore {
     /// forever; fixed 2026-07-13 per audit finding).
     pub fn rebuild_cited_by(&self) -> anyhow::Result<()> {
         let all = self.all_claims()?;
-        let mut index: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+        let mut index: std::collections::HashMap<String, Vec<String>> =
+            std::collections::HashMap::new();
         for c in &all {
             for citation_id in &c.cites {
-                index.entry(citation_id.clone()).or_default().push(c.global_id());
+                index
+                    .entry(citation_id.clone())
+                    .or_default()
+                    .push(c.global_id());
             }
         }
 
@@ -204,7 +209,10 @@ impl ClaimStore {
         Ok(())
     }
 
-    pub fn get_verification(&self, citation_id: &str) -> anyhow::Result<Option<CitationVerification>> {
+    pub fn get_verification(
+        &self,
+        citation_id: &str,
+    ) -> anyhow::Result<Option<CitationVerification>> {
         let read = self.db.begin_read()?;
         let table = read.open_table(VERIFICATION_TABLE)?;
         Ok(table
@@ -272,7 +280,10 @@ mod tests {
 
         let mut citing = store.claims_citing("shared-cite").unwrap();
         citing.sort();
-        assert_eq!(citing, vec!["topic-x:a".to_string(), "topic-y:b".to_string()]);
+        assert_eq!(
+            citing,
+            vec!["topic-x:a".to_string(), "topic-y:b".to_string()]
+        );
     }
 
     #[test]
@@ -280,7 +291,10 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = ClaimStore::open(&dir.path().join("claims.redb")).unwrap();
         store
-            .upsert_topic_claims(&[sample_claim("a", "topic-x", vec![]), sample_claim("b", "topic-y", vec![])])
+            .upsert_topic_claims(&[
+                sample_claim("a", "topic-x", vec![]),
+                sample_claim("b", "topic-y", vec![]),
+            ])
             .unwrap();
 
         let x_claims = store.claims_for_topic("topic-x").unwrap();
@@ -309,7 +323,10 @@ mod tests {
         store.record_verification(&ok).unwrap();
         store.record_verification(&drifted).unwrap();
 
-        assert_eq!(store.get_verification("c1").unwrap().unwrap().status, VerificationStatus::Ok);
+        assert_eq!(
+            store.get_verification("c1").unwrap().unwrap().status,
+            VerificationStatus::Ok
+        );
         let drift_list = store.drifted_citations().unwrap();
         assert_eq!(drift_list.len(), 1);
         assert_eq!(drift_list[0].citation_id, "c2");
@@ -326,9 +343,14 @@ mod tests {
     fn rebuild_cited_by_reflects_current_claim_set() {
         let dir = tempfile::tempdir().unwrap();
         let store = ClaimStore::open(&dir.path().join("claims.redb")).unwrap();
-        store.upsert_topic_claims(&[sample_claim("a", "topic-x", vec!["c1"])]).unwrap();
+        store
+            .upsert_topic_claims(&[sample_claim("a", "topic-x", vec!["c1"])])
+            .unwrap();
         store.rebuild_cited_by().unwrap();
-        assert_eq!(store.claims_citing("c1").unwrap(), vec!["topic-x:a".to_string()]);
+        assert_eq!(
+            store.claims_citing("c1").unwrap(),
+            vec!["topic-x:a".to_string()]
+        );
     }
 
     #[test]
@@ -340,13 +362,23 @@ mod tests {
         // claim forever.
         let dir = tempfile::tempdir().unwrap();
         let store = ClaimStore::open(&dir.path().join("claims.redb")).unwrap();
-        store.upsert_topic_claims(&[sample_claim("a", "topic-x", vec!["stale-cite"])]).unwrap();
+        store
+            .upsert_topic_claims(&[sample_claim("a", "topic-x", vec!["stale-cite"])])
+            .unwrap();
         store.rebuild_cited_by().unwrap();
-        assert_eq!(store.claims_citing("stale-cite").unwrap(), vec!["topic-x:a".to_string()]);
+        assert_eq!(
+            store.claims_citing("stale-cite").unwrap(),
+            vec!["topic-x:a".to_string()]
+        );
 
         // Article re-edited: same claim id, no longer cites "stale-cite".
-        store.upsert_topic_claims(&[sample_claim("a", "topic-x", vec![])]).unwrap();
+        store
+            .upsert_topic_claims(&[sample_claim("a", "topic-x", vec![])])
+            .unwrap();
         store.rebuild_cited_by().unwrap();
-        assert!(store.claims_citing("stale-cite").unwrap().is_empty(), "orphaned citation key should be pruned, not left stale");
+        assert!(
+            store.claims_citing("stale-cite").unwrap().is_empty(),
+            "orphaned citation key should be pruned, not left stale"
+        );
     }
 }
