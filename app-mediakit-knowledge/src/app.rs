@@ -766,7 +766,15 @@ async fn serve_article(
             None,
             &rendered.html,
         );
-        let head = ui::doc_head(&format!("{title} (as of {date})"), "", tenant);
+        // rel=canonical points at the current, unversioned URL — an as-of
+        // view is a duplicate of the canonical article, not a distinct page.
+        let head = ui::doc_head_seo(
+            &format!("{title} (as of {date})"),
+            "",
+            tenant,
+            Some(&format!("{prefix}/wiki/{}", doc.slug)),
+            None,
+        );
         return Html(
             ui::page(
                 tenant,
@@ -868,7 +876,20 @@ async fn serve_article(
         alt_ref,
         &rendered.html,
     );
-    let head = ui::doc_head(&title, &description, tenant);
+    // hreflang wants the alternate's ISO code ("es"/"en"), not its display
+    // label ("Espa\u{00f1}ol") — alt_ref's second element is the label, so
+    // derive the code from doc.lang / the alt path's own prefix instead.
+    let alt_seo: Option<(&str, &str)> = alt_ref.map(|(path, _)| {
+        let code = if path.starts_with("/es/") { "es" } else { "en" };
+        (path, code)
+    });
+    let head = ui::doc_head_seo(
+        &title,
+        &description,
+        tenant,
+        Some(&format!("{prefix}/wiki/{}", doc.slug)),
+        alt_seo,
+    );
     Html(
         ui::page(
             tenant,
