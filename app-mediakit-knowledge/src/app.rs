@@ -64,13 +64,21 @@ impl AppState {
         tracing::info!("indexed {} article(s)", index.article_count());
         let search = SearchIndex::build(&index).expect("build search index");
         // Load the counsel-owned Important Information text from the content repo.
-        let important_info = mounts.mounts.first().and_then(|m| {
-            std::fs::read_to_string(m.path.join("important-information.md"))
+        // Uses the primary (editable, article-owning) mount specifically —
+        // not just whichever mount happens to be listed first in
+        // knowledge.toml, since a `role="guide"` mount is a read-only
+        // secondary source, never where these counsel-owned sidecars live.
+        let primary_root = mounts
+            .primary()
+            .or_else(|| mounts.mounts.first())
+            .map(|m| m.path.clone());
+        let important_info = primary_root.as_ref().and_then(|root| {
+            std::fs::read_to_string(root.join("important-information.md"))
                 .ok()
                 .map(|text| content::render(&content::parse(&text).body_md).html)
         });
         // Per-wiki category nav + redirects from the content repo root.
-        let root = mounts.mounts.first().map(|m| m.path.clone());
+        let root = primary_root;
         let categories = root
             .as_ref()
             .map(|r| sitedata::load_categories(r))
@@ -87,8 +95,8 @@ impl AppState {
             .unwrap_or_default();
 
         std::fs::create_dir_all(&config.site.state_dir).ok();
-        let claims = ClaimStore::open(&config.site.state_dir.join("claims.redb"))
-            .expect("open claim store");
+        let claims =
+            ClaimStore::open(&config.site.state_dir.join("claims.redb")).expect("open claim store");
         for doc in index.documents() {
             if let Ok(parsed) = content::load(doc) {
                 let extracted = content::extract_claims(&doc.slug, &parsed.body_md);
@@ -296,10 +304,26 @@ async fn home(State(state): State<AppState>) -> Response {
         Vec::new()
     };
 
-    let nav: Vec<(String, String)> = cats.iter().map(|(s, l, _)| (s.clone(), l.clone())).collect();
+    let nav: Vec<(String, String)> = cats
+        .iter()
+        .map(|(s, l, _)| (s.clone(), l.clone()))
+        .collect();
     let body = ui::home_page(tenant, &lede, total, &cats, &guides);
     let head = ui::doc_head(tenant.home_label(), &description, tenant);
-    Html(ui::page(tenant, "en", head, body, &nav, &[], "", state.important_info.as_deref()).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav,
+            &[],
+            "",
+            state.important_info.as_deref(),
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 /// Category listing page — every article in one category.
@@ -324,7 +348,20 @@ async fn category_page(State(state): State<AppState>, Path(name): Path<String>) 
     let description = format!("Articles in the {label} area.");
     let body = ui::category_index(&label, &docs);
     let head = ui::doc_head(&label, &description, tenant);
-    Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref()).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            "",
+            state.important_info.as_deref(),
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -361,7 +398,20 @@ async fn search_page(State(state): State<AppState>, Query(params): Query<SearchQ
         )
     };
     let head = ui::doc_head(&title, &desc, tenant);
-    Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], &q, state.important_info.as_deref()).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            &q,
+            state.important_info.as_deref(),
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -379,7 +429,10 @@ async fn history_page(
     let tenant = state.tenant;
     let slug = slug.trim_end_matches('/');
     let Some(doc) = state.index.resolve(slug, Lang::En) else {
-        return not_found(&state, &format!("No record found for \u{201c}{slug}\u{201d}."));
+        return not_found(
+            &state,
+            &format!("No record found for \u{201c}{slug}\u{201d}."),
+        );
     };
     let repo_root = &state.mounts.mounts[doc.mount_index].path;
     let rel = doc.path.strip_prefix(repo_root).unwrap_or(&doc.path);
@@ -395,8 +448,20 @@ async fn history_page(
             &format!("Changes to {} in revision {}", doc.title, diff.short_sha),
             tenant,
         );
-        return Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref()).into_string())
-            .into_response();
+        return Html(
+            ui::page(
+                tenant,
+                "en",
+                head,
+                body,
+                &nav_cats(&state),
+                &[],
+                "",
+                state.important_info.as_deref(),
+            )
+            .into_string(),
+        )
+        .into_response();
     }
 
     let revs = crate::history::file_history(repo_root, rel, 50);
@@ -406,7 +471,20 @@ async fn history_page(
         &format!("Revision history of {}", doc.title),
         tenant,
     );
-    Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref()).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            "",
+            state.important_info.as_deref(),
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 /// "Index of record" — every article A–Z (the auditor's completeness check).
@@ -430,7 +508,20 @@ async fn special_all_pages(State(state): State<AppState>) -> Response {
         "A–Z index of every record in the registry.",
         tenant,
     );
-    Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref()).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            "",
+            state.important_info.as_deref(),
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 /// "Recent changes" — records most recently updated (the site-wide delta view).
@@ -451,7 +542,20 @@ async fn special_recent(State(state): State<AppState>) -> Response {
         .collect();
     let body = ui::special_list("Recent changes", "Recent changes", &items);
     let head = ui::doc_head("Recent changes", "Records most recently updated.", tenant);
-    Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref()).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            "",
+            state.important_info.as_deref(),
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 // --- Discovery surfaces (robots / sitemap / feeds / llms.txt) ---------------
@@ -476,13 +580,21 @@ async fn robots(State(state): State<AppState>) -> Response {
 async fn sitemap(State(state): State<AppState>) -> Response {
     let docs: Vec<_> = state.index.documents().collect();
     let body = discovery::sitemap_xml(&site_base(&state), &docs);
-    ([(header::CONTENT_TYPE, "application/xml; charset=utf-8")], body).into_response()
+    (
+        [(header::CONTENT_TYPE, "application/xml; charset=utf-8")],
+        body,
+    )
+        .into_response()
 }
 
 async fn feed_atom(State(state): State<AppState>) -> Response {
     let docs = state.index.recent(20);
     let body = discovery::atom_feed(&site_base(&state), &state.config.site.title, &docs);
-    ([(header::CONTENT_TYPE, "application/atom+xml; charset=utf-8")], body).into_response()
+    (
+        [(header::CONTENT_TYPE, "application/atom+xml; charset=utf-8")],
+        body,
+    )
+        .into_response()
 }
 
 async fn llms(State(state): State<AppState>) -> Response {
@@ -558,9 +670,17 @@ fn compute_backlinks(state: &AppState, target_slug: &str) -> Vec<BacklinkRef> {
         if doc.slug == target_slug {
             continue;
         }
-        let Ok(parsed) = content::load(doc) else { continue };
-        if wikilink_targets(&parsed.body_md).iter().any(|t| t == target_slug) {
-            out.push(BacklinkRef { slug: doc.slug.clone(), title: doc.title.clone() });
+        let Ok(parsed) = content::load(doc) else {
+            continue;
+        };
+        if wikilink_targets(&parsed.body_md)
+            .iter()
+            .any(|t| t == target_slug)
+        {
+            out.push(BacklinkRef {
+                slug: doc.slug.clone(),
+                title: doc.title.clone(),
+            });
         }
     }
     out
@@ -573,9 +693,15 @@ fn wikilink_targets(body_md: &str) -> Vec<String> {
     let mut rest = body_md;
     while let Some(start) = rest.find("[[") {
         let after_open = &rest[start + 2..];
-        let Some(end) = after_open.find("]]") else { break };
+        let Some(end) = after_open.find("]]") else {
+            break;
+        };
         let inner = &after_open[..end];
-        let target = inner.split_once('|').map(|(t, _)| t).unwrap_or(inner).trim();
+        let target = inner
+            .split_once('|')
+            .map(|(t, _)| t)
+            .unwrap_or(inner)
+            .trim();
         if !target.starts_with('#') && !target.is_empty() {
             out.push(target.to_string());
         }
@@ -595,7 +721,6 @@ async fn serve_article(
 ) -> Response {
     let slug = slug.trim_end_matches('/');
     let prefix = if lang == Lang::Es { "/es" } else { "" };
-    let lang_code = if lang == Lang::Es { "es" } else { "en" };
     let Some(doc) = state.index.resolve(slug, lang) else {
         // Not a current slug — try an alias (301 to canonical), then redirects.yaml.
         if let Some(canonical) = state.index.resolve_alias(slug) {
@@ -604,9 +729,18 @@ async fn serve_article(
         if let Some(to) = state.redirects.get(&format!("/{slug}")) {
             return moved_301(to);
         }
-        return not_found(&state, &format!("No record found for \u{201c}{slug}\u{201d}."));
+        return not_found(
+            &state,
+            &format!("No record found for \u{201c}{slug}\u{201d}."),
+        );
     };
     let tenant = state.tenant;
+    // The language actually served — `doc.lang` can silently be `En` even
+    // when the request was routed as `Lang::Es` (`ContentIndex::resolve`
+    // falls back to the English doc when no `.es` counterpart exists).
+    // Stamping `<html lang>` and the toggle from the *requested* `lang`
+    // instead of this would mislabel English fallback content as Spanish.
+    let lang_code = if doc.lang == Lang::Es { "es" } else { "en" };
     let repo_root = &state.mounts.mounts[doc.mount_index].path;
     let rel = doc.path.strip_prefix(repo_root).unwrap_or(&doc.path);
 
@@ -623,7 +757,15 @@ async fn serve_article(
             .clone()
             .unwrap_or_else(|| doc.title.clone());
         let short = rev.chars().take(8).collect::<String>();
-        let body = ui::article(&title, &doc.slug, None, Some(&short), Some(&date), None, &rendered.html);
+        let body = ui::article(
+            &title,
+            &doc.slug,
+            None,
+            Some(&short),
+            Some(&date),
+            None,
+            &rendered.html,
+        );
         let head = ui::doc_head(&format!("{title} (as of {date})"), "", tenant);
         return Html(
             ui::page(
@@ -641,12 +783,29 @@ async fn serve_article(
         .into_response();
     }
 
-    // Current view.
-    let parsed = match content::load(doc) {
-        Ok(p) => p,
-        Err(e) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, format!("read error: {e}")).into_response()
+    // Current view. The file read + git-history walk are blocking
+    // (std::fs::read_to_string, libgit2 tree diffs) — moved off the tokio
+    // worker thread via spawn_blocking so a deep-history article can't stall
+    // unrelated requests sharing that worker.
+    let doc_owned = doc.clone();
+    let repo_root_owned = repo_root.clone();
+    let rel_owned = rel.to_path_buf();
+    let blocking_result = tokio::task::spawn_blocking(move || {
+        let parsed = content::load(&doc_owned)?;
+        let prov = crate::history::file_history(&repo_root_owned, &rel_owned, 1);
+        Ok::<_, std::io::Error>((parsed, prov))
+    })
+    .await;
+    let (parsed, prov) = match blocking_result {
+        Ok(Ok(result)) => result,
+        Ok(Err(e)) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                format!("read error: {e}"),
+            )
+                .into_response()
         }
+        Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "internal error").into_response(),
     };
     let rendered = content::render_doc(&parsed);
     let title = parsed
@@ -654,25 +813,40 @@ async fn serve_article(
         .title
         .clone()
         .unwrap_or_else(|| doc.title.clone());
-    let description = parsed.frontmatter.short_description.clone().unwrap_or_default();
+    let description = parsed
+        .frontmatter
+        .short_description
+        .clone()
+        .unwrap_or_default();
     // Provenance: the short hash of the file's most recent commit.
-    let prov = crate::history::file_history(repo_root, rel, 1);
     let sha = prov.first().map(|r| r.short_sha.as_str());
 
     // Content negotiation (Phase 3.7): `Accept: application/json` returns the
     // structured representation instead of the HTML chrome.
     if wants_json(headers) {
+        // compute_backlinks scans every document's body — also blocking
+        // filesystem work — so it's only ever done on this less-common path,
+        // and likewise moved off the async worker thread.
+        let state_owned = state.clone();
+        let slug_owned = doc.slug.clone();
+        let backlinks =
+            tokio::task::spawn_blocking(move || compute_backlinks(&state_owned, &slug_owned))
+                .await
+                .unwrap_or_default();
         let json = ArticleJson {
             frontmatter: &parsed.frontmatter,
             body_md: &parsed.body_md,
             blake3: blake3::hash(parsed.body_md.as_bytes()).to_hex().to_string(),
             revision_sha: prov.first().map(|r| r.sha.clone()),
-            backlinks: compute_backlinks(&state, &doc.slug),
+            backlinks,
         };
         return axum::Json(json).into_response();
     }
-    // Language toggle — only when a genuine counterpart exists.
-    let alt_lang: Option<(String, &str)> = if lang == Lang::Es {
+    // Language toggle — only when a genuine counterpart exists. Guards on
+    // `doc.lang` (what was actually served), not the requested `lang` —
+    // an Es request that silently fell back to English must not offer an
+    // "English" toggle pointing at the identical content it already shows.
+    let alt_lang: Option<(String, &str)> = if doc.lang == Lang::Es {
         Some((format!("/wiki/{}", doc.slug), "English"))
     } else if state
         .index
@@ -695,8 +869,20 @@ async fn serve_article(
         &rendered.html,
     );
     let head = ui::doc_head(&title, &description, tenant);
-    Html(ui::page(tenant, lang_code, head, body, &nav_cats(&state), &rendered.headings, "", state.important_info.as_deref()).into_string())
-        .into_response()
+    Html(
+        ui::page(
+            tenant,
+            lang_code,
+            head,
+            body,
+            &nav_cats(&state),
+            &rendered.headings,
+            "",
+            state.important_info.as_deref(),
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 /// Serve an embedded static asset by path.
