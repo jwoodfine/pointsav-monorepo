@@ -153,16 +153,36 @@ body{{font-family:"Inter","Sans Fallback",system-ui,-apple-system,"Segoe UI",Ari
 .sw-search{{display:none;}}
 .sw-masthead__nav{{display:none;}}
 .sw-masthead__inner{{gap:12px;}}
+/* Real bug, only visible at wider mobile widths (found at 850x870 — a phone-
+   width viewport like 390px is too narrow for the gap this produced to show):
+   `margin-left:auto` was on `.sw-hamburger` ALONE, so only the hamburger got
+   pushed to the far right — the toggle, with no auto-margin of its own, just
+   sat in normal flow right after the wordmark, stranding it far from the
+   hamburger with a growing gap as the viewport widens. Matches exactly the
+   mechanism home.pointsav.com's own CSS uses: the auto-margin belongs on
+   `.sw-lang-switch` (it claims the free space and gets pushed right), and the
+   hamburger's own default auto-margin is cancelled by the adjacent-sibling
+   rule below so it just follows the toggle normally instead of competing for
+   the same space. */
 .sw-hamburger{{display:inline-flex;margin-left:auto;}}
+.sw-lang-switch:not(.sw-lang-switch--drawer){{margin-left:auto;}}
+.sw-lang-switch:not(.sw-lang-switch--drawer) + .sw-hamburger{{margin-left:0;}}
 /* No separate icon-only padding override — home.pointsav.com uses the SAME
    padding (4px/12px) whether the label is showing or not; the pill just
    shrinks to fit the glyph alone once the label's `display:none` below
    removes it. A tighter padding override here would be an unmatched guess. */
 .sw-lang-switch:not(.sw-lang-switch--drawer) .sw-lang-switch__label{{display:none;}}
+/* Second real bug found at the same 850x870 report: this rule was stuck in
+   the 768px block below while the hamburger that opens it is reachable up to
+   1024px — between 769-1024px the click handler fired correctly (class +
+   aria-expanded both flipped, confirmed via automation) but nothing was
+   visible, because `.sw-mobile-nav` still defaulted to `display:none` with no
+   override active at that width. Must live in the SAME breakpoint as the
+   hamburger that controls it. */
+.sw-mobile-nav.sw-mobile-nav--open{{display:flex;flex-direction:column;}}
 }}
 @media (max-width:768px){{
 .sw-footer__top{{grid-template-columns:1fr;gap:24px;}}
-.sw-mobile-nav.sw-mobile-nav--open{{display:flex;flex-direction:column;}}
 }}"#,
         topnav = tokens::TOPNAV_BG,
         on_chrome = tokens::ON_CHROME,
