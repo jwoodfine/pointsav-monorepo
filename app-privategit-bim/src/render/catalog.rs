@@ -755,7 +755,8 @@ fn matches_search(haystack: &str, tokens: &[String]) -> bool {
 /// "stretched-link" technique) so the whole card still reads and clicks as
 /// one link everywhere except the checkbox's own top-left corner, which
 /// sits above it in z-order.
-pub(crate) fn render_object_card(o: &Value) -> String {
+pub(crate) fn render_object_card(o: &Value, lang: &str) -> String {
+    let objects_href = if lang == "es" { "/es/objects" } else { "/objects" };
     let id = s(o, "id");
     let name = s(o, "name");
     let group = s(o, "group");
@@ -779,7 +780,7 @@ pub(crate) fn render_object_card(o: &Value) -> String {
     <input type="checkbox" class="bim-compare-check" name="ids" value="{id}" aria-label="Add {name} to compare">
     <span class="bim-cat-card__checkbox" aria-hidden="true"></span>
   </label>
-  <a class="bim-cat-card__link" href="/objects/{id}" aria-label="{name} — view specification" title="{uni_title}">
+  <a class="bim-cat-card__link" href="{objects_href}/{id}" aria-label="{name} — view specification" title="{uni_title}">
     <span class="bim-cat-thumb bim-cat-thumb--obj">{symbol}{ifc_badge}</span>
     <span class="bim-cat-card__body">
       <span class="bim-cat-chip bim-cat-chip--pr"><span class="bim-cat-chip__lv">Pr</span>{uni_pr}</span>
@@ -789,6 +790,7 @@ pub(crate) fn render_object_card(o: &Value) -> String {
     </span>
   </a>
 </div>"#,
+        objects_href = objects_href,
         id = esc(id),
         name = esc(name),
         mfr = esc(manufacturer),
@@ -1074,7 +1076,7 @@ pub fn render_objects_index(
             )
         )
     } else {
-        matches.iter().map(|o| render_object_card(o)).collect()
+        matches.iter().map(|o| render_object_card(o, lang)).collect()
     };
 
     let uni_pairs = counted_pairs(uni_items);
