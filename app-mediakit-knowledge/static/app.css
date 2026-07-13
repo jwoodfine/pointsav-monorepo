@@ -787,14 +787,22 @@ button:disabled { cursor: default; }
 
   .k-control--menu { display: inline-flex; } /* hamburger revealed           */
 
-  .k-header__inner { gap: var(--k-space-2); }
   .k-header__center { order: 3; flex-basis: 100%; }  /* search wraps below    */
 
   /* Compact: search drops below the logo/controls row on small screens.
      justify-content: space-between pins the controls (theme + hamburger) to
      the right edge of that row — without it they pack flush against the logo
-     once .k-header__center (which normally absorbs the space) wraps away. */
-  .k-header__inner { flex-wrap: wrap; row-gap: var(--k-space-2); justify-content: space-between; }
+     once .k-header__center (which normally absorbs the space) wraps away.
+     padding-inline tightens the side margin from the desktop --k-gutter (24px)
+     to --k-space-4 (16px) — closer to the screen edge, matching common mobile
+     header conventions, while still leaving a comfortable touch margin. */
+  .k-header__inner {
+    gap: var(--k-space-2);
+    flex-wrap: wrap;
+    row-gap: var(--k-space-2);
+    justify-content: space-between;
+    padding-inline: var(--k-space-4);
+  }
   .k-search { max-width: none; }
 
   .k-logo__descriptor { display: none; }    /* brand word only on small screens */
