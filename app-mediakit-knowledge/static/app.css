@@ -790,8 +790,11 @@ button:disabled { cursor: default; }
   .k-header__inner { gap: var(--k-space-2); }
   .k-header__center { order: 3; flex-basis: 100%; }  /* search wraps below    */
 
-  /* Compact: search drops below the logo/controls row on small screens. */
-  .k-header__inner { flex-wrap: wrap; row-gap: var(--k-space-2); }
+  /* Compact: search drops below the logo/controls row on small screens.
+     justify-content: space-between pins the controls (theme + hamburger) to
+     the right edge of that row — without it they pack flush against the logo
+     once .k-header__center (which normally absorbs the space) wraps away. */
+  .k-header__inner { flex-wrap: wrap; row-gap: var(--k-space-2); justify-content: space-between; }
   .k-search { max-width: none; }
 
   .k-logo__descriptor { display: none; }    /* brand word only on small screens */
