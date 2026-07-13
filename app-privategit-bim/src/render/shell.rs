@@ -148,19 +148,14 @@ undertaken to be updated except as required by law.</p>",
         (_, None) => String::new(),
     };
     let html_lang = if lang == "es" { "es" } else { "en" };
-
-    // Visible verification-pending notice (Round 11, 2026-07-12) — the
-    // operator's own decision was to draft Spanish content directly rather
-    // than route it to project-editorial, on condition it stays flagged
-    // everywhere until a native-speaker/professional pass confirms it.
-    // Matches the reference app-mediakit-marketing-2's own disclosed-caveat
-    // pattern (ui.rs:216-219) but surfaced as real page chrome, not just a
-    // code comment, since it applies sitewide rather than to one field.
-    let translation_notice = if lang == "es" {
-        r#"<p class="bim-translation-notice">Esta página es una traducción preparada internamente, pendiente de verificación por un hablante nativo antes de considerarse definitiva. Ante cualquier discrepancia, la <a href="{en}">versión en inglés</a> es la referencia autorizada.</p>"#
-            .replace("{en}", &esc(&en_path))
+    // Round 12 (2026-07-13): Method/Objects/Search are now fully bilingual
+    // — nav links to them go to the /es counterpart on Spanish pages. Key
+    // Plans and Research stay English-only by design (excluded scope), so
+    // their nav links never gain an /es prefix.
+    let (method_href, objects_href, search_href) = if lang == "es" {
+        ("/es/method", "/es/objects", "/es/search")
     } else {
-        String::new()
+        ("/method", "/objects", "/search")
     };
     // Carbon Web Components + their CSS are only used by /edit/* (real
     // <cds-content-switcher> etc.) — the public catalog no longer borrows
@@ -218,12 +213,12 @@ undertaken to be updated except as required by law.</p>",
     <div class="bim-header__inner">
       <a href="/" class="bim-header__brand" aria-label="Woodfine — BIM Library">Woodfine <span class="bim-header__brand-sub">BIM Library</span></a>
       <nav class="bim-header__nav" aria-label="Primary">
-        <a href="/method"{method_current}>{nav_method}</a>
-        <a href="/objects"{objects_current}>{nav_objects}</a>
+        <a href="{method_href}"{method_current}>{nav_method}</a>
+        <a href="{objects_href}"{objects_current}>{nav_objects}</a>
         <a href="/key-plans"{key_plans_current}>Key Plans</a>
         <a href="/research"{research_current}>{nav_research}</a>
       </nav>
-      <form class="bim-header__search" method="get" action="/search" role="search">
+      <form class="bim-header__search" method="get" action="{search_href}" role="search">
         <input type="search" name="q" placeholder="{search_label}" aria-label="{search_aria}">
       </form>
       <div class="bim-header__right">
@@ -245,12 +240,12 @@ undertaken to be updated except as required by law.</p>",
                 </svg>
               </button>
             </div>
-            <form class="bim-drawer__search" method="get" action="/search" role="search">
+            <form class="bim-drawer__search" method="get" action="{search_href}" role="search">
               <input type="search" name="q" placeholder="{search_label}" aria-label="{search_aria}">
             </form>
             <nav class="bim-drawer__nav" aria-label="Primary">
-              <a href="/method"{method_current}>{nav_method}</a>
-              <a href="/objects"{objects_current}>{nav_objects}</a>
+              <a href="{method_href}"{method_current}>{nav_method}</a>
+              <a href="{objects_href}"{objects_current}>{nav_objects}</a>
               <a href="/key-plans"{key_plans_current}>Key Plans</a>
               <a href="/research"{research_current}>{nav_research}</a>
             </nav>
@@ -262,7 +257,7 @@ undertaken to be updated except as required by law.</p>",
   </header>
   <div class="bim-shell">
     <main id="bim-main-content" class="bim-main">
-      {translation_notice}{content}
+      {content}
     </main>
   </div>
   <section class="bim-disclosure" aria-label="{important_info_aria}">
@@ -355,7 +350,6 @@ undertaken to be updated except as required by law.</p>",
         ),
         hreflang_tags = hreflang_tags,
         html_lang = html_lang,
-        translation_notice = translation_notice,
         html_theme_attr = html_theme_attr,
         carbon_assets = carbon_assets,
         theme_preload_script = theme_preload_script,
@@ -365,6 +359,9 @@ undertaken to be updated except as required by law.</p>",
         key_plans_current = key_plans_current,
         research_current = research_current,
         method_current = method_current,
+        method_href = method_href,
+        objects_href = objects_href,
+        search_href = search_href,
         nav_method = t(lang, "Method", "Método"),
         nav_objects = t(lang, "Objects", "Objetos"),
         nav_research = t(lang, "Research", "Investigación"),

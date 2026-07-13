@@ -4,7 +4,7 @@
 use crate::state::AppState;
 use serde_json::Value;
 
-use super::shell::esc;
+use super::shell::{esc, t};
 
 struct Hit {
     kind: &'static str,
@@ -100,17 +100,38 @@ fn highlight_snippet(text: &str, tokens: &[String]) -> String {
     format!("{prefix}{out}{suffix}")
 }
 
-pub fn render_search_results(query: &str, state: &AppState) -> String {
+/// English kind key -> display label. Kept as a translate-at-render step
+/// rather than storing a localized string on `Hit`, since the same hit list
+/// is scored/sorted once regardless of `lang`.
+fn kind_label<'a>(kind: &'a str, lang: &str) -> &'a str {
+    match kind {
+        "Category" => t(lang, "Category", "Categoría"),
+        "Object" => t(lang, "Object", "Objeto"),
+        "Key Plan" => "Key Plan",
+        "Research" => t(lang, "Research", "Investigación"),
+        _ => kind,
+    }
+}
+
+pub fn render_search_results(query: &str, state: &AppState, lang: &str) -> String {
     let trimmed = query.trim();
     if trimmed.is_empty() {
-        return r#"<div class="bim-search-page">
+        return format!(
+            r#"<div class="bim-search-page">
   <header class="bim-cat-pagehead">
-    <span class="bim-cat-kicker">Catalog search</span>
-    <h1>Search</h1>
+    <span class="bim-cat-kicker">{kicker}</span>
+    <h1>{title}</h1>
   </header>
-  <p class="bim-empty">Enter a search term above — categories, entity slugs, IFC classes, and research articles are all searched.</p>
-</div>"#
-            .to_string();
+  <p class="bim-empty">{hint}</p>
+</div>"#,
+            kicker = t(lang, "Catalog search", "Búsqueda en el catálogo"),
+            title = t(lang, "Search", "Buscar"),
+            hint = t(
+                lang,
+                "Enter a search term above — categories, entity slugs, IFC classes, and research articles are all searched.",
+                "Escriba un término de búsqueda arriba — se buscan categorías, slugs de entidad, clases IFC y artículos de investigación.",
+            ),
+        );
     }
 
     let tokens: Vec<String> = trimmed
@@ -128,10 +149,15 @@ pub fn render_search_results(query: &str, state: &AppState) -> String {
             (cat.ifc_anchor.as_str(), 30),
         ];
         if let Some(score) = score_match(&tokens, &fields) {
+            let url = if lang == "es" {
+                format!("/es/tokens/{}", cat.slug)
+            } else {
+                format!("/tokens/{}", cat.slug)
+            };
             hits.push(Hit {
                 kind: "Category",
                 title: cat.display_name.clone(),
-                url: format!("/tokens/{}", cat.slug),
+                url,
                 snippet: highlight_snippet(&cat.card_desc, &tokens),
                 score,
                 tiebreak: cat.slug.clone(),
@@ -173,10 +199,15 @@ pub fn render_search_results(query: &str, state: &AppState) -> String {
             } else {
                 description
             };
+            let url = if lang == "es" {
+                format!("/es/objects/{id}")
+            } else {
+                format!("/objects/{id}")
+            };
             hits.push(Hit {
                 kind: "Object",
                 title: name.to_string(),
-                url: format!("/objects/{id}"),
+                url,
                 snippet: highlight_snippet(snippet_source, &tokens),
                 score,
                 tiebreak: id.to_string(),
@@ -266,29 +297,44 @@ pub fn render_search_results(query: &str, state: &AppState) -> String {
   <span class="bim-search-result__snippet">{snippet}</span>
 </a>"#,
             url = esc(&hit.url),
-            kind = esc(hit.kind),
+            kind = esc(kind_label(hit.kind, lang)),
             title = esc(&hit.title),
             snippet = hit.snippet,
         ));
     }
     if results_html.is_empty() {
+        let tokens_path = if lang == "es" { "/es/tokens" } else { "/tokens" };
         results_html = format!(
-            r#"<p class="bim-empty">No results for &ldquo;{q}&rdquo;. Try a different term, or <a href="/tokens" data-path="/tokens">browse all categories</a>.</p>"#,
-            q = esc(trimmed)
+            r#"<p class="bim-empty">{pre} &ldquo;{q}&rdquo;. {try_other}, {or} <a href="{tokens_path}" data-path="{tokens_path}">{browse}</a>.</p>"#,
+            pre = t(lang, "No results for", "Sin resultados para"),
+            q = esc(trimmed),
+            try_other = t(lang, "Try a different term", "Intente con otro término"),
+            or = t(lang, "or", "o"),
+            tokens_path = tokens_path,
+            browse = t(lang, "browse all categories", "explore todas las categorías"),
         );
     }
 
     format!(
         r#"<div class="bim-search-page">
   <header class="bim-cat-pagehead">
-    <span class="bim-cat-kicker">Catalog search</span>
-    <h1>Search results</h1>
-    <p class="bim-cat-pagehead__lede">{count} {result_word} for &ldquo;{q}&rdquo;</p>
+    <span class="bim-cat-kicker">{kicker}</span>
+    <h1>{title}</h1>
+    <p class="bim-cat-pagehead__lede">{count} {result_word} {for_word} &ldquo;{q}&rdquo;</p>
   </header>
   <div class="bim-search-results">{results_html}</div>
 </div>"#,
+        kicker = t(lang, "Catalog search", "Búsqueda en el catálogo"),
+        title = t(lang, "Search results", "Resultados de búsqueda"),
         count = count,
-        result_word = if count == 1 { "result" } else { "results" },
+        result_word = if lang == "es" {
+            "resultado(s)"
+        } else if count == 1 {
+            "result"
+        } else {
+            "results"
+        },
+        for_word = t(lang, "for", "para"),
         q = esc(trimmed),
         results_html = results_html,
     )

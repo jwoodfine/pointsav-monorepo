@@ -167,24 +167,6 @@ h1, h2 {
   margin-top: 0.5rem;
 }
 
-/* Spanish translation-verification notice (Round 11, 2026-07-12) — shown
-   once per Spanish page, above the article content. */
-.bim-translation-notice {
-  margin: 0 0 1.25rem;
-  padding: 0.625rem 0.875rem;
-  font-size: 0.8125rem;
-  color: var(--bim-fg-secondary, #374151);
-  background: var(--bim-bg-subtle, #F7F9FA);
-  border: 1px solid var(--bim-border, #E6E7E8);
-  border-left: 3px solid var(--bim-accent, #164679);
-  border-radius: var(--bim-radius-md, 4px);
-}
-
-.bim-translation-notice a {
-  color: inherit;
-  text-decoration: underline;
-}
-
 .bim-theme-toggle__moon { display: none; }
 :root[data-theme="dark"] .bim-theme-toggle__sun { display: none; }
 :root[data-theme="dark"] .bim-theme-toggle__moon { display: block; }

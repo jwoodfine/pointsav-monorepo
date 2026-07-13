@@ -40,9 +40,22 @@ pub async fn objects_index_handler(
     let q = params.get("q").cloned().unwrap_or_default();
     let uni = params.get("uni").map(String::as_str);
     let mfr = params.get("mfr").map(String::as_str);
-    let content = render::catalog::render_objects_index(&state, &q, uni, mfr);
-    Html(render::shell::page_shell(
-        "Objects", "/objects", &content, &state,
+    let content = render::catalog::render_objects_index(&state, &q, uni, mfr, "en");
+    Html(render::shell::page_shell_lang(
+        "Objects", "/objects", &content, &state, "en", Some("/es/objects"),
+    ))
+}
+
+pub async fn objects_index_handler_es(
+    Query(params): Query<HashMap<String, String>>,
+    State(state): State<AppState>,
+) -> Html<String> {
+    let q = params.get("q").cloned().unwrap_or_default();
+    let uni = params.get("uni").map(String::as_str);
+    let mfr = params.get("mfr").map(String::as_str);
+    let content = render::catalog::render_objects_index(&state, &q, uni, mfr, "es");
+    Html(render::shell::page_shell_lang(
+        "Objetos", "/es/objects", &content, &state, "es", Some("/objects"),
     ))
 }
 
@@ -57,12 +70,30 @@ pub async fn objects_compare_handler(
     State(state): State<AppState>,
 ) -> Html<String> {
     let ids = parse_repeated_ids(raw.as_deref());
-    let content = render::catalog::render_objects_compare(&state, &ids);
-    Html(render::shell::page_shell(
+    let content = render::catalog::render_objects_compare(&state, &ids, "en");
+    Html(render::shell::page_shell_lang(
         "Compare Objects",
         "/objects",
         &content,
         &state,
+        "en",
+        Some("/es/objects/compare"),
+    ))
+}
+
+pub async fn objects_compare_handler_es(
+    RawQuery(raw): RawQuery,
+    State(state): State<AppState>,
+) -> Html<String> {
+    let ids = parse_repeated_ids(raw.as_deref());
+    let content = render::catalog::render_objects_compare(&state, &ids, "es");
+    Html(render::shell::page_shell_lang(
+        "Comparar Objetos",
+        "/es/objects/compare",
+        &content,
+        &state,
+        "es",
+        Some("/objects/compare"),
     ))
 }
 
@@ -70,17 +101,44 @@ pub async fn object_detail_handler(
     Path(slug): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Html<String>, (StatusCode, Html<String>)> {
-    match render::catalog::render_object_detail(&state, &slug) {
-        Some((name, content)) => Ok(Html(render::shell::page_shell(
+    match render::catalog::render_object_detail(&state, &slug, "en") {
+        Some((name, content)) => Ok(Html(render::shell::page_shell_lang(
             &name,
             &format!("/objects/{slug}"),
             &content,
             &state,
+            "en",
+            Some(&format!("/es/objects/{slug}")),
         ))),
         None => Err((
             StatusCode::NOT_FOUND,
             Html(render::shell::page_shell(
                 "Not found",
+                "",
+                &render::catalog::render_not_found(),
+                &state,
+            )),
+        )),
+    }
+}
+
+pub async fn object_detail_handler_es(
+    Path(slug): Path<String>,
+    State(state): State<AppState>,
+) -> Result<Html<String>, (StatusCode, Html<String>)> {
+    match render::catalog::render_object_detail(&state, &slug, "es") {
+        Some((name, content)) => Ok(Html(render::shell::page_shell_lang(
+            &name,
+            &format!("/es/objects/{slug}"),
+            &content,
+            &state,
+            "es",
+            Some(&format!("/objects/{slug}")),
+        ))),
+        None => Err((
+            StatusCode::NOT_FOUND,
+            Html(render::shell::page_shell(
+                "No encontrado",
                 "",
                 &render::catalog::render_not_found(),
                 &state,

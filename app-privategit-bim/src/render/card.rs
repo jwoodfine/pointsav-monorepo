@@ -113,8 +113,12 @@ pub fn render_token_page(category: &str, state: &AppState, lang: &str) -> String
 
     let Some(file_val) = state.tokens.get(category) else {
         return format!(
-            r#"<div class="bim-empty"><p>No token file found for category <code>{}</code>.</p></div>"#,
-            esc(category)
+            r#"<div class="bim-empty"><p>{}</p></div>"#,
+            t(
+                lang,
+                &format!("No token file found for category <code>{}</code>.", esc(category)),
+                &format!("No se encontró archivo de token para la categoría <code>{}</code>.", esc(category)),
+            )
         );
     };
 
@@ -122,16 +126,22 @@ pub fn render_token_page(category: &str, state: &AppState, lang: &str) -> String
         Some(b) => b,
         None => {
             return format!(
-                r#"<div class="bim-empty"><p>Token file for <code>{}</code> has no 'bim' root.</p></div>"#,
-                esc(category)
+                r#"<div class="bim-empty"><p>{}</p></div>"#,
+                t(
+                    lang,
+                    &format!("Token file for <code>{}</code> has no 'bim' root.", esc(category)),
+                    &format!("El archivo de token de <code>{}</code> no tiene raíz 'bim'.", esc(category)),
+                )
             );
         }
     };
 
-    // Only the lede/intro is Tier-1 scope this round (Round 11, 2026-07-12)
-    // — the entity table, property sets, and IFC/Uniclass codes below stay
-    // English-only regardless of `lang` (out of scope per the approved
-    // plan's "Tokens-per-entity-spec-data pages" carve-out).
+    // Round 12 (2026-07-13): entity table, property sets, and per-entity
+    // descriptions now translate too — Round 11 originally scoped these out,
+    // but the operator asked to keep translating everything except the
+    // Research essays and the Key Plans pages themselves. IFC/Uniclass
+    // codes, slugs, and property-set names stay as-is in both languages —
+    // those are technical identifiers, not prose.
     let intro_html = meta
         .and_then(|m| {
             if lang == "es" {
@@ -163,10 +173,24 @@ pub fn render_token_page(category: &str, state: &AppState, lang: &str) -> String
                 // an empty <td> reads as a broken/half-populated table —
                 // "—" makes the sparseness a legible fact about the data,
                 // not something that looks like a rendering bug).
-                let raw_description = entity
-                    .get("$description")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("");
+                // Round 12 (2026-07-13): `$description_es` is an optional
+                // sibling field on the same entity — present wherever Tier 3
+                // translation has been staged, absent on Key Plan entities
+                // (deliberately excluded, see NEXT.md) where it silently
+                // falls back to English, same graceful-degradation pattern
+                // as every other `.es` sidecar in this codebase.
+                let raw_description = if lang == "es" {
+                    entity
+                        .get("$description_es")
+                        .and_then(|v| v.as_str())
+                        .or_else(|| entity.get("$description").and_then(|v| v.as_str()))
+                        .unwrap_or("")
+                } else {
+                    entity
+                        .get("$description")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                };
                 let stripped_description = strip_internal_maintenance_notes(raw_description);
                 let description = if stripped_description.is_empty() {
                     "—"
@@ -207,13 +231,23 @@ pub fn render_token_page(category: &str, state: &AppState, lang: &str) -> String
         ));
     }
     let pset_block = if pset_rows.is_empty() {
-        r#"<p class="bim-empty">No property sets registered for this category yet.</p>"#.to_string()
+        format!(
+            r#"<p class="bim-empty">{}</p>"#,
+            t(
+                lang,
+                "No property sets registered for this category yet.",
+                "Aún no hay conjuntos de propiedades registrados para esta categoría.",
+            )
+        )
     } else {
         format!(
             r#"<table class="bim-table-wrap bim-token-table">
-  <thead><tr><th>Property set</th><th>Property</th><th>Type</th></tr></thead>
+  <thead><tr><th>{pset_h}</th><th>{prop_h}</th><th>{type_h}</th></tr></thead>
   <tbody>{pset_rows}</tbody>
-</table>"#
+</table>"#,
+            pset_h = t(lang, "Property set", "Conjunto de propiedades"),
+            prop_h = t(lang, "Property", "Propiedad"),
+            type_h = t(lang, "Type", "Tipo"),
         )
     };
 
@@ -248,29 +282,29 @@ pub fn render_token_page(category: &str, state: &AppState, lang: &str) -> String
   </header>
 
   <details class="bim-spec-card" open>
-    <summary>Specification</summary>
+    <summary>{spec_h}</summary>
     <div class="bim-spec-card__body">
       <div class="bim-intro">{intro_html}</div>
       <p class="bim-elements"><code>{elements}</code></p>
       <table class="bim-cat-spectable bim-detail-spectable">
-        <tr><th>IFC entity</th><td><code>{ifc_anchor}</code></td></tr>
+        <tr><th>{ifc_entity_h}</th><td><code>{ifc_anchor}</code></td></tr>
         {uniclass_row}
-        <tr><th>IFC hierarchy</th><td class="bim-ifc-hierarchy"><code>{ifc_hierarchy}</code></td></tr>
+        <tr><th>{ifc_hierarchy_h}</th><td class="bim-ifc-hierarchy"><code>{ifc_hierarchy}</code></td></tr>
       </table>
-      <h2>Applicable property sets</h2>
+      <h2>{psets_h}</h2>
       {pset_block}
     </div>
   </details>
 
   <details class="bim-spec-card" open>
-    <summary>BIM Objects ({entity_count})</summary>
+    <summary>{objects_h} ({entity_count})</summary>
     <div class="bim-spec-card__body">
       <table class="bim-table-wrap bim-token-table">
         <thead>
           <tr>
-            <th>Token slug</th>
-            <th>IFC class</th>
-            <th>Description</th>
+            <th>{slug_h}</th>
+            <th>{ifc_class_h}</th>
+            <th>{desc_h}</th>
           </tr>
         </thead>
         <tbody>{rows}</tbody>
@@ -279,15 +313,15 @@ pub fn render_token_page(category: &str, state: &AppState, lang: &str) -> String
   </details>
 
   <details class="bim-accordion">
-    <summary>Regulation</summary>
-    <div class="bim-spec-card__body"><p class="bim-empty">No regulatory overlays registered for this category.</p></div>
+    <summary>{regulation_h}</summary>
+    <div class="bim-spec-card__body"><p class="bim-empty">{regulation_empty}</p></div>
   </details>
   <details class="bim-accordion">
-    <summary>Climate Zone</summary>
-    <div class="bim-spec-card__body"><p class="bim-empty">No climate zone constraints modeled for this category.</p></div>
+    <summary>{climate_h}</summary>
+    <div class="bim-spec-card__body"><p class="bim-empty">{climate_empty}</p></div>
   </details>
   <details class="bim-accordion">
-    <summary>Token Format</summary>
+    <summary>{token_format_h}</summary>
     <div class="bim-spec-card__body"><pre><code>{dtcg_json}</code></pre></div>
   </details>
 </div>"#,
@@ -303,6 +337,27 @@ pub fn render_token_page(category: &str, state: &AppState, lang: &str) -> String
         entity_count = entity_count,
         rows = rows,
         dtcg_json = esc(&dtcg_json),
+        spec_h = t(lang, "Specification", "Especificación"),
+        ifc_entity_h = t(lang, "IFC entity", "Entidad IFC"),
+        ifc_hierarchy_h = t(lang, "IFC hierarchy", "Jerarquía IFC"),
+        psets_h = t(lang, "Applicable property sets", "Conjuntos de propiedades aplicables"),
+        objects_h = t(lang, "BIM Objects", "Objetos BIM"),
+        slug_h = t(lang, "Token slug", "Slug de token"),
+        ifc_class_h = t(lang, "IFC class", "Clase IFC"),
+        desc_h = t(lang, "Description", "Descripción"),
+        regulation_h = t(lang, "Regulation", "Normativa"),
+        regulation_empty = t(
+            lang,
+            "No regulatory overlays registered for this category.",
+            "No hay condicionantes normativos registrados para esta categoría.",
+        ),
+        climate_h = t(lang, "Climate Zone", "Zona Climática"),
+        climate_empty = t(
+            lang,
+            "No climate zone constraints modeled for this category.",
+            "No hay restricciones de zona climática modeladas para esta categoría.",
+        ),
+        token_format_h = t(lang, "Token Format", "Formato de Token"),
     )
 }
 
