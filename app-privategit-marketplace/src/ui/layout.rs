@@ -135,15 +135,27 @@ body{{font-family:"Inter","Sans Fallback",system-ui,-apple-system,"Segoe UI",Ari
 .sw-legal__lede{{color:#555;margin:0 0 20px;}}
 .sw-legal hr{{border:none;border-top:1px solid #ddd;margin:32px 0 20px;}}
 .sw-legal__copyright,.sw-legal__trademark{{font-size:12px;color:#666;max-width:80ch;}}
-@media (max-width:768px){{
+/* Masthead-row breakpoint is 1024px, not the crate's usual 768px, and wider
+   than home.pointsav.com's own 60rem/960px: same reasoning as that site's
+   documented choice (its nav needs ~918px minimum to sit on one row without
+   wrapping/overflowing) but ours needs still more room, because this crate's
+   masthead also carries a search box home.pointsav.com's masthead does not.
+   Measured live, not assumed: at the initial 768px value this row overflowed
+   horizontally anywhere from 769px up through ~1020px, pushing the
+   lang-toggle pill off-screen entirely (`scrollWidth > clientWidth` — first
+   found at 960px still overflowing by 54px at 961px, tapering to 0px only at
+   1020px). 1024px (a round, standard breakpoint) clears that with margin. */
+@media (max-width:1024px){{
 .sw-search{{display:none;}}
 .sw-masthead__nav{{display:none;}}
 .sw-masthead__inner{{gap:12px;}}
-.sw-footer__top{{grid-template-columns:1fr;gap:24px;}}
 .sw-hamburger{{display:inline-flex;margin-left:auto;}}
-.sw-mobile-nav.sw-mobile-nav--open{{display:flex;flex-direction:column;}}
 .sw-lang-switch:not(.sw-lang-switch--drawer){{padding:6px;}}
 .sw-lang-switch:not(.sw-lang-switch--drawer) .sw-lang-switch__label{{display:none;}}
+}}
+@media (max-width:768px){{
+.sw-footer__top{{grid-template-columns:1fr;gap:24px;}}
+.sw-mobile-nav.sw-mobile-nav--open{{display:flex;flex-direction:column;}}
 }}"#,
         topnav = tokens::TOPNAV_BG,
         on_chrome = tokens::ON_CHROME,
