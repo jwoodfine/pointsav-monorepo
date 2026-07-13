@@ -122,10 +122,37 @@ pub fn extract_claims(topic_slug: &str, body_md: &str) -> Vec<Claim> {
         let close_end = content_end + CLOSE.len();
 
         // Nesting guard: another opener inside this span means the author
-        // nested claims, which the convention forbids (§4.1) — treat the
-        // outer marker as malformed and resume scanning from just past it.
+        // nested claims, which the convention forbids (§4.1). Depth-count
+        // forward from marker_end to find the OUTER marker's true matching
+        // closer (the naive `content_end` above is actually the INNER
+        // claim's closer in this case) and skip the entire malformed region
+        // — extracting nothing from it, inner claim included. A shallow
+        // `cursor = marker_end` here would leave the true outer closer
+        // un-skipped and, worse, let the inner claim be parsed as valid on
+        // the next loop iteration.
         if body_md[content_start..content_end].contains(OPEN) {
-            cursor = marker_end;
+            let mut depth = 1usize;
+            let mut scan = marker_end;
+            let true_close_end = loop {
+                let next_open = body_md[scan..].find(OPEN).map(|p| scan + p);
+                let next_close = body_md[scan..].find(CLOSE).map(|p| scan + p);
+                match (next_open, next_close) {
+                    (Some(o), Some(c)) if o < c => {
+                        depth += 1;
+                        scan = o + OPEN.len();
+                    }
+                    (_, Some(c)) => {
+                        depth -= 1;
+                        let end = c + CLOSE.len();
+                        if depth == 0 {
+                            break end;
+                        }
+                        scan = end;
+                    }
+                    _ => break body_md.len(), // unbalanced past this point — consume to EOF
+                }
+            };
+            cursor = true_close_end;
             continue;
         }
 
@@ -281,12 +308,22 @@ mod tests {
     }
 
     #[test]
-    fn nested_markers_outer_is_skipped() {
+    fn nested_markers_both_outer_and_inner_are_skipped() {
         let md = "<!--claim id=outer confidence=structural cites=[]-->Text <!--claim id=inner confidence=structural cites=[]-->nested<!--/claim--> more<!--/claim-->";
         // The outer opener's span contains another opener before its own
-        // closer — malformed per §4.1, both markers skipped as a unit here.
+        // closer — malformed per §4.1, the ENTIRE region (outer AND inner)
+        // is skipped as a unit, not just the outer id.
         let claims = extract_claims("t", md);
         assert!(claims.iter().all(|c| c.id != "outer"));
+        assert!(claims.iter().all(|c| c.id != "inner"));
+    }
+
+    #[test]
+    fn valid_claim_after_a_nested_malformed_region_still_extracts() {
+        let md = "<!--claim id=outer confidence=structural cites=[]-->Text <!--claim id=inner confidence=structural cites=[]-->nested<!--/claim--> more<!--/claim--><!--claim id=valid confidence=structural cites=[]-->Fine.<!--/claim-->";
+        let claims = extract_claims("t", md);
+        assert_eq!(claims.len(), 1);
+        assert_eq!(claims[0].id, "valid");
     }
 
     #[test]
