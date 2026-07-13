@@ -18,12 +18,17 @@
 
 pub mod app;
 pub mod assets;
+pub mod citations;
+pub mod claims_store;
 pub mod config;
 pub mod content;
 pub mod discovery;
 pub mod error;
 pub mod history;
+pub mod jsonld;
 pub mod legal;
+pub mod mcp;
 pub mod search;
 pub mod sitedata;
 pub mod ui;
+pub mod verification;
