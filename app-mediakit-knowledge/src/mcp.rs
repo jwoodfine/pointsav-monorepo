@@ -39,6 +39,13 @@ pub struct QueryClaimsParams {
     pub asof: Option<String>,
 }
 
+/// Parameters for `validate_editorial_standards`.
+#[derive(Debug, serde::Deserialize, schemars::JsonSchema)]
+pub struct ValidateEditorialParams {
+    /// Markdown body text to check against the editorial-standards ruleset.
+    pub body_md: String,
+}
+
 fn internal_error(msg: impl Into<String>) -> McpError {
     McpError {
         code: ErrorCode(-32603),
@@ -86,6 +93,19 @@ impl ClaimsMcpServer {
             .map_err(|e| internal_error(format!("serialization failed: {e}")))?;
         Ok(CallToolResult::success(vec![ContentBlock::text(json)]))
     }
+
+    #[tool(
+        description = "Check markdown body text against the provisional editorial-standards ruleset (Bloomberg-standard language, BCSC forward-looking-claim posture). Returns a JSON array of flagged lines. Provisional starter ruleset — not project-editorial's eventual real one."
+    )]
+    async fn validate_editorial_standards(
+        &self,
+        Parameters(params): Parameters<ValidateEditorialParams>,
+    ) -> Result<CallToolResult, McpError> {
+        let findings = crate::editorial::validate_editorial_standards(&params.body_md);
+        let json = serde_json::to_string_pretty(&findings)
+            .map_err(|e| internal_error(format!("serialization failed: {e}")))?;
+        Ok(CallToolResult::success(vec![ContentBlock::text(json)]))
+    }
 }
 
 /// Keep only claims whose `valid_at` is at or before `asof` (timeless claims
@@ -112,9 +132,10 @@ impl ServerHandler for ClaimsMcpServer {
         InitializeResult::new(ServerCapabilities::builder().enable_tools().build())
             .with_server_info(Implementation::from_build_env())
             .with_instructions(
-                "app-mediakit-knowledge claim-layer MCP surface (provisional — see \
-                 KNOWLEDGE-PLATFORM-PLAN.md Decision 3 for the pending service-slm \
-                 reconciliation). Tools: query_claims(topic, asof?).",
+                "app-mediakit-knowledge claim-layer + editorial-linter MCP surface \
+                 (provisional — see KNOWLEDGE-PLATFORM-PLAN.md Decisions 3 and 8 for \
+                 the pending service-slm / project-editorial reconciliations). Tools: \
+                 query_claims(topic, asof?), validate_editorial_standards(body_md).",
             )
     }
 }
