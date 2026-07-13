@@ -231,10 +231,15 @@ pub fn render_search_results(query: &str, state: &AppState, lang: &str) -> Strin
             } else {
                 description
             };
+            let url = if lang == "es" {
+                format!("/es/key-plans/{slug}")
+            } else {
+                format!("/key-plans/{slug}")
+            };
             hits.push(Hit {
                 kind: "Key Plan",
                 title: name.to_string(),
-                url: format!("/key-plans/{slug}"),
+                url,
                 snippet: highlight_snippet(snippet_source, &tokens),
                 score,
                 tiebreak: slug.to_string(),
@@ -269,10 +274,15 @@ pub fn render_search_results(query: &str, state: &AppState, lang: &str) -> Strin
             let body = strip_markdown(&raw);
             let fields = [(title.as_str(), 90), (body.as_str(), 6)];
             if let Some(score) = score_match(&tokens, &fields) {
+                let url = if lang == "es" {
+                    format!("/es/research/{slug}")
+                } else {
+                    format!("/research/{slug}")
+                };
                 hits.push(Hit {
                     kind: "Research",
                     title: title.clone(),
-                    url: format!("/research/{slug}"),
+                    url,
                     snippet: highlight_snippet(&body, &tokens),
                     score,
                     tiebreak: slug.clone(),

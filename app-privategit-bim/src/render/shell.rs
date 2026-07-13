@@ -76,22 +76,28 @@ activities are forward-looking and subject to change without notice; they are no
 undertaken to be updated except as required by law.</p>",
         )
     };
-    let objects_current = if active_path.starts_with("/objects") {
+    // Strip the /es prefix before matching — active_path is "/es/objects" on
+    // Spanish pages, and a bare .starts_with("/objects") would never match
+    // that, leaving the nav's "current page" highlight permanently off for
+    // every Spanish page (a real bug present since Round 11, caught while
+    // fixing the Key Plans/Research nav dead-end in Round 13).
+    let unprefixed_path = active_path.strip_prefix("/es").unwrap_or(active_path);
+    let objects_current = if unprefixed_path.starts_with("/objects") {
         r#" aria-current="page""#
     } else {
         ""
     };
-    let key_plans_current = if active_path.starts_with("/key-plans") {
+    let key_plans_current = if unprefixed_path.starts_with("/key-plans") {
         r#" aria-current="page""#
     } else {
         ""
     };
-    let research_current = if active_path.starts_with("/research") {
+    let research_current = if unprefixed_path.starts_with("/research") {
         r#" aria-current="page""#
     } else {
         ""
     };
-    let method_current = if active_path.starts_with("/method") {
+    let method_current = if unprefixed_path.starts_with("/method") {
         r#" aria-current="page""#
     } else {
         ""
@@ -114,10 +120,9 @@ undertaken to be updated except as required by law.</p>",
     };
 
     // hreflang + language-switch link (Round 11, 2026-07-12). `alt_path` is
-    // `None` for the many English-only pages outside Tier-1 scope this
-    // round (Objects/Key Plans/Research/Search) — the switch simply renders
-    // nothing there, matching the reference `lang_switch()`'s own
-    // graceful-degradation behavior for partial coverage.
+    // `None` only for the handful of routes with no /es counterpart at all
+    // (e.g. the 404 fallback) — the switch renders nothing there, matching
+    // the reference `lang_switch()`'s own graceful-degradation behavior.
     let base = state.config.public_url.trim_end_matches('/');
     let (en_path, es_path_opt): (String, Option<String>) = if lang == "es" {
         (
@@ -148,14 +153,24 @@ undertaken to be updated except as required by law.</p>",
         (_, None) => String::new(),
     };
     let html_lang = if lang == "es" { "es" } else { "en" };
-    // Round 12 (2026-07-13): Method/Objects/Search are now fully bilingual
-    // — nav links to them go to the /es counterpart on Spanish pages. Key
-    // Plans and Research stay English-only by design (excluded scope), so
-    // their nav links never gain an /es prefix.
-    let (method_href, objects_href, search_href) = if lang == "es" {
-        ("/es/method", "/es/objects", "/es/search")
+    // Round 12 (2026-07-13): Method/Objects/Search are fully bilingual.
+    // Round 13 (2026-07-13): Key Plans/Research nav links now also go to
+    // their /es chrome-only pages — clicking them from Spanish used to
+    // strand the visitor on a fully-English page with the language switch
+    // entirely absent (no way back to Spanish). The Key Plan/Research
+    // *content* itself still stays English by design; only the chrome and
+    // this nav link changed.
+    let (method_href, objects_href, search_href, key_plans_href, research_href) = if lang == "es"
+    {
+        (
+            "/es/method",
+            "/es/objects",
+            "/es/search",
+            "/es/key-plans",
+            "/es/research",
+        )
     } else {
-        ("/method", "/objects", "/search")
+        ("/method", "/objects", "/search", "/key-plans", "/research")
     };
     // Carbon Web Components + their CSS are only used by /edit/* (real
     // <cds-content-switcher> etc.) — the public catalog no longer borrows
@@ -215,8 +230,8 @@ undertaken to be updated except as required by law.</p>",
       <nav class="bim-header__nav" aria-label="Primary">
         <a href="{method_href}"{method_current}>{nav_method}</a>
         <a href="{objects_href}"{objects_current}>{nav_objects}</a>
-        <a href="/key-plans"{key_plans_current}>Key Plans</a>
-        <a href="/research"{research_current}>{nav_research}</a>
+        <a href="{key_plans_href}"{key_plans_current}>Key Plans</a>
+        <a href="{research_href}"{research_current}>{nav_research}</a>
       </nav>
       <form class="bim-header__search" method="get" action="{search_href}" role="search">
         <input type="search" name="q" placeholder="{search_label}" aria-label="{search_aria}">
@@ -246,8 +261,8 @@ undertaken to be updated except as required by law.</p>",
             <nav class="bim-drawer__nav" aria-label="Primary">
               <a href="{method_href}"{method_current}>{nav_method}</a>
               <a href="{objects_href}"{objects_current}>{nav_objects}</a>
-              <a href="/key-plans"{key_plans_current}>Key Plans</a>
-              <a href="/research"{research_current}>{nav_research}</a>
+              <a href="{key_plans_href}"{key_plans_current}>Key Plans</a>
+              <a href="{research_href}"{research_current}>{nav_research}</a>
             </nav>
             {lang_switch}
           </div>
@@ -360,6 +375,8 @@ undertaken to be updated except as required by law.</p>",
         research_current = research_current,
         method_current = method_current,
         method_href = method_href,
+        key_plans_href = key_plans_href,
+        research_href = research_href,
         objects_href = objects_href,
         search_href = search_href,
         nav_method = t(lang, "Method", "Método"),

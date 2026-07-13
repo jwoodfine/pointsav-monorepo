@@ -364,7 +364,12 @@ pub fn render_token_page(category: &str, state: &AppState, lang: &str) -> String
     )
 }
 
-pub fn render_research_index(state: &AppState) -> String {
+/// Research essays are the "Journals" the operator confirmed stay English —
+/// only page chrome (kicker/lede/breadcrumb/empty-state) translates here,
+/// same boundary as Key Plans (Round 13, 2026-07-13). Titles and body text
+/// are read verbatim from the English `.md` source regardless of `lang`.
+pub fn render_research_index(state: &AppState, lang: &str) -> String {
+    let research_path = if lang == "es" { "/es/research" } else { "/research" };
     let research_dir = state.config.vault_dir.join("research");
     let mut items = String::new();
     if let Ok(rd) = std::fs::read_dir(&research_dir) {
@@ -390,33 +395,45 @@ pub fn render_research_index(state: &AppState) -> String {
                 .unwrap_or_else(|| slug.replace('-', " "));
             items.push_str(&format!(
                 r#"<div class="bim-research-item">
-  <a href="/research/{slug}" data-path="/research/{slug}" class="bim-nav-link">
+  <a href="{research_path}/{slug}" data-path="{research_path}/{slug}" class="bim-nav-link">
     <span class="bim-research-item__title">{title}</span>
     <span class="bim-research-item__slug">/research/{slug}</span>
   </a>
 </div>"#,
+                research_path = research_path,
                 slug = esc(slug),
                 title = esc(&title),
             ));
         }
     }
     if items.is_empty() {
-        items = r#"<p class="bim-empty">No research documents found.</p>"#.into();
+        items = format!(
+            r#"<p class="bim-empty">{}</p>"#,
+            t(lang, "No research documents found.", "No se encontraron documentos de investigación.")
+        );
     }
     format!(
         r#"<div class="bim-research">
   <header class="bim-cat-pagehead">
-    <span class="bim-cat-kicker">Research backplane</span>
-    <h1>Research</h1>
-    <p class="bim-cat-pagehead__lede">Background notes and working documents behind the BIM Object Library's classifications and methodology.</p>
+    <span class="bim-cat-kicker">{kicker}</span>
+    <h1>{title}</h1>
+    <p class="bim-cat-pagehead__lede">{lede}</p>
   </header>
   <div class="bim-research-list">{items}</div>
 </div>"#,
+        kicker = t(lang, "Research backplane", "Panel de investigación"),
+        title = t(lang, "Research", "Investigación"),
+        lede = t(
+            lang,
+            "Background notes and working documents behind the BIM Object Library's classifications and methodology.",
+            "Notas de referencia y documentos de trabajo detrás de las clasificaciones y la metodología de la Biblioteca BIM.",
+        ),
         items = items,
     )
 }
 
-pub fn render_research_item(slug: &str, state: &AppState) -> String {
+pub fn render_research_item(slug: &str, state: &AppState, lang: &str) -> String {
+    let research_path = if lang == "es" { "/es/research" } else { "/research" };
     let path = state
         .config
         .vault_dir
@@ -426,8 +443,10 @@ pub fn render_research_item(slug: &str, state: &AppState) -> String {
         Ok(s) => s,
         Err(_) => {
             return format!(
-                r#"<div class="bim-empty"><p>Research document <code>{}</code> not found.</p></div>"#,
-                esc(slug)
+                r#"<div class="bim-empty"><p>{} <code>{}</code> {}.</p></div>"#,
+                t(lang, "Research document", "Documento de investigación"),
+                esc(slug),
+                t(lang, "not found", "no encontrado")
             )
         }
     };
@@ -435,10 +454,12 @@ pub fn render_research_item(slug: &str, state: &AppState) -> String {
     format!(
         r#"<div class="bim-research-item-page">
   <div class="bim-breadcrumbs">
-    <a href="/research" data-path="/research" class="bim-nav-link">Research</a> / <span>{slug}</span>
+    <a href="{research_path}" data-path="{research_path}" class="bim-nav-link">{research_label}</a> / <span>{slug}</span>
   </div>
   <div class="bim-markdown">{html_body}</div>
 </div>"#,
+        research_path = research_path,
+        research_label = t(lang, "Research", "Investigación"),
         slug = esc(slug),
         html_body = html_body,
     )

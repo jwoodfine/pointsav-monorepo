@@ -80,6 +80,26 @@ fn category_label(cat: &str) -> &'static str {
     }
 }
 
+/// Spanish rendering of `category_label` — a page-chrome/navigation label
+/// (grouping heading, filter chip), not the Key Plan's own technical
+/// content, so it translates like any other UI label even though the Key
+/// Plan pages themselves stay content-untranslated (Round 13, 2026-07-13).
+fn category_label_lang(cat: &str, lang: &str) -> &'static str {
+    if lang != "es" {
+        return category_label(cat);
+    }
+    match cat {
+        "private-office" => "Oficina Privada",
+        "corporate-office" => "Oficina Corporativa",
+        "medical" => "Médico",
+        "business" => "Negocios",
+        "laboratory" => "Laboratorio",
+        "academic" => "Académico",
+        "civic" => "Cívico",
+        _ => "Otro",
+    }
+}
+
 fn category_space(cat: &str) -> &'static str {
     match cat {
         "private-office" => "Private office spaces",
@@ -805,12 +825,12 @@ pub(crate) fn render_object_card(o: &Value, lang: &str) -> String {
 
 // ── Key Plan card (navy key-plan thumbnail; honest empty-bill note) ──────
 
-pub(crate) fn render_key_plan_card(c: &Value) -> String {
+pub(crate) fn render_key_plan_card(c: &Value, lang: &str) -> String {
+    let key_plans_path = if lang == "es" { "/es/key-plans" } else { "/key-plans" };
     let slug = s(c, "slug");
     let id = s(c, "id");
     let name = s(c, "name");
     let category = s(c, "category");
-    let cat_label = s(c, "category_label");
     let space = s(c, "uniclass_space");
     let has_zone = c
         .get("has_zone_data")
@@ -857,12 +877,17 @@ pub(crate) fn render_key_plan_card(c: &Value) -> String {
     let (thumb, note) = if has_zone {
         let svg = s(c, "svg");
         let note = if bill_len == 0 && has_room_program {
-            r#"<span class="bim-cat-card__note">Room programme</span>"#.to_string()
+            format!(
+                r#"<span class="bim-cat-card__note">{}</span>"#,
+                t(lang, "Room programme", "Programa de habitación")
+            )
         } else if bill_len == 0 {
             String::new()
         } else if linked_len < bill_len {
             format!(
-                r#"<span class="bim-cat-card__note">{linked_len} of {bill_len} parts linked to the catalog</span>"#
+                r#"<span class="bim-cat-card__note">{linked_len} {of} {bill_len} {rest}</span>"#,
+                of = t(lang, "of", "de"),
+                rest = t(lang, "parts linked to the catalog", "componentes vinculados al catálogo"),
             )
         } else {
             String::new()
@@ -877,12 +902,19 @@ pub(crate) fn render_key_plan_card(c: &Value) -> String {
                 r#"<span class="bim-cat-thumb bim-cat-thumb--comp bim-cat-thumb--floorscale">{}</span>"#,
                 super::svg::render_floor_scale_svg()
             ),
-            r#"<span class="bim-cat-card__note">Leasehold sized as a fraction of the Floor Plate — tenant designs interior layout</span>"#.to_string(),
+            format!(
+                r#"<span class="bim-cat-card__note">{}</span>"#,
+                t(
+                    lang,
+                    "Leasehold sized as a fraction of the Floor Plate — tenant designs interior layout",
+                    "Arrendamiento dimensionado como una fracción de la Placa de Piso — el inquilino diseña el interior",
+                )
+            ),
         )
     };
 
     format!(
-        r#"<a class="bim-cat-card bim-cat-card--comp" href="/key-plans/{slug}" data-cat="{category}" aria-label="{name} — view specification">
+        r#"<a class="bim-cat-card bim-cat-card--comp" href="{key_plans_path}/{slug}" data-cat="{category}" aria-label="{name} — view specification">
   {thumb}
   <span class="bim-cat-card__body">
     <span class="bim-cat-chip bim-cat-chip--ef"><span class="bim-cat-chip__lv">SL</span>{space}</span>
@@ -891,11 +923,12 @@ pub(crate) fn render_key_plan_card(c: &Value) -> String {
     {note}
   </span>
 </a>"#,
+        key_plans_path = key_plans_path,
         slug = esc(slug),
         id = esc(id),
         name = esc(name),
         category = esc(category),
-        cat_label = esc(cat_label),
+        cat_label = esc(category_label_lang(category, lang)),
         space = esc(space),
         area_line = esc(&area_line),
         thumb = thumb,
@@ -1172,7 +1205,9 @@ pub fn render_key_plans_index(
     q: &str,
     use_case: Option<&str>,
     layout: Option<&str>,
+    lang: &str,
 ) -> String {
+    let key_plans_path = if lang == "es" { "/es/key-plans" } else { "/key-plans" };
     let objects = build_objects(state);
     let key_plans: Vec<Value> = build_key_plans(state, &objects)
         .into_iter()
@@ -1200,7 +1235,7 @@ pub fn render_key_plans_index(
             .map(|slug| {
                 (
                     slug.to_string(),
-                    category_label(slug).to_string(),
+                    category_label_lang(slug, lang).to_string(),
                     counts[slug],
                 )
             })
@@ -1221,12 +1256,16 @@ pub fn render_key_plans_index(
     if modeled_n > 0 {
         layout_pairs.push((
             "modeled".to_string(),
-            "Zone layout modeled".to_string(),
+            t(lang, "Zone layout modeled", "Distribución de zonas modelada").to_string(),
             modeled_n,
         ));
     }
     if floor_n > 0 {
-        layout_pairs.push(("floor".to_string(), "Floor-scale".to_string(), floor_n));
+        layout_pairs.push((
+            "floor".to_string(),
+            t(lang, "Floor-scale", "Escala de piso").to_string(),
+            floor_n,
+        ));
     }
 
     let matches: Vec<&Value> = key_plans
@@ -1259,28 +1298,35 @@ pub fn render_key_plans_index(
             }
             let cards: String = in_section
                 .iter()
-                .map(|c| render_key_plan_card(c))
+                .map(|c| render_key_plan_card(c, lang))
                 .collect();
             format!(
                 r#"<section class="bim-cat-usesection">
   <h2 class="bim-cat-usesection__h">{label}</h2>
   <div class="bim-cat-grid bim-cat-grid--comp">{cards}</div>
 </section>"#,
-                label = esc(category_label(cat)),
+                label = esc(category_label_lang(cat, lang)),
                 cards = cards,
             )
         })
         .collect();
 
     let body = if matches.is_empty() {
-        r#"<p class="bim-empty">No Key Plans match the current filters.</p>"#.to_string()
+        format!(
+            r#"<p class="bim-empty">{}</p>"#,
+            t(
+                lang,
+                "No Key Plans match the current filters.",
+                "Ningún Key Plan coincide con los filtros actuales.",
+            )
+        )
     } else {
         sections
     };
 
     let use_chips = chip_row(
-        "Use Case",
-        "/key-plans",
+        t(lang, "Use Case", "Caso de uso"),
+        key_plans_path,
         "use",
         &use_pairs,
         use_case,
@@ -1288,8 +1334,8 @@ pub fn render_key_plans_index(
         &[("layout", layout)],
     );
     let layout_chips = chip_row(
-        "Layout",
-        "/key-plans",
+        t(lang, "Layout", "Distribución"),
+        key_plans_path,
         "layout",
         &layout_pairs,
         layout,
@@ -1300,24 +1346,35 @@ pub fn render_key_plans_index(
     format!(
         r##"<div class="bim-catalog-page">
   <header class="bim-cat-pagehead">
-    <span class="bim-cat-kicker">The assemblies</span>
+    <span class="bim-cat-kicker">{kicker}</span>
     <h1>Key Plans</h1>
-    <p class="bim-cat-pagehead__lede">An assembly of Objects — what an architectural drawing becomes once its parts are real, with the rules checked at every join. Start from an assembly and open its parts list.</p>
+    <p class="bim-cat-pagehead__lede">{lede}</p>
   </header>
-  <form class="bim-cat-searchform" method="get" action="/key-plans">
+  <form class="bim-cat-searchform" method="get" action="{key_plans_path}">
     <label class="bim-cat-search">
       <span class="bim-cat-search__ico" aria-hidden="true">⌕</span>
-      <input type="search" name="q" value="{q}" placeholder="Search the registry" aria-label="Search Key Plans">
+      <input type="search" name="q" value="{q}" placeholder="{search_ph}" aria-label="{search_aria}">
     </label>
     {use_hidden}{layout_hidden}
-    <button class="bim-cat-searchform__submit" type="submit">Search</button>
+    <button class="bim-cat-searchform__submit" type="submit">{search_btn}</button>
   </form>
   <div class="bim-cat-filters">{use_chips}{layout_chips}</div>
   <div class="bim-cat-gridhead">
-    <div class="bim-cat-res"><b>{n}</b> of {total} Key Plans</div>
+    <div class="bim-cat-res"><b>{n}</b> {of} {total} Key Plans</div>
   </div>
   {body}
 </div>"##,
+        kicker = t(lang, "The assemblies", "Los conjuntos"),
+        lede = t(
+            lang,
+            "An assembly of Objects — what an architectural drawing becomes once its parts are real, with the rules checked at every join. Start from an assembly and open its parts list.",
+            "Un conjunto de Objetos — lo que un plano arquitectónico se convierte una vez que sus partes son reales, con las reglas verificadas en cada unión. Comience desde un conjunto y abra su lista de componentes.",
+        ),
+        key_plans_path = key_plans_path,
+        search_ph = t(lang, "Search the registry", "Buscar en el registro"),
+        search_aria = t(lang, "Search Key Plans", "Buscar Key Plans"),
+        search_btn = t(lang, "Search", "Buscar"),
+        of = t(lang, "of", "de"),
         q = esc(q),
         use_hidden = use_case
             .map(|v| format!(r#"<input type="hidden" name="use" value="{}">"#, esc(v)))
@@ -1637,18 +1694,25 @@ pub fn render_object_detail(state: &AppState, slug: &str, lang: &str) -> Option<
 // the plan-anchored inspector.
 // ─────────────────────────────────────────────────────────────────────────────
 
-fn zone_bars_html(c: &Value) -> String {
+fn zone_bars_html(c: &Value, lang: &str) -> String {
     let has_zone = c
         .get("has_zone_data")
         .and_then(Value::as_bool)
         .unwrap_or(false);
     if !has_zone {
-        return r#"<p class="bim-cat-note">Floor-scale plan — sized as a proportion of the floor plate; no three-zone cross-section is modeled at this program level.</p>"#.to_string();
+        return format!(
+            r#"<p class="bim-cat-note">{}</p>"#,
+            t(
+                lang,
+                "Floor-scale plan — sized as a proportion of the floor plate; no three-zone cross-section is modeled at this program level.",
+                "Plano a escala de piso — dimensionado como una proporción de la placa de piso; no se modela una sección transversal de tres zonas en este nivel de programa.",
+            )
+        );
     }
     let rows: Vec<(&str, &str, Option<f64>)> = vec![
-        ("H", "Habitat", c.get("zone1").and_then(Value::as_f64)),
+        ("H", t(lang, "Habitat", "Hábitat"), c.get("zone1").and_then(Value::as_f64)),
         ("M", "Magazine", c.get("zone2").and_then(Value::as_f64)),
-        ("C", "Corridor", c.get("zone3").and_then(Value::as_f64)),
+        ("C", t(lang, "Corridor", "Corredor"), c.get("zone3").and_then(Value::as_f64)),
     ];
     let present: Vec<(&str, &str, f64)> = rows
         .into_iter()
@@ -1657,12 +1721,12 @@ fn zone_bars_html(c: &Value) -> String {
     let max = present.iter().fold(0.0_f64, |m, (_, _, v)| m.max(*v));
     let bars: String = present
         .iter()
-        .map(|(k, t, v)| {
+        .map(|(k, label, v)| {
             let pct = if max > 0.0 { (v / max * 100.0).round() as i64 } else { 0 };
             format!(
-                r#"<div class="bim-cat-zone"><div class="bim-cat-zone__k">{k}</div><div class="bim-cat-zone__t">{t}</div><div class="bim-cat-zone__n">{v}<small> m</small></div><div class="bim-cat-zone__bar"><i style="width:{pct}%"></i></div></div>"#,
+                r#"<div class="bim-cat-zone"><div class="bim-cat-zone__k">{k}</div><div class="bim-cat-zone__t">{label}</div><div class="bim-cat-zone__n">{v}<small> m</small></div><div class="bim-cat-zone__bar"><i style="width:{pct}%"></i></div></div>"#,
                 k = esc(k),
-                t = esc(t),
+                label = esc(label),
                 v = round2(*v),
                 pct = pct,
             )
@@ -1671,7 +1735,8 @@ fn zone_bars_html(c: &Value) -> String {
     format!(r#"<div class="bim-cat-zones">{bars}</div>"#)
 }
 
-fn bill_html(c: &Value, comp_slug: &str) -> String {
+fn bill_html(c: &Value, comp_slug: &str, lang: &str) -> String {
+    let key_plans_path = if lang == "es" { "/es/key-plans" } else { "/key-plans" };
     let bill = c
         .get("bill")
         .and_then(Value::as_array)
@@ -1690,15 +1755,31 @@ fn bill_html(c: &Value, comp_slug: &str) -> String {
             .cloned()
             .unwrap_or_default();
         return if program.is_empty() {
-            r#"<p class="bim-cat-note">Room programme on record; no furniture layout catalogued.</p>"#.to_string()
+            format!(
+                r#"<p class="bim-cat-note">{}</p>"#,
+                t(
+                    lang,
+                    "Room programme on record; no furniture layout catalogued.",
+                    "Programa de habitación en registro; no se ha catalogado una disposición de mobiliario.",
+                )
+            )
         } else {
-            r#"<p class="bim-cat-note">Furniture programme on record; not linked to catalog Objects.</p>"#.to_string()
+            format!(
+                r#"<p class="bim-cat-note">{}</p>"#,
+                t(
+                    lang,
+                    "Furniture programme on record; not linked to catalog Objects.",
+                    "Programa de mobiliario en registro; no vinculado a Objetos del catálogo.",
+                )
+            )
         };
     }
 
     let status_chip = if linked_n < n {
         format!(
-            r#"<div class="bim-bill-status"><span class="bim-bill-status__chip">{linked_n} of {n} parts linked to the catalog</span></div>"#
+            r#"<div class="bim-bill-status"><span class="bim-bill-status__chip">{linked_n} {of} {n} {rest}</span></div>"#,
+            of = t(lang, "of", "de"),
+            rest = t(lang, "parts linked to the catalog", "componentes vinculados al catálogo"),
         )
     } else {
         String::new()
@@ -1724,18 +1805,21 @@ fn bill_html(c: &Value, comp_slug: &str) -> String {
                 let obj_id = b.get("obj_id").and_then(Value::as_str).unwrap_or("");
                 let code = b.get("code").and_then(Value::as_str).unwrap_or("");
                 format!(
-                    r#"<a class="bim-bill-row bim-bill-row--linked" data-plan-obj="{i}" href="/key-plans/{comp_slug}/o/{obj_id}"><span class="bim-bill-row__name">{name}</span><span class="bim-bill-row__code">{code} &middot; view object →</span></a>"#,
+                    r#"<a class="bim-bill-row bim-bill-row--linked" data-plan-obj="{i}" href="{key_plans_path}/{comp_slug}/o/{obj_id}"><span class="bim-bill-row__name">{name}</span><span class="bim-bill-row__code">{code} &middot; {view_object} →</span></a>"#,
                     i = i,
+                    key_plans_path = key_plans_path,
                     comp_slug = esc(comp_slug),
                     obj_id = esc(obj_id),
                     name = esc(name),
                     code = esc(code),
+                    view_object = t(lang, "view object", "ver objeto"),
                 )
             } else {
                 format!(
-                    r#"<div class="bim-bill-row bim-bill-row--unlinked" data-plan-obj="{i}"><span class="bim-bill-row__name">{name}</span><span class="bim-bill-row__tag">not in catalog</span></div>"#,
+                    r#"<div class="bim-bill-row bim-bill-row--unlinked" data-plan-obj="{i}"><span class="bim-bill-row__name">{name}</span><span class="bim-bill-row__tag">{not_in_catalog}</span></div>"#,
                     i = i,
                     name = esc(name),
+                    not_in_catalog = t(lang, "not in catalog", "no está en el catálogo"),
                 )
             }
         })
@@ -1753,7 +1837,10 @@ pub fn render_key_plan_detail(
     state: &AppState,
     slug: &str,
     highlight_object: Option<&str>,
+    lang: &str,
 ) -> Option<(String, String)> {
+    let key_plans_path = if lang == "es" { "/es/key-plans" } else { "/key-plans" };
+    let home_href = if lang == "es" { "/es" } else { "/" };
     let objects = build_objects(state);
     let key_plans = build_key_plans(state, &objects);
     let c = key_plans.iter().find(|c| s(c, "slug") == slug)?;
@@ -1780,7 +1867,8 @@ pub fn render_key_plan_detail(
         None => name.to_string(),
     };
     let id = s(c, "id");
-    let cat_label = s(c, "category_label");
+    let category = s(c, "category");
+    let cat_label = category_label_lang(category, lang);
     let space = s(c, "uniclass_space");
     let description = s(c, "description");
     let has_zone = c
@@ -1807,25 +1895,29 @@ pub fn render_key_plan_detail(
     // empty page background below the plan on any Key Plan with a long
     // parts list. It describes the plan, not the parts list, so it belongs
     // under the drawing in both the normal and object-highlight views.
+    let data_box = t(lang, "Data Box", "Cuadro de Datos");
+    let net_leasable = t(lang, "Net leasable area", "Área rentable neta");
     let plan_area_line = match (area_sf, area_m2) {
         (Some(sf), Some(m2)) => format!(
-            r#"<div class="bim-cat-areabox"><span class="bim-cat-areabox__kicker">Data Box</span><span class="bim-cat-areabox__n">{sf}<small> SF</small></span><span class="bim-cat-areabox__l">Net leasable area &middot; {m2} m²</span></div>"#,
+            r#"<div class="bim-cat-areabox"><span class="bim-cat-areabox__kicker">{data_box}</span><span class="bim-cat-areabox__n">{sf}<small> SF</small></span><span class="bim-cat-areabox__l">{net_leasable} &middot; {m2} m²</span></div>"#,
             sf = sf,
             m2 = esc(m2)
         ),
         (Some(sf), None) => format!(
-            r#"<div class="bim-cat-areabox"><span class="bim-cat-areabox__kicker">Data Box</span><span class="bim-cat-areabox__n">{sf}<small> SF</small></span><span class="bim-cat-areabox__l">Net leasable area</span></div>"#,
+            r#"<div class="bim-cat-areabox"><span class="bim-cat-areabox__kicker">{data_box}</span><span class="bim-cat-areabox__n">{sf}<small> SF</small></span><span class="bim-cat-areabox__l">{net_leasable}</span></div>"#,
             sf = sf
         ),
         _ => String::new(),
     };
     let plan_classblock = format!(
-        r#"<div class="bim-cat-secth">Classification &amp; registry</div>
+        r#"<div class="bim-cat-secth">{class_h}</div>
     <div class="bim-cat-classblock">
       <div class="bim-cat-clrow"><span class="bim-cat-clrow__k">Uniclass 2015 — SL (Spaces/locations)</span><span class="bim-cat-clrow__v">{space}</span></div>
-      <div class="bim-cat-clrow"><span class="bim-cat-clrow__k">Key Plan reference</span><span class="bim-cat-clrow__v">{id}<small>{cat_label}</small></span></div>
+      <div class="bim-cat-clrow"><span class="bim-cat-clrow__k">{kp_ref}</span><span class="bim-cat-clrow__v">{id}<small>{cat_label}</small></span></div>
     </div>"#,
+        class_h = t(lang, "Classification & registry", "Clasificación y registro"),
         space = esc(space),
+        kp_ref = t(lang, "Key Plan reference", "Referencia de Key Plan"),
         id = esc(id),
         cat_label = esc(cat_label),
     );
@@ -1836,7 +1928,10 @@ pub fn render_key_plan_detail(
     );
 
     let breadcrumb_normal = format!(
-        r#"<nav class="bim-breadcrumbs"><a href="/">Home</a> / <a href="/key-plans">Key Plans</a> / <span>{name}</span></nav>"#,
+        r#"<nav class="bim-breadcrumbs"><a href="{home_href}">{home}</a> / <a href="{key_plans_path}">Key Plans</a> / <span>{name}</span></nav>"#,
+        home_href = home_href,
+        home = t(lang, "Home", "Inicio"),
+        key_plans_path = key_plans_path,
         name = esc(name)
     );
 
@@ -1847,7 +1942,12 @@ pub fn render_key_plan_detail(
         let uni_pr = s(o, "uniclass_pr");
         let uni_title = s(o, "uniclass_pr_title");
         let manufacturer = s(o, "manufacturer");
-        let description_o = s(o, "description");
+        let o_description_es = s(o, "description_es");
+        let description_o = if lang == "es" && !o_description_es.is_empty() {
+            o_description_es
+        } else {
+            s(o, "description")
+        };
         let spec_rows: String = o
             .get("spec")
             .and_then(Value::as_array)
@@ -1855,32 +1955,49 @@ pub fn render_key_plan_detail(
             .unwrap_or_default();
         let dl = match o.get("ifc_file").and_then(Value::as_str) {
             Some(f) => format!(
-                r#"<a class="bim-cat-btn" href="/furniture/download/{}">Download IFC (.ifc)</a>"#,
-                esc(f)
+                r#"<a class="bim-cat-btn" href="/furniture/download/{}">{}</a>"#,
+                esc(f),
+                t(lang, "Download IFC (.ifc)", "Descargar IFC (.ifc)")
             ),
-            None => r#"<p class="bim-cat-note">No IFC block published for this object yet.</p>"#
-                .to_string(),
+            None => format!(
+                r#"<p class="bim-cat-note">{}</p>"#,
+                t(
+                    lang,
+                    "No IFC block published for this object yet.",
+                    "Aún no se ha publicado un bloque IFC para este objeto.",
+                )
+            ),
         };
         format!(
-            r#"<nav class="bim-breadcrumbs"><a href="/">Home</a> / <span class="bim-cat-chip bim-cat-chip--ef bim-cat-chip--inline"><span class="bim-cat-chip__lv">SL</span>{space}</span> / <a href="/key-plans/{slug}">{id}</a> / <span>{o_name}</span></nav>
-    <p class="bim-detail-backlink"><a href="/key-plans/{slug}">← Back to {name}</a></p>
+            r#"<nav class="bim-breadcrumbs"><a href="{home_href}">{home}</a> / <span class="bim-cat-chip bim-cat-chip--ef bim-cat-chip--inline"><span class="bim-cat-chip__lv">SL</span>{space}</span> / <a href="{key_plans_path}/{slug}">{id}</a> / <span>{o_name}</span></nav>
+    <p class="bim-detail-backlink"><a href="{key_plans_path}/{slug}">← {back_to} {name}</a></p>
     <div class="bim-chip-row">
       <span class="bim-cat-chip bim-cat-chip--pr"><span class="bim-cat-chip__lv">Pr</span>{uni_pr}</span>
       <span class="bim-cat-chip bim-cat-chip--plain">{ifc_class}</span>
       <span class="bim-cat-chip bim-cat-chip--machine">IFC 4.3 &middot; DTCG</span>
     </div>
     <h2 class="bim-inspector__title">{o_name}</h2>
-    <p class="bim-detail-head__prov">{manufacturer} &middot; BIM Object</p>
+    <p class="bim-detail-head__prov">{manufacturer} &middot; {bim_object}</p>
     <p class="bim-cat-desc">{description_o}</p>
-    <div class="bim-cat-secth">Specification &amp; property set</div>
+    <div class="bim-cat-secth">{spec_h}</div>
     <table class="bim-cat-spectable"><tbody>{spec_rows}</tbody></table>
-    <div class="bim-cat-secth">Classification</div>
+    <div class="bim-cat-secth">{class_h_short}</div>
     <div class="bim-cat-classblock">
-      <div class="bim-cat-clrow"><span class="bim-cat-clrow__k">IFC 4.3 entity class</span><span class="bim-cat-clrow__v">{ifc_class}</span></div>
+      <div class="bim-cat-clrow"><span class="bim-cat-clrow__k">{ifc_class_label}</span><span class="bim-cat-clrow__v">{ifc_class}</span></div>
       <div class="bim-cat-clrow"><span class="bim-cat-clrow__k">Uniclass 2015 — Pr</span><span class="bim-cat-clrow__v">{uni_pr}<small>{uni_title}</small></span></div>
     </div>
-    <div class="bim-cat-secth">Download <span class="bim-cat-chip bim-cat-chip--machine">machine-readable</span></div>
+    <div class="bim-cat-secth">{download_h} <span class="bim-cat-chip bim-cat-chip--machine">{machine_readable}</span></div>
     {dl}"#,
+            home_href = home_href,
+            home = t(lang, "Home", "Inicio"),
+            key_plans_path = key_plans_path,
+            back_to = t(lang, "Back to", "Volver a"),
+            bim_object = t(lang, "BIM Object", "Objeto BIM"),
+            spec_h = t(lang, "Specification & property set", "Especificación y conjunto de propiedades"),
+            class_h_short = t(lang, "Classification", "Clasificación"),
+            ifc_class_label = t(lang, "IFC 4.3 entity class", "Clase de entidad IFC 4.3"),
+            download_h = t(lang, "Download", "Descargar"),
+            machine_readable = t(lang, "machine-readable", "legible por máquina"),
             slug = esc(slug),
             id = esc(id),
             name = esc(name),
@@ -1909,11 +2026,11 @@ pub fn render_key_plan_detail(
     <h2 class="bim-inspector__title">{name}</h2>
     <p class="bim-detail-head__prov">{id} &middot; {cat_label}</p>
     <p class="bim-cat-desc">{description}</p>
-    <div class="bim-cat-secth">Zone allocation</div>
+    <div class="bim-cat-secth">{zone_h}</div>
     {zone_bars}
-    <div class="bim-cat-secth">Parts list <span class="bim-cat-secth__sub">every Object this assembly is built from</span></div>
+    <div class="bim-cat-secth">{parts_h} <span class="bim-cat-secth__sub">{parts_sub}</span></div>
     {bill}
-    <div class="bim-cat-secth">Specification</div>
+    <div class="bim-cat-secth">{spec_h}</div>
     <table class="bim-cat-spectable"><tbody>{spec_rows}</tbody></table>"#,
             breadcrumb = breadcrumb_normal,
             space = esc(space),
@@ -1921,8 +2038,16 @@ pub fn render_key_plan_detail(
             id = esc(id),
             cat_label = esc(cat_label),
             description = esc(description),
-            zone_bars = zone_bars_html(c),
-            bill = bill_html(c, slug),
+            zone_h = t(lang, "Zone allocation", "Asignación de zonas"),
+            zone_bars = zone_bars_html(c, lang),
+            parts_h = t(lang, "Parts list", "Lista de componentes"),
+            parts_sub = t(
+                lang,
+                "every Object this assembly is built from",
+                "cada Objeto a partir del cual se construye este conjunto",
+            ),
+            bill = bill_html(c, slug, lang),
+            spec_h = t(lang, "Specification", "Especificación"),
             spec_rows = spec_rows,
         )
     };
