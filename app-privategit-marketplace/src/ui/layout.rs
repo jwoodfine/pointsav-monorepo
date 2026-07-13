@@ -82,8 +82,12 @@ body{{font-family:"Inter","Sans Fallback",system-ui,-apple-system,"Segoe UI",Ari
 .sw-search__input{{flex:1;background:transparent;border:0;color:#fff;padding:8px 12px;font-size:13px;outline:none;}}
 .sw-search__input::placeholder{{color:rgba(255,255,255,.6);}}
 .sw-search__btn{{background:transparent;border:0;color:rgba(255,255,255,.85);padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;}}
-.sw-lang-switch{{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;color:var(--sw-on-chrome);text-decoration:none;font-size:13px;white-space:nowrap;padding:6px 10px;border:1px solid rgba(255,255,255,.18);border-radius:6px;}}
-.sw-lang-switch:hover,.sw-lang-switch:focus-visible{{border-color:rgba(255,255,255,.4);}}
+/* Pixel-matched against home.pointsav.com's `.m-lang-switch` (padding
+   0.25rem/0.75rem, gap 0.5rem, radius --m-radius-control, border alpha .35 —
+   its own tokens.css, not guessed) — operator found ours visibly different at
+   mobile width even though the glyph path itself was already identical. */
+.sw-lang-switch{{display:inline-flex;align-items:center;gap:8px;flex:0 0 auto;color:var(--sw-on-chrome);text-decoration:none;font-size:13px;white-space:nowrap;padding:4px 12px;border:1px solid rgba(255,255,255,.35);border-radius:2px;}}
+.sw-lang-switch:hover,.sw-lang-switch:focus-visible{{border-color:#fff;}}
 .sw-lang-switch__glyph{{width:14px;height:14px;flex-shrink:0;}}
 .sw-lang-switch--drawer{{margin:12px 24px;align-self:flex-start;}}
 .sw-hamburger{{display:none;background:transparent;border:0;color:var(--sw-on-chrome);padding:6px;cursor:pointer;align-items:center;}}
@@ -150,7 +154,10 @@ body{{font-family:"Inter","Sans Fallback",system-ui,-apple-system,"Segoe UI",Ari
 .sw-masthead__nav{{display:none;}}
 .sw-masthead__inner{{gap:12px;}}
 .sw-hamburger{{display:inline-flex;margin-left:auto;}}
-.sw-lang-switch:not(.sw-lang-switch--drawer){{padding:6px;}}
+/* No separate icon-only padding override — home.pointsav.com uses the SAME
+   padding (4px/12px) whether the label is showing or not; the pill just
+   shrinks to fit the glyph alone once the label's `display:none` below
+   removes it. A tighter padding override here would be an unmatched guess. */
 .sw-lang-switch:not(.sw-lang-switch--drawer) .sw-lang-switch__label{{display:none;}}
 }}
 @media (max-width:768px){{
