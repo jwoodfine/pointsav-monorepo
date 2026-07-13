@@ -12,40 +12,73 @@
 //! nice-to-have, not core to closing the raw-JSON-hop problem this phase fixes).
 //! No account creation, no extra fields — kept as simple as the operator asked.
 
+use crate::ui::Lang;
 use crate::Installer;
 use maud::{html, Markup, PreEscaped};
 
-pub fn checkout_markup(installer: &Installer, wallet_address: &str) -> Markup {
+pub fn checkout_markup(installer: &Installer, wallet_address: &str, lang: Lang) -> Markup {
     let dollars = installer.price_usdc as f64 / 1_000_000.0;
+    let order_action = lang.localize("/order");
     html! {
         (checkout_style())
-        div."sw-co-wrap" {
-            h1."sw-co-title" { "Checkout" }
-            article."sw-co-card" {
-                span."sw-co-id" { (installer.id) }
-                h2."sw-co-name" { (installer.name) }
-                p."sw-co-tier" { (installer.license_tier.label()) }
-                div."sw-co-amount" {
-                    span."sw-co-amount__val" { "$" (format!("{dollars:.2}")) }
-                    span."sw-co-amount__unit" { " USDC \u{2014} Polygon PoS" }
+        @match lang {
+            Lang::En => div."sw-co-wrap" {
+                h1."sw-co-title" { "Checkout" }
+                article."sw-co-card" {
+                    span."sw-co-id" { (installer.id) }
+                    h2."sw-co-name" { (installer.name) }
+                    p."sw-co-tier" { (installer.license_tier.label()) }
+                    div."sw-co-amount" {
+                        span."sw-co-amount__val" { "$" (format!("{dollars:.2}")) }
+                        span."sw-co-amount__unit" { " USDC \u{2014} Polygon PoS" }
+                    }
+                    div."sw-co-wallet" {
+                        span."sw-co-wallet__label" { "Send to" }
+                        code."sw-co-wallet__addr" { (wallet_address) }
+                    }
+                    p."sw-co-hint" {
+                        "Send exactly this amount in native USDC on Polygon. Once your transaction \
+                         is confirmed on-chain, paste its transaction hash below — this becomes \
+                         your permanent, portable proof of ownership."
+                    }
+                    form."sw-co-form" method="get" action=(order_action) {
+                        input type="hidden" name="product" value=(installer.id);
+                        label."sw-co-form__label" for="tx_hash" { "Transaction hash" }
+                        input."sw-co-form__input" type="text" id="tx_hash" name="tx_hash"
+                            placeholder="0x..." required autocomplete="off";
+                        button."sw-co-form__submit" type="submit" { "Check payment status" }
+                    }
                 }
-                div."sw-co-wallet" {
-                    span."sw-co-wallet__label" { "Send to" }
-                    code."sw-co-wallet__addr" { (wallet_address) }
+            },
+            Lang::Es => div."sw-co-wrap" {
+                h1."sw-co-title" { "Pago" }
+                article."sw-co-card" {
+                    span."sw-co-id" { (installer.id) }
+                    h2."sw-co-name" { (installer.name) }
+                    p."sw-co-tier" { (installer.license_tier.label()) }
+                    div."sw-co-amount" {
+                        span."sw-co-amount__val" { "$" (format!("{dollars:.2}")) }
+                        span."sw-co-amount__unit" { " USDC \u{2014} Polygon PoS" }
+                    }
+                    div."sw-co-wallet" {
+                        span."sw-co-wallet__label" { "Enviar a" }
+                        code."sw-co-wallet__addr" { (wallet_address) }
+                    }
+                    p."sw-co-hint" {
+                        "Env\u{ed}e exactamente este monto en USDC nativo sobre Polygon. Una vez que su \
+                         transacci\u{f3}n se confirme en la cadena, pegue su hash de transacci\u{f3}n a \
+                         continuaci\u{f3}n \u{2014} esto se convierte en su comprobante de propiedad \
+                         permanente y port\u{e1}til."
+                    }
+                    form."sw-co-form" method="get" action=(order_action) {
+                        input type="hidden" name="product" value=(installer.id);
+                        label."sw-co-form__label" for="tx_hash" { "Hash de transacci\u{f3}n" }
+                        input."sw-co-form__input" type="text" id="tx_hash" name="tx_hash"
+                            placeholder="0x..." required autocomplete="off";
+                        button."sw-co-form__submit" type="submit" { "Verificar estado del pago" }
+                    }
                 }
-                p."sw-co-hint" {
-                    "Send exactly this amount in native USDC on Polygon. Once your transaction \
-                     is confirmed on-chain, paste its transaction hash below — this becomes \
-                     your permanent, portable proof of ownership."
-                }
-                form."sw-co-form" method="get" action="/order" {
-                    input type="hidden" name="product" value=(installer.id);
-                    label."sw-co-form__label" for="tx_hash" { "Transaction hash" }
-                    input."sw-co-form__input" type="text" id="tx_hash" name="tx_hash"
-                        placeholder="0x..." required autocomplete="off";
-                    button."sw-co-form__submit" type="submit" { "Check payment status" }
-                }
-            }
+            },
         }
     }
 }
@@ -95,7 +128,7 @@ mod tests {
 
     #[test]
     fn checkout_page_renders_product_price_and_wallet() {
-        let html = checkout_markup(&fixture(), "0xTESTWALLET").into_string();
+        let html = checkout_markup(&fixture(), "0xTESTWALLET", Lang::En).into_string();
         assert!(html.contains("os-console"));
         assert!(html.contains("PointSav Console OS"));
         assert!(html.contains("AGPL-3.0-or-later"));
@@ -104,5 +137,17 @@ mod tests {
         assert!(html.contains("action=\"/order\""));
         assert!(html.contains(r#"name="product" value="os-console""#));
         assert!(html.contains(r#"name="tx_hash""#));
+    }
+
+    #[test]
+    fn spanish_checkout_page_translates_chrome_and_submits_to_es_order() {
+        let html = checkout_markup(&fixture(), "0xTESTWALLET", Lang::Es).into_string();
+        assert!(html.contains("<h1 class=\"sw-co-title\">Pago</h1>"));
+        assert!(html.contains("Enviar a"));
+        assert!(html.contains("Verificar estado del pago"));
+        assert!(html.contains("action=\"/es/order\""));
+        // Product name/price stay untranslated (data-driven, no translation source).
+        assert!(html.contains("PointSav Console OS"));
+        assert!(html.contains("$1.00"));
     }
 }

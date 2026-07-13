@@ -79,6 +79,15 @@ impl Lang {
                 search_placeholder: "Search products\u{2026}",
                 search_label: "Search products",
                 menu_label: "Menu",
+                documentation: "Documentation",
+                design_system: "Design System",
+                newsroom: "Newsroom",
+                important_information: "Important information",
+                persistent_disclaimer_lede: "Software licenses only \u{2014} not an offer of \
+                    securities or investment. USDC payments on Polygon are irreversible. ",
+                full_disclaimer_link: "Full disclaimer",
+                all_rights_reserved: "All rights reserved.",
+                powered_by: "Powered by",
             },
             Lang::Es => NavLabels {
                 products: "Productos",
@@ -93,6 +102,16 @@ impl Lang {
                 search_placeholder: "Buscar productos\u{2026}",
                 search_label: "Buscar productos",
                 menu_label: "Men\u{fa}",
+                documentation: "Documentaci\u{f3}n",
+                design_system: "Sistema de dise\u{f1}o",
+                newsroom: "Sala de prensa",
+                important_information: "Informaci\u{f3}n importante",
+                persistent_disclaimer_lede: "Solo licencias de software \u{2014} no es una oferta \
+                    de valores ni de inversi\u{f3}n. Los pagos en USDC sobre Polygon son \
+                    irreversibles. ",
+                full_disclaimer_link: "Aviso legal completo",
+                all_rights_reserved: "Todos los derechos reservados.",
+                powered_by: "Desarrollado con",
             },
         }
     }
@@ -113,6 +132,14 @@ pub struct NavLabels {
     pub search_placeholder: &'static str,
     pub search_label: &'static str,
     pub menu_label: &'static str,
+    pub documentation: &'static str,
+    pub design_system: &'static str,
+    pub newsroom: &'static str,
+    pub important_information: &'static str,
+    pub persistent_disclaimer_lede: &'static str,
+    pub full_disclaimer_link: &'static str,
+    pub all_rights_reserved: &'static str,
+    pub powered_by: &'static str,
 }
 
 /// `/software` catalog page chrome strings. Product `name`/`description` text

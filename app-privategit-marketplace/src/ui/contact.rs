@@ -15,10 +15,18 @@
 //! System Administrator contact). No ticketing system, phone number, or
 //! physical mailing address is documented — none is invented here.
 
+use crate::ui::Lang;
 use maud::{html, Markup};
 
-/// The full self-contained contact page (`GET /page/contact`).
-pub fn contact_markup() -> Markup {
+/// The full self-contained contact page (`GET /page/contact`, `GET /es/page/contact`).
+pub fn contact_markup(lang: Lang) -> Markup {
+    match lang {
+        Lang::En => contact_markup_en(),
+        Lang::Es => contact_markup_es(),
+    }
+}
+
+fn contact_markup_en() -> Markup {
     html! {
         div."sw-legal" {
             h1 { "Contact us" }
@@ -42,6 +50,37 @@ pub fn contact_markup() -> Markup {
             p {
                 "We do not publish a guaranteed response-time commitment for this "
                 "channel."
+            }
+        }
+    }
+}
+
+fn contact_markup_es() -> Markup {
+    html! {
+        div."sw-legal" {
+            h1 { "Cont\u{e1}ctenos" }
+            p."sw-legal__lede" {
+                strong { "PointSav Digital Systems" } " \u{2014} nombre comercial de Woodfine "
+                "Capital Projects Inc."
+            }
+
+            h2 { "1. Canal de soporte" }
+            p {
+                "La forma m\u{e1}s r\u{e1}pida de contactarnos es "
+                a href="mailto:open.source@pointsav.com" { "open.source@pointsav.com" } "."
+            }
+
+            h2 { "2. Sobre qu\u{e9} contactarnos" }
+            p {
+                "Problemas de licencias y pedidos (indique su hash de transacci\u{f3}n), "
+                "problemas con binarios o descargas, reportes de accesibilidad y "
+                "divulgaciones de seguridad."
+            }
+
+            h2 { "3. Expectativas de respuesta" }
+            p {
+                "No publicamos un compromiso garantizado de tiempo de respuesta para "
+                "este canal."
             }
         }
     }

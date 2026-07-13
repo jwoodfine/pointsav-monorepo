@@ -9,6 +9,7 @@
 //! their license key on any page. This page is permanent and re-visitable at any
 //! time from the same tx_hash — the durable ownership record.
 
+use crate::ui::Lang;
 use maud::{html, Markup, PreEscaped};
 
 fn order_style() -> Markup {
@@ -30,70 +31,143 @@ fn order_style() -> Markup {
     html! { style { (PreEscaped(css)) } }
 }
 
-pub fn order_pending_markup(tx_hash: &str, retry_after: u64) -> Markup {
-    html! {
-        (order_style())
-        div."sw-or-wrap" {
-            h1."sw-or-title" { "Order status" }
-            article."sw-or-card" {
-                span."sw-or-status sw-or-status--pending" { "Pending" }
-                p { "Your transaction " code { (tx_hash) } " has not yet confirmed on Polygon." }
-                p."sw-or-hint" {
-                    "This page checks the same payment record every visit — reload in about "
-                    (retry_after) " seconds, or come back later. This page stays valid forever \
-                     once your payment confirms."
-                }
-            }
-        }
-    }
-}
-
-pub fn order_confirmed_markup(tx_hash: &str, license_key: &str, product_id: &str) -> Markup {
-    let download_href = format!("/order/{tx_hash}/download?product={product_id}");
-    html! {
-        (order_style())
-        div."sw-or-wrap" {
-            h1."sw-or-title" { "Order status" }
-            article."sw-or-card" {
-                span."sw-or-status sw-or-status--confirmed" { "Confirmed" }
-                p { "Payment confirmed for " strong { (product_id) } "." }
-                div."sw-or-receipt" {
-                    span."sw-or-receipt__label" { "Your receipt \u{2014} proof of ownership" }
-                    span."sw-or-receipt__key" { (license_key) }
-                    p."sw-or-receipt__note" {
-                        "A permanent, portable record you hold \u{2014} verifiable, transferable, \
-                         ours to honor but never to revoke. Keep it for your records; you do not \
-                         need it to download."
+pub fn order_pending_markup(tx_hash: &str, retry_after: u64, lang: Lang) -> Markup {
+    match lang {
+        Lang::En => html! {
+            (order_style())
+            div."sw-or-wrap" {
+                h1."sw-or-title" { "Order status" }
+                article."sw-or-card" {
+                    span."sw-or-status sw-or-status--pending" { "Pending" }
+                    p { "Your transaction " code { (tx_hash) } " has not yet confirmed on Polygon." }
+                    p."sw-or-hint" {
+                        "This page checks the same payment record every visit — reload in about "
+                        (retry_after) " seconds, or come back later. This page stays valid forever \
+                         once your payment confirms."
                     }
                 }
-                a."sw-or-download" href=(download_href) { "Download" }
-                p."sw-or-hint" {
-                    "This page is permanent \u{2014} bookmark it. Revisiting later and clicking \
-                     Download again always gets you a fresh, working download link."
+            }
+        },
+        Lang::Es => html! {
+            (order_style())
+            div."sw-or-wrap" {
+                h1."sw-or-title" { "Estado del pedido" }
+                article."sw-or-card" {
+                    span."sw-or-status sw-or-status--pending" { "Pendiente" }
+                    p {
+                        "Su transacci\u{f3}n " code { (tx_hash) }
+                        " a\u{fa}n no se ha confirmado en Polygon."
+                    }
+                    p."sw-or-hint" {
+                        "Esta p\u{e1}gina verifica el mismo registro de pago en cada visita \u{2014} "
+                        "recargue en aproximadamente " (retry_after) " segundos, o vuelva m\u{e1}s "
+                        "tarde. Esta p\u{e1}gina permanece v\u{e1}lida para siempre una vez que su "
+                        "pago se confirme."
+                    }
                 }
             }
-        }
+        },
     }
 }
 
-pub fn order_not_found_markup(tx_hash: &str, product_id: Option<&str>) -> Markup {
-    let back_href = product_id
-        .map(|p| format!("/checkout/{p}"))
-        .unwrap_or_else(|| "/software".to_string());
-    html! {
-        (order_style())
-        div."sw-or-wrap" {
-            h1."sw-or-title" { "Order status" }
-            article."sw-or-card" {
-                span."sw-or-status sw-or-status--notfound" { "Not found" }
-                p { "We could not find a recognised USDC payment for " code { (tx_hash) } "." }
-                p."sw-or-hint" {
-                    "Double-check the transaction hash you pasted, or confirm the payment has \
-                     been sent to the correct address."
+pub fn order_confirmed_markup(
+    tx_hash: &str,
+    license_key: &str,
+    product_id: &str,
+    lang: Lang,
+) -> Markup {
+    let download_href = format!("/order/{tx_hash}/download?product={product_id}");
+    match lang {
+        Lang::En => html! {
+            (order_style())
+            div."sw-or-wrap" {
+                h1."sw-or-title" { "Order status" }
+                article."sw-or-card" {
+                    span."sw-or-status sw-or-status--confirmed" { "Confirmed" }
+                    p { "Payment confirmed for " strong { (product_id) } "." }
+                    div."sw-or-receipt" {
+                        span."sw-or-receipt__label" { "Your receipt \u{2014} proof of ownership" }
+                        span."sw-or-receipt__key" { (license_key) }
+                        p."sw-or-receipt__note" {
+                            "A permanent, portable record you hold \u{2014} verifiable, transferable, \
+                             ours to honor but never to revoke. Keep it for your records; you do not \
+                             need it to download."
+                        }
+                    }
+                    a."sw-or-download" href=(download_href) { "Download" }
+                    p."sw-or-hint" {
+                        "This page is permanent \u{2014} bookmark it. Revisiting later and clicking \
+                         Download again always gets you a fresh, working download link."
+                    }
                 }
-                a."sw-or-back" href=(back_href) { "\u{2190} Back to checkout" }
             }
-        }
+        },
+        Lang::Es => html! {
+            (order_style())
+            div."sw-or-wrap" {
+                h1."sw-or-title" { "Estado del pedido" }
+                article."sw-or-card" {
+                    span."sw-or-status sw-or-status--confirmed" { "Confirmado" }
+                    p { "Pago confirmado para " strong { (product_id) } "." }
+                    div."sw-or-receipt" {
+                        span."sw-or-receipt__label" { "Su recibo \u{2014} comprobante de propiedad" }
+                        span."sw-or-receipt__key" { (license_key) }
+                        p."sw-or-receipt__note" {
+                            "Un registro permanente y port\u{e1}til que usted conserva \u{2014} "
+                            "verificable, transferible, que nos comprometemos a honrar pero nunca a "
+                            "revocar. Consérvelo para sus registros; no lo necesita para descargar."
+                        }
+                    }
+                    a."sw-or-download" href=(download_href) { "Descargar" }
+                    p."sw-or-hint" {
+                        "Esta p\u{e1}gina es permanente \u{2014} gu\u{e1}rdela en marcadores. Volver a "
+                        "visitarla y hacer clic en Descargar de nuevo siempre le dar\u{e1} un enlace "
+                        "de descarga nuevo y funcional."
+                    }
+                }
+            }
+        },
+    }
+}
+
+pub fn order_not_found_markup(tx_hash: &str, product_id: Option<&str>, lang: Lang) -> Markup {
+    let back_href = product_id
+        .map(|p| lang.localize(&format!("/checkout/{p}")))
+        .unwrap_or_else(|| lang.localize("/software"));
+    match lang {
+        Lang::En => html! {
+            (order_style())
+            div."sw-or-wrap" {
+                h1."sw-or-title" { "Order status" }
+                article."sw-or-card" {
+                    span."sw-or-status sw-or-status--notfound" { "Not found" }
+                    p { "We could not find a recognised USDC payment for " code { (tx_hash) } "." }
+                    p."sw-or-hint" {
+                        "Double-check the transaction hash you pasted, or confirm the payment has \
+                         been sent to the correct address."
+                    }
+                    a."sw-or-back" href=(back_href) { "\u{2190} Back to checkout" }
+                }
+            }
+        },
+        Lang::Es => html! {
+            (order_style())
+            div."sw-or-wrap" {
+                h1."sw-or-title" { "Estado del pedido" }
+                article."sw-or-card" {
+                    span."sw-or-status sw-or-status--notfound" { "No encontrado" }
+                    p {
+                        "No pudimos encontrar un pago reconocido en USDC para "
+                        code { (tx_hash) } "."
+                    }
+                    p."sw-or-hint" {
+                        "Verifique el hash de transacci\u{f3}n que peg\u{f3}, o confirme que el pago "
+                        "se envi\u{f3} a la direcci\u{f3}n correcta."
+                    }
+                    a."sw-or-back" href=(back_href) { "\u{2190} Volver al pago" }
+                }
+            }
+        },
     }
 }
 
@@ -103,7 +177,7 @@ mod tests {
 
     #[test]
     fn pending_state_shows_retry_hint() {
-        let html = order_pending_markup("0xabc", 30).into_string();
+        let html = order_pending_markup("0xabc", 30, Lang::En).into_string();
         assert!(html.contains("Pending"));
         assert!(html.contains("0xabc"));
         assert!(html.contains("30"));
@@ -111,8 +185,8 @@ mod tests {
 
     #[test]
     fn confirmed_state_shows_receipt_and_download_link() {
-        let html =
-            order_confirmed_markup("0xabc", "aaaa-bbbb-cccc-dddd", "os-console").into_string();
+        let html = order_confirmed_markup("0xabc", "aaaa-bbbb-cccc-dddd", "os-console", Lang::En)
+            .into_string();
         assert!(html.contains("Confirmed"));
         assert!(html.contains("aaaa-bbbb-cccc-dddd"));
         assert!(html.contains("os-console"));
@@ -122,14 +196,36 @@ mod tests {
 
     #[test]
     fn not_found_state_links_back_to_checkout_when_product_known() {
-        let html = order_not_found_markup("0xabc", Some("os-console")).into_string();
+        let html = order_not_found_markup("0xabc", Some("os-console"), Lang::En).into_string();
         assert!(html.contains("Not found"));
         assert!(html.contains("href=\"/checkout/os-console\""));
     }
 
     #[test]
     fn not_found_state_falls_back_to_software_page_without_product() {
-        let html = order_not_found_markup("0xabc", None).into_string();
+        let html = order_not_found_markup("0xabc", None, Lang::En).into_string();
         assert!(html.contains("href=\"/software\""));
+    }
+
+    #[test]
+    fn spanish_order_states_translate_labels_and_localize_back_links() {
+        let pending = order_pending_markup("0xabc", 30, Lang::Es).into_string();
+        assert!(pending.contains("Pendiente"));
+
+        let confirmed =
+            order_confirmed_markup("0xabc", "aaaa-bbbb-cccc-dddd", "os-console", Lang::Es)
+                .into_string();
+        assert!(confirmed.contains("Confirmado"));
+        assert!(confirmed.contains("Descargar"));
+        // Download link itself is not lang-prefixed (no UI to translate, machine link).
+        assert!(confirmed.contains("href=\"/order/0xabc/download?product=os-console\""));
+
+        let not_found_known =
+            order_not_found_markup("0xabc", Some("os-console"), Lang::Es).into_string();
+        assert!(not_found_known.contains("No encontrado"));
+        assert!(not_found_known.contains("href=\"/es/checkout/os-console\""));
+
+        let not_found_bare = order_not_found_markup("0xabc", None, Lang::Es).into_string();
+        assert!(not_found_bare.contains("href=\"/es/software\""));
     }
 }

@@ -203,7 +203,7 @@ pub fn masthead(surface: SoftwareSurface, lang: Lang, lang_toggle_href: &str) ->
                     a href=(lang.localize("/software")) { (nav.products) }
                     a href=(lang.localize("/pricing")) { (nav.pricing) }
                     a href=(lang.localize("/licensing")) { (nav.licensing) }
-                    a href="/page/contact" { (nav.contact) }
+                    a href=(lang.localize("/page/contact")) { (nav.contact) }
                 }
                 div."sw-search" {
                     form."sw-search__form" role="search" action=(lang.localize("/software")) method="get" {
@@ -249,17 +249,16 @@ pub fn masthead(surface: SoftwareSurface, lang: Lang, lang_toggle_href: &str) ->
             // Same 7 links as the footer's "Site" column — the only masthead-level
             // path to Pricing/Licensing/Contact/Disclaimer/Privacy/Accessibility on
             // mobile, where the footer is otherwise reachable only by scrolling to
-            // the bottom of the page. Products/Pricing/Licensing link to the ES
-            // sibling when `lang` is Spanish; the other four have no ES page yet
-            // (MVL scope) and stay pointed at the English original.
+            // the bottom of the page. Every page now has a real ES sibling
+            // (2026-07-13 full-site-parity pass), so all seven localize.
             nav."sw-mobile-nav" #"sw-mobile-nav" aria-label="Mobile navigation" {
                 a href=(lang.localize("/software")) { (nav.products) }
                 a href=(lang.localize("/pricing")) { (nav.pricing) }
                 a href=(lang.localize("/licensing")) { (nav.licensing) }
-                a href="/page/contact" { (nav.contact) }
-                a href="/page/disclaimer" { (nav.disclaimer) }
-                a href="/page/privacy" { (nav.privacy) }
-                a href="/page/accessibility" { (nav.accessibility) }
+                a href=(lang.localize("/page/contact")) { (nav.contact) }
+                a href=(lang.localize("/page/disclaimer")) { (nav.disclaimer) }
+                a href=(lang.localize("/page/privacy")) { (nav.privacy) }
+                a href=(lang.localize("/page/accessibility")) { (nav.accessibility) }
                 // Labeled duplicate of the masthead's icon-only pill — same
                 // masthead-collapses/drawer-keeps-label split verified live on
                 // home.pointsav.com (`.m-drawer .m-lang-switch`).
@@ -321,10 +320,10 @@ pub fn footer(surface: SoftwareSurface, lang: Lang) -> Markup {
                             li { a href=(lang.localize("/software")) { (nav.products) } }
                             li { a href=(lang.localize("/pricing")) { (nav.pricing) } }
                             li { a href=(lang.localize("/licensing")) { (nav.licensing) } }
-                            li { a href="/page/contact" { (nav.contact) } }
-                            li { a href="/page/disclaimer" { (nav.disclaimer) } }
-                            li { a href="/page/privacy" { (nav.privacy) } }
-                            li { a href="/page/accessibility" { (nav.accessibility) } }
+                            li { a href=(lang.localize("/page/contact")) { (nav.contact) } }
+                            li { a href=(lang.localize("/page/disclaimer")) { (nav.disclaimer) } }
+                            li { a href=(lang.localize("/page/privacy")) { (nav.privacy) } }
+                            li { a href=(lang.localize("/page/accessibility")) { (nav.accessibility) } }
                         }
                     }
                     div."sw-footer__col" {
@@ -339,19 +338,19 @@ pub fn footer(surface: SoftwareSurface, lang: Lang) -> Markup {
                             li {
                                 a href="https://documentation.pointsav.com/" target="_blank" rel="noopener"
                                     aria-label="Documentation (opens in new tab)" {
-                                    "Documentation" span."sw-footer__ext" aria-hidden="true" { "\u{2197}" }
+                                    (nav.documentation) span."sw-footer__ext" aria-hidden="true" { "\u{2197}" }
                                 }
                             }
                             li {
                                 a href="https://design.pointsav.com/" target="_blank" rel="noopener"
                                     aria-label="Design System (opens in new tab)" {
-                                    "Design System" span."sw-footer__ext" aria-hidden="true" { "\u{2197}" }
+                                    (nav.design_system) span."sw-footer__ext" aria-hidden="true" { "\u{2197}" }
                                 }
                             }
                             li {
                                 a href="https://pointsav.com/" target="_blank" rel="noopener"
                                     aria-label="Newsroom (opens in new tab)" {
-                                    "Newsroom" span."sw-footer__ext" aria-hidden="true" { "\u{2197}" }
+                                    (nav.newsroom) span."sw-footer__ext" aria-hidden="true" { "\u{2197}" }
                                 }
                             }
                             li {
@@ -372,10 +371,10 @@ pub fn footer(surface: SoftwareSurface, lang: Lang) -> Markup {
                 // the wiki/marketing sites don't: sell software licenses paid for in
                 // on-chain USDC.
                 details."sw-footer__disclosure" {
-                    summary."sw-footer__disclosure-summary" { "Important information" }
+                    summary."sw-footer__disclosure-summary" { (nav.important_information) }
                     div."sw-footer__slot" {
-                        p."sw-footer__slot-label" { (surface.disclosure_label()) }
-                        div."sw-footer__slot-body" { (super::disclosure_body()) }
+                        p."sw-footer__slot-label" { (surface.disclosure_label(lang)) }
+                        div."sw-footer__slot-body" { (super::disclosure_body(lang)) }
                     }
                 }
                 // Persistent one-line disclaimer, always visible even with the
@@ -385,9 +384,8 @@ pub fn footer(surface: SoftwareSurface, lang: Lang) -> Markup {
                 // a collapsed disclosure should never leave the footer reading
                 // as if no disclaimer exists at all, e.g. in a cropped screenshot.
                 p."sw-footer__persistent-disclaimer" {
-                    "Software licenses only — not an offer of securities or investment. "
-                    "USDC payments on Polygon are irreversible. "
-                    a href="/page/disclaimer" { "Full disclaimer" } "."
+                    (nav.persistent_disclaimer_lede)
+                    a href=(lang.localize("/page/disclaimer")) { (nav.full_disclaimer_link) } "."
                 }
                 div."sw-footer__cities" {
                     @for (i, c) in surface.cities().iter().enumerate() {
@@ -411,16 +409,16 @@ pub fn footer(surface: SoftwareSurface, lang: Lang) -> Markup {
                         aria-label="Powered by PrivateGit (opens in new tab)" {
                         span."sw-footer__badge-glyph" aria-hidden="true" { (PreEscaped(BADGE_GLYPH)) }
                         span."sw-footer__badge-text" {
-                            span."sw-footer__badge-label" { "Powered by" }
+                            span."sw-footer__badge-label" { (nav.powered_by) }
                             span."sw-footer__badge-name" { "PrivateGit" }
                         }
                     }
                 }
                 div."sw-footer__legal" {
                     p."sw-footer__copyright" {
-                        "\u{00a9} 2026 " (surface.copyright_holder()) " All rights reserved."
+                        "\u{00a9} 2026 " (surface.copyright_holder()) " " (nav.all_rights_reserved)
                     }
-                    p."sw-footer__trademark" { (surface.trademark_line()) }
+                    p."sw-footer__trademark" { (surface.trademark_line(lang)) }
                 }
             }
         }
@@ -644,7 +642,7 @@ mod tests {
         assert!(page.contains(r#".sw-wordmark{font-family:"Source Serif 4""#));
 
         // Footer markers: verbatim trademark line, copyright holder, cities.
-        assert!(page.contains(SURFACE.trademark_line()));
+        assert!(page.contains(SURFACE.trademark_line(Lang::En)));
         assert!(page.contains(SURFACE.copyright_holder()));
         for c in SURFACE.cities() {
             assert!(page.contains(c), "missing footer city {c}");
@@ -673,7 +671,7 @@ mod tests {
         // collapsed by default in every browser — nothing to assert there.
         assert!(page.contains("sw-footer__disclosure"));
         assert!(page.contains("Important information"));
-        assert!(page.contains(SURFACE.disclosure_label()));
+        assert!(page.contains(SURFACE.disclosure_label(Lang::En)));
 
         // Persistent one-line disclaimer, always visible regardless of accordion state
         // (project-knowledge's "Apollo Academy" pattern, 2026-07-02) -- a collapsed
@@ -826,7 +824,7 @@ mod tests {
         // Sovereign chrome present, including the verbatim trademark line and the
         // "Important information" disclosure accordion (2026-07-02).
         assert!(out.contains("sw-masthead"));
-        assert!(out.contains(SURFACE.trademark_line()));
+        assert!(out.contains(SURFACE.trademark_line(Lang::En)));
         assert!(out.contains("sw-footer__disclosure"));
 
         // Scoped chrome stylesheet injected before </head>.
