@@ -65,13 +65,29 @@ fn build_app(app_state: state::AppState, static_dir: PathBuf) -> Router {
             "/key-plans",
             get(routes::key_plans::key_plans_index_handler),
         )
+        // Round 13 (2026-07-13): /es/key-plans* — chrome-only translation.
+        // The Key Plan/Composition data itself (dimensions, bill of
+        // materials, descriptions) stays English by design; only the page
+        // shell, breadcrumbs, and status labels translate.
+        .route(
+            "/es/key-plans",
+            get(routes::key_plans::key_plans_index_handler_es),
+        )
         .route(
             "/key-plans/{slug}",
             get(routes::key_plans::key_plan_detail_handler),
         )
         .route(
+            "/es/key-plans/{slug}",
+            get(routes::key_plans::key_plan_detail_handler_es),
+        )
+        .route(
             "/key-plans/{slug}/o/{object}",
             get(routes::key_plans::key_plan_object_handler),
+        )
+        .route(
+            "/es/key-plans/{slug}/o/{object}",
+            get(routes::key_plans::key_plan_object_handler_es),
         )
         .route(
             "/key-plans/download/{filename}",
@@ -119,9 +135,20 @@ fn build_app(app_state: state::AppState, static_dir: PathBuf) -> Router {
             get(routes::furniture::single_handler),
         )
         .route("/research", get(routes::research::research_index_handler))
+        // Round 13 (2026-07-13): /es/research* — chrome-only translation.
+        // Essay titles/body ("the Journals") stay English by design; only
+        // page shell/breadcrumb translate.
+        .route(
+            "/es/research",
+            get(routes::research::research_index_handler_es),
+        )
         .route(
             "/research/{slug}",
             get(routes::research::research_item_handler),
+        )
+        .route(
+            "/es/research/{slug}",
+            get(routes::research::research_item_handler_es),
         )
         .route("/search", get(routes::search::search_handler))
         .route("/es/search", get(routes::search::search_handler_es))
