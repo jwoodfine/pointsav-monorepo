@@ -1612,7 +1612,11 @@ mod tests {
         let secret_path = scratch.parent().unwrap().join("secret-router-test.txt");
         fs::write(&secret_path, b"top secret").unwrap();
         fs::create_dir_all(scratch.join("prod/0.0.1")).unwrap();
-        fs::write(scratch.join("prod/MANIFEST.json"), r#"{"requires_license": false}"#).unwrap();
+        fs::write(
+            scratch.join("prod/MANIFEST.json"),
+            r#"{"requires_license": false}"#,
+        )
+        .unwrap();
         let state = test_state(&scratch, None, None);
 
         let resp = oneshot_get(
@@ -1629,7 +1633,11 @@ mod tests {
     async fn router_rejects_encoded_slash_in_product_segment() {
         let scratch = scratch_dir("router-traversal-slash");
         fs::create_dir_all(scratch.join("prod/0.0.1")).unwrap();
-        fs::write(scratch.join("prod/MANIFEST.json"), r#"{"requires_license": false}"#).unwrap();
+        fs::write(
+            scratch.join("prod/MANIFEST.json"),
+            r#"{"requires_license": false}"#,
+        )
+        .unwrap();
         let state = test_state(&scratch, None, None);
 
         // %2F decodes to a literal '/' inside what matchit treated as one segment.
@@ -1641,7 +1649,11 @@ mod tests {
     async fn router_rejects_nul_byte_in_segment() {
         let scratch = scratch_dir("router-traversal-nul");
         fs::create_dir_all(scratch.join("prod/0.0.1")).unwrap();
-        fs::write(scratch.join("prod/MANIFEST.json"), r#"{"requires_license": false}"#).unwrap();
+        fs::write(
+            scratch.join("prod/MANIFEST.json"),
+            r#"{"requires_license": false}"#,
+        )
+        .unwrap();
         let state = test_state(&scratch, None, None);
 
         let resp = oneshot_get(state, "/releases/prod/..%00/linux-x86_64").await;
@@ -1653,8 +1665,16 @@ mod tests {
     async fn router_serves_legitimate_open_binary_unaffected() {
         let scratch = scratch_dir("router-legit");
         fs::create_dir_all(scratch.join("prod/0.0.1")).unwrap();
-        fs::write(scratch.join("prod/MANIFEST.json"), r#"{"requires_license": false}"#).unwrap();
-        fs::write(scratch.join("prod/0.0.1/linux-x86_64"), b"real-binary-bytes").unwrap();
+        fs::write(
+            scratch.join("prod/MANIFEST.json"),
+            r#"{"requires_license": false}"#,
+        )
+        .unwrap();
+        fs::write(
+            scratch.join("prod/0.0.1/linux-x86_64"),
+            b"real-binary-bytes",
+        )
+        .unwrap();
         let state = test_state(&scratch, None, None);
 
         let resp = oneshot_get(state, "/releases/prod/0.0.1/linux-x86_64").await;
