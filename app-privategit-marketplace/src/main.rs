@@ -977,15 +977,37 @@ async fn render_pricing_page(state: &AppState, lang: Lang) -> Response {
 // disclaimers). Content is a compile-time constant (`ui::disclaimer::disclaimer_markup`),
 // not read from disk, so there is no "file missing" error path to handle here.
 async fn disclaimer_page() -> Response {
+    render_disclaimer_page(Lang::En)
+}
+
+// GET /es/page/disclaimer — full-site-parity pass (2026-07-13); see `ui::lang` module docs.
+async fn disclaimer_page_es() -> Response {
+    render_disclaimer_page(Lang::Es)
+}
+
+fn render_disclaimer_page(lang: Lang) -> Response {
+    let (title, description) = match lang {
+        Lang::En => (
+            "Disclaimer — PointSav Software".to_string(),
+            "Legal disclaimer for software.pointsav.com — no warranty, licensing terms, and \
+             payment/jurisdictional notices for PointSav software purchases."
+                .to_string(),
+        ),
+        Lang::Es => (
+            "Aviso legal — PointSav Software".to_string(),
+            "Aviso legal de software.pointsav.com — sin garant\u{ed}a, t\u{e9}rminos de \
+             licencia, y avisos de pago/jurisdicci\u{f3}n para compras de software PointSav."
+                .to_string(),
+        ),
+    };
     let body = ui::render_page(
         SoftwareSurface::Marketplace,
-        Lang::En,
-        "Disclaimer — PointSav Software",
-        "Legal disclaimer for software.pointsav.com — no warranty, licensing terms, and \
-         payment/jurisdictional notices for PointSav software purchases.",
-        "/page/disclaimer",
-        false,
-        ui::disclaimer_markup(),
+        lang,
+        &title,
+        &description,
+        &lang.localize("/page/disclaimer"),
+        true,
+        ui::disclaimer_markup(lang),
     )
     .into_string();
     (
@@ -998,14 +1020,37 @@ async fn disclaimer_page() -> Response {
 
 // GET /page/privacy — self-contained privacy page, same pattern as disclaimer_page.
 async fn privacy_page() -> Response {
+    render_privacy_page(Lang::En)
+}
+
+// GET /es/page/privacy — full-site-parity pass (2026-07-13).
+async fn privacy_page_es() -> Response {
+    render_privacy_page(Lang::Es)
+}
+
+fn render_privacy_page(lang: Lang) -> Response {
+    let (title, description) = match lang {
+        Lang::En => (
+            "Privacy — PointSav Software".to_string(),
+            "Privacy policy for software.pointsav.com — what data this site collects and how \
+             it's used."
+                .to_string(),
+        ),
+        Lang::Es => (
+            "Privacidad — PointSav Software".to_string(),
+            "Pol\u{ed}tica de privacidad de software.pointsav.com \u{2014} qu\u{e9} datos "
+                .to_string()
+                + "recopila este sitio y c\u{f3}mo se usan.",
+        ),
+    };
     let body = ui::render_page(
         SoftwareSurface::Marketplace,
-        Lang::En,
-        "Privacy — PointSav Software",
-        "Privacy policy for software.pointsav.com — what data this site collects and how it's used.",
-        "/page/privacy",
-        false,
-        ui::privacy_markup(),
+        lang,
+        &title,
+        &description,
+        &lang.localize("/page/privacy"),
+        true,
+        ui::privacy_markup(lang),
     )
     .into_string();
     (
@@ -1018,14 +1063,33 @@ async fn privacy_page() -> Response {
 
 // GET /page/accessibility — self-contained accessibility page, same pattern as disclaimer_page.
 async fn accessibility_page() -> Response {
+    render_accessibility_page(Lang::En)
+}
+
+// GET /es/page/accessibility — full-site-parity pass (2026-07-13).
+async fn accessibility_page_es() -> Response {
+    render_accessibility_page(Lang::Es)
+}
+
+fn render_accessibility_page(lang: Lang) -> Response {
+    let (title, description) = match lang {
+        Lang::En => (
+            "Accessibility — PointSav Software".to_string(),
+            "Accessibility statement for software.pointsav.com.".to_string(),
+        ),
+        Lang::Es => (
+            "Accesibilidad — PointSav Software".to_string(),
+            "Declaraci\u{f3}n de accesibilidad de software.pointsav.com.".to_string(),
+        ),
+    };
     let body = ui::render_page(
         SoftwareSurface::Marketplace,
-        Lang::En,
-        "Accessibility — PointSav Software",
-        "Accessibility statement for software.pointsav.com.",
-        "/page/accessibility",
-        false,
-        ui::accessibility_markup(),
+        lang,
+        &title,
+        &description,
+        &lang.localize("/page/accessibility"),
+        true,
+        ui::accessibility_markup(lang),
     )
     .into_string();
     (
@@ -1061,11 +1125,15 @@ async fn sitemap_xml() -> Response {
         "/page/disclaimer",
         "/page/privacy",
         "/page/accessibility",
-        // MVL Spanish variants (operator-approved 2026-07-12) — only the three
-        // translated pages; the rest have no /es/* sibling yet.
+        // Spanish variants — every page now has a real ES sibling (2026-07-13
+        // full-site-parity pass); /es alone omitted since it 302s to /es/software.
         "/es/software",
         "/es/pricing",
         "/es/licensing",
+        "/es/page/contact",
+        "/es/page/disclaimer",
+        "/es/page/privacy",
+        "/es/page/accessibility",
     ];
     let urls: String = pages
         .iter()
@@ -1086,15 +1154,37 @@ async fn sitemap_xml() -> Response {
 // Closes the highest-priority finding from the original Sovereign Editorial audit
 // (this route previously did not exist at all — HTTP 0, flagged twice).
 async fn contact_page() -> Response {
+    render_contact_page(Lang::En)
+}
+
+// GET /es/page/contact — full-site-parity pass (2026-07-13).
+async fn contact_page_es() -> Response {
+    render_contact_page(Lang::Es)
+}
+
+fn render_contact_page(lang: Lang) -> Response {
+    let (title, description) = match lang {
+        Lang::En => (
+            "Contact us — PointSav Software".to_string(),
+            "Contact PointSav Digital Systems for support with software licenses, downloads, \
+             and security disclosures."
+                .to_string(),
+        ),
+        Lang::Es => (
+            "Cont\u{e1}ctenos — PointSav Software".to_string(),
+            "Contacte a PointSav Digital Systems para soporte con licencias de software, \
+             descargas y divulgaciones de seguridad."
+                .to_string(),
+        ),
+    };
     let body = ui::render_page(
         SoftwareSurface::Marketplace,
-        Lang::En,
-        "Contact us — PointSav Software",
-        "Contact PointSav Digital Systems for support with software licenses, downloads, \
-         and security disclosures.",
-        "/page/contact",
-        false,
-        ui::contact_markup(),
+        lang,
+        &title,
+        &description,
+        &lang.localize("/page/contact"),
+        true,
+        ui::contact_markup(lang),
     )
     .into_string();
     (
@@ -1328,20 +1418,45 @@ async fn checkout_page(
     State(state): State<Arc<AppState>>,
     Path(product_id): Path<String>,
 ) -> Response {
+    render_checkout_page(&state, &product_id, Lang::En).await
+}
+
+// GET /es/checkout/:product_id — full-site-parity pass (2026-07-13).
+async fn checkout_page_es(
+    State(state): State<Arc<AppState>>,
+    Path(product_id): Path<String>,
+) -> Response {
+    render_checkout_page(&state, &product_id, Lang::Es).await
+}
+
+async fn render_checkout_page(state: &AppState, product_id: &str, lang: Lang) -> Response {
     match load_catalog(&state.catalog_path) {
         Ok(catalog) => match catalog.installers.iter().find(|i| i.id == product_id) {
             Some(installer) => {
-                let content = ui::checkout_markup(installer, &state.polygon_wallet_address);
+                let content = ui::checkout_markup(installer, &state.polygon_wallet_address, lang);
+                let (title, description) = match lang {
+                    Lang::En => (
+                        format!("Checkout — {} — PointSav Software", installer.name),
+                        format!(
+                            "Pay with Polygon USDC to mint a license for {}.",
+                            installer.name
+                        ),
+                    ),
+                    Lang::Es => (
+                        format!("Pago — {} — PointSav Software", installer.name),
+                        format!(
+                            "Pague con Polygon USDC para emitir una licencia de {}.",
+                            installer.name
+                        ),
+                    ),
+                };
                 let body = ui::render_page(
                     SoftwareSurface::Marketplace,
-                    Lang::En,
-                    &format!("Checkout — {} — PointSav Software", installer.name),
-                    &format!(
-                        "Pay with Polygon USDC to mint a license for {}.",
-                        installer.name
-                    ),
-                    &format!("/checkout/{}", installer.id),
-                    false,
+                    lang,
+                    &title,
+                    &description,
+                    &lang.localize(&format!("/checkout/{}", installer.id)),
+                    true,
                     content,
                 )
                 .into_string();
@@ -1385,6 +1500,13 @@ async fn order_redirect(Query(q): Query<OrderRedirectQuery>) -> Response {
     Redirect::to(&format!("/order/{tx_hash}?product={}", q.product)).into_response()
 }
 
+// GET /es/order?product=<id>&tx_hash=<value> — Spanish checkout form's submit target,
+// same pattern as `order_redirect`. Full-site-parity pass (2026-07-13).
+async fn order_redirect_es(Query(q): Query<OrderRedirectQuery>) -> Response {
+    let tx_hash = q.tx_hash.trim().to_lowercase();
+    Redirect::to(&format!("/es/order/{tx_hash}?product={}", q.product)).into_response()
+}
+
 #[derive(Deserialize, Default)]
 struct OrderQuery {
     product: Option<String>,
@@ -1400,23 +1522,55 @@ async fn order_status_page(
     Path(tx_hash): Path<String>,
     Query(q): Query<OrderQuery>,
 ) -> Response {
+    render_order_status_page(&state, &tx_hash, q, Lang::En).await
+}
+
+// GET /es/order/:tx_hash — full-site-parity pass (2026-07-13).
+async fn order_status_page_es(
+    State(state): State<Arc<AppState>>,
+    Path(tx_hash): Path<String>,
+    Query(q): Query<OrderQuery>,
+) -> Response {
+    render_order_status_page(&state, &tx_hash, q, Lang::Es).await
+}
+
+async fn render_order_status_page(
+    state: &AppState,
+    tx_hash: &str,
+    q: OrderQuery,
+    lang: Lang,
+) -> Response {
     let tx_hash = tx_hash.to_lowercase();
-    let content = match resolve_license(&state, &tx_hash).await {
+    let content = match resolve_license(state, &tx_hash).await {
         LicenseOutcome::Confirmed {
             license_key,
             product_id,
             ..
-        } => ui::order_confirmed_markup(&tx_hash, &license_key, &product_id),
-        LicenseOutcome::Pending { retry_after } => ui::order_pending_markup(&tx_hash, retry_after),
-        LicenseOutcome::NotFound => ui::order_not_found_markup(&tx_hash, q.product.as_deref()),
+        } => ui::order_confirmed_markup(&tx_hash, &license_key, &product_id, lang),
+        LicenseOutcome::Pending { retry_after } => {
+            ui::order_pending_markup(&tx_hash, retry_after, lang)
+        }
+        LicenseOutcome::NotFound => {
+            ui::order_not_found_markup(&tx_hash, q.product.as_deref(), lang)
+        }
+    };
+    let (title, description) = match lang {
+        Lang::En => (
+            "Order status — PointSav Software".to_string(),
+            "Check a PointSav software purchase by transaction hash.".to_string(),
+        ),
+        Lang::Es => (
+            "Estado del pedido — PointSav Software".to_string(),
+            "Consulte una compra de software PointSav por hash de transacci\u{f3}n.".to_string(),
+        ),
     };
     let body = ui::render_page(
         SoftwareSurface::Marketplace,
-        Lang::En,
-        "Order status — PointSav Software",
-        "Check a PointSav software purchase by transaction hash.",
-        &format!("/order/{tx_hash}"),
-        false,
+        lang,
+        &title,
+        &description,
+        &lang.localize(&format!("/order/{tx_hash}")),
+        true,
         content,
     )
     .into_string();
@@ -1556,7 +1710,8 @@ async fn main() -> Result<()> {
         .route("/software/:product_id", get(product_detail_page))
         .route("/licensing", get(licensing_page))
         .route("/pricing", get(pricing_page))
-        // MVL Spanish variants (operator-approved 2026-07-12) — see `ui::lang` module docs.
+        // Spanish variants (operator-approved 2026-07-12 MVL, extended to full-site
+        // parity 2026-07-13) — see `ui::lang` module docs.
         .route("/es", get(root_es))
         .route("/es/software", get(software_page_es))
         .route("/es/licensing", get(licensing_page_es))
@@ -1565,6 +1720,10 @@ async fn main() -> Result<()> {
         .route("/page/privacy", get(privacy_page))
         .route("/page/accessibility", get(accessibility_page))
         .route("/page/contact", get(contact_page))
+        .route("/es/page/disclaimer", get(disclaimer_page_es))
+        .route("/es/page/privacy", get(privacy_page_es))
+        .route("/es/page/accessibility", get(accessibility_page_es))
+        .route("/es/page/contact", get(contact_page_es))
         .route("/robots.txt", get(robots_txt))
         .route("/sitemap.xml", get(sitemap_xml))
         .route("/healthz", get(healthz))
@@ -1573,8 +1732,11 @@ async fn main() -> Result<()> {
         .route("/v1/claim", post(v1_claim))
         .route("/v1/wallet/address", get(v1_wallet_address))
         .route("/checkout/:product_id", get(checkout_page))
+        .route("/es/checkout/:product_id", get(checkout_page_es))
         .route("/order", get(order_redirect))
+        .route("/es/order", get(order_redirect_es))
         .route("/order/:tx_hash", get(order_status_page))
+        .route("/es/order/:tx_hash", get(order_status_page_es))
         .route("/order/:tx_hash/download", get(order_download))
         .nest_service("/static", ServeDir::new(static_dir))
         .layer(SetResponseHeaderLayer::overriding(
@@ -2496,7 +2658,7 @@ esac
 
         // P2 chrome wraps the dynamic content.
         assert!(html.contains("sw-masthead"));
-        assert!(html.contains(SoftwareSurface::Marketplace.trademark_line()));
+        assert!(html.contains(SoftwareSurface::Marketplace.trademark_line(Lang::En)));
         assert!(html.contains(SoftwareSurface::Marketplace.copyright_holder()));
 
         let _ = fs::remove_dir_all(&scratch);
@@ -2546,7 +2708,7 @@ esac
         assert!(!html.contains("OLD LIGHT NAV"));
         assert!(!html.contains("OLD THIN FOOTER"));
         assert!(html.contains("sw-masthead"));
-        assert!(html.contains(SoftwareSurface::Marketplace.trademark_line()));
+        assert!(html.contains(SoftwareSurface::Marketplace.trademark_line(Lang::En)));
 
         // NOT affected by P3: no dynamic catalog cards on /licensing.
         assert!(!html.contains("sw-cat-card"));
@@ -2591,7 +2753,7 @@ esac
 
         // Sovereign chrome present (same page shell as /software and /licensing).
         assert!(html.contains("sw-masthead"));
-        assert!(html.contains(SoftwareSurface::Marketplace.trademark_line()));
+        assert!(html.contains(SoftwareSurface::Marketplace.trademark_line(Lang::En)));
 
         // `home.pointsav.com` and `home.woodfinegroup.com` legitimately appear now
         // (2026-07-07 footer redesign, operator-approved) — the footer's "Network"
@@ -2621,7 +2783,7 @@ esac
         assert!(html.contains("Polygon"));
         assert!(html.contains("open.source@pointsav.com"));
         assert!(html.contains("sw-masthead"));
-        assert!(html.contains(SoftwareSurface::Marketplace.trademark_line()));
+        assert!(html.contains(SoftwareSurface::Marketplace.trademark_line(Lang::En)));
     }
 
     #[tokio::test]
@@ -2636,7 +2798,7 @@ esac
         assert!(html.contains("WCAG 2.1"));
         assert!(html.contains("open.source@pointsav.com"));
         assert!(html.contains("sw-masthead"));
-        assert!(html.contains(SoftwareSurface::Marketplace.trademark_line()));
+        assert!(html.contains(SoftwareSurface::Marketplace.trademark_line(Lang::En)));
     }
 
     #[tokio::test]
@@ -2650,7 +2812,49 @@ esac
         let html = body_text(body).await;
         assert!(html.contains("open.source@pointsav.com"));
         assert!(html.contains("sw-masthead"));
-        assert!(html.contains(SoftwareSurface::Marketplace.trademark_line()));
+        assert!(html.contains(SoftwareSurface::Marketplace.trademark_line(Lang::En)));
+    }
+
+    // ── Full-site-parity pass (2026-07-13): GET /es/page/* ──────────────────────
+
+    #[tokio::test]
+    async fn es_contact_page_translates_content_and_carries_hreflang() {
+        let (parts, body) = contact_page_es().await.into_parts();
+        assert_eq!(parts.status, StatusCode::OK);
+        let html = body_text(body).await;
+        assert!(html.contains("Cont\u{e1}ctenos"));
+        assert!(html.contains("open.source@pointsav.com"));
+        assert!(html.contains(r#"<html lang="es">"#));
+        assert!(html.contains(r#"hreflang="en" href="https://software.pointsav.com/page/contact""#));
+    }
+
+    #[tokio::test]
+    async fn es_disclaimer_page_translates_content() {
+        let (parts, body) = disclaimer_page_es().await.into_parts();
+        assert_eq!(parts.status, StatusCode::OK);
+        let html = body_text(body).await;
+        assert!(html.contains("Aviso legal"));
+        assert!(html.contains("Sin garant\u{ed}a"));
+        assert!(html.contains(r#"<html lang="es">"#));
+    }
+
+    #[tokio::test]
+    async fn es_privacy_page_translates_content() {
+        let (parts, body) = privacy_page_es().await.into_parts();
+        assert_eq!(parts.status, StatusCode::OK);
+        let html = body_text(body).await;
+        assert!(html.contains("Privacidad"));
+        assert!(html.contains(r#"<html lang="es">"#));
+    }
+
+    #[tokio::test]
+    async fn es_accessibility_page_translates_content() {
+        let (parts, body) = accessibility_page_es().await.into_parts();
+        assert_eq!(parts.status, StatusCode::OK);
+        let html = body_text(body).await;
+        assert!(html.contains("Accesibilidad"));
+        assert!(html.contains("WCAG 2.1 AA"));
+        assert!(html.contains(r#"<html lang="es">"#));
     }
 
     // ── Phase 4: GET /pricing ─────────────────────────────────────────────────
@@ -2727,6 +2931,19 @@ esac
         assert!(html.contains("PrivateGit OS"));
         assert!(html.contains("$1.00"));
         assert!(html.contains("0xTESTWALLET"));
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn es_checkout_page_translates_chrome_and_submits_to_es_order() {
+        let scratch = scratch_dir("checkout-es-ok");
+        let state = test_state_full(&scratch);
+        let resp = checkout_page_es(State(state), Path("os-privategit".to_string())).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let html = body_text(resp.into_body()).await;
+        assert!(html.contains("PrivateGit OS"));
+        assert!(html.contains("action=\"/es/order\""));
+        assert!(html.contains(r#"<html lang="es">"#));
         let _ = fs::remove_dir_all(&scratch);
     }
 
@@ -2817,6 +3034,26 @@ esac
         assert!(html.contains("Confirmed"));
         // A $1.00 payment matches os-console in this test's write_catalog fixture.
         assert!(html.contains("os-console"));
+        assert!(html.contains("href=\"/order/0xconfirmedpayment01/download?product=os-console\""));
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn es_order_status_page_confirmed_translates_labels() {
+        let scratch = scratch_dir("order-confirmed-es");
+        let double = write_tool_wallet_double(&scratch);
+        let state = test_state(&scratch, double.to_string_lossy().into_owned());
+        let resp = order_status_page_es(
+            State(state),
+            Path("0xconfirmedpayment01".to_string()),
+            Query(OrderQuery::default()),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let html = body_text(resp.into_body()).await;
+        assert!(html.contains("Confirmado"));
+        assert!(html.contains(r#"<html lang="es">"#));
+        // Download link stays unprefixed — no UI to translate, machine link only.
         assert!(html.contains("href=\"/order/0xconfirmedpayment01/download?product=os-console\""));
         let _ = fs::remove_dir_all(&scratch);
     }

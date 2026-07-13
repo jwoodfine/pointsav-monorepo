@@ -12,6 +12,8 @@
 //! in that crate — it is a pure machine surface), so a `Source` variant would be
 //! dead code and is intentionally omitted rather than stubbed with a dead arm.
 
+use crate::ui::Lang;
+
 /// The served surfaces of software.pointsav.com.
 ///
 /// `Source` is intentionally absent — see the module docs.
@@ -63,12 +65,33 @@ impl SoftwareSurface {
     /// checked directly against its HTML, not assumed. Do not paraphrase or shorten
     /// again without reading `TRADEMARK.md` §13 directly AND cross-checking a live
     /// family site — a claimed citation is not a substitute for checking either.
-    pub fn trademark_line(self) -> &'static str {
-        "Woodfine Capital Projects\u{2122}, MCorp\u{2122}, PointSav Digital Systems\u{2122}, \
-         Totebox Orchestration\u{2122}, Totebox Archive\u{2122}, and Capability Geometry\u{2122} \
-         are trademarks of Woodfine Capital Projects Inc., used in Canada, the United States, \
-         Latin America, and Europe. All other trademarks are the property of their respective \
-         owners."
+    ///
+    /// **Translated for ES 2026-07-13** (full-site-parity pass) — home.pointsav.com's
+    /// own served HTML was checked directly and its trademark/copyright line IS fully
+    /// translated on its `/es` page (not left English), superseding this session's
+    /// earlier, more cautious assumption that shared legal-adjacent copy should wait
+    /// for factory-release-engineering's canonical Spanish DISCLAIMER text. That
+    /// pending translation is the LP-offering disclaimer document specifically; the
+    /// short trademark-notice sentence is not sourced from it, and home.pointsav.com's
+    /// own practice is the concrete precedent to match here. Mark names themselves
+    /// (™ terms) stay untranslated — they are proper nouns, same as home.pointsav.com's.
+    pub fn trademark_line(self, lang: Lang) -> &'static str {
+        match lang {
+            Lang::En => {
+                "Woodfine Capital Projects\u{2122}, MCorp\u{2122}, PointSav Digital Systems\u{2122}, \
+                 Totebox Orchestration\u{2122}, Totebox Archive\u{2122}, and Capability Geometry\u{2122} \
+                 are trademarks of Woodfine Capital Projects Inc., used in Canada, the United States, \
+                 Latin America, and Europe. All other trademarks are the property of their respective \
+                 owners."
+            }
+            Lang::Es => {
+                "Woodfine Capital Projects\u{2122}, MCorp\u{2122}, PointSav Digital Systems\u{2122}, \
+                 Totebox Orchestration\u{2122}, Totebox Archive\u{2122} y Capability Geometry\u{2122} \
+                 son marcas comerciales de Woodfine Capital Projects Inc., utilizadas en Canad\u{e1}, \
+                 los Estados Unidos, Am\u{e9}rica Latina y Europa. Todas las dem\u{e1}s marcas \
+                 comerciales son propiedad de sus respectivos titulares."
+            }
+        }
     }
 
     /// Copyright holder — the parent company, for every surface.
@@ -98,8 +121,11 @@ impl SoftwareSurface {
     /// marketplace. This site now has its own self-contained disclaimer
     /// page (`/page/disclaimer`, see `ui::disclaimer`) instead of citing
     /// someone else's.
-    pub fn disclosure_label(self) -> &'static str {
-        "Payment and licensing disclosure"
+    pub fn disclosure_label(self, lang: Lang) -> &'static str {
+        match lang {
+            Lang::En => "Payment and licensing disclosure",
+            Lang::Es => "Divulgaci\u{f3}n de pagos y licencias",
+        }
     }
 }
 
