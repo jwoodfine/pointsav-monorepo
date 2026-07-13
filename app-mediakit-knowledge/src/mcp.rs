@@ -70,8 +70,13 @@ impl ClaimsMcpServer {
         }
     }
 
-    #[tool(description = "Query claims for a topic slug, optionally filtered to a point in time via each claim's valid_at field. Returns the matching claims as a JSON array.")]
-    async fn query_claims(&self, Parameters(params): Parameters<QueryClaimsParams>) -> Result<CallToolResult, McpError> {
+    #[tool(
+        description = "Query claims for a topic slug, optionally filtered to a point in time via each claim's valid_at field. Returns the matching claims as a JSON array."
+    )]
+    async fn query_claims(
+        &self,
+        Parameters(params): Parameters<QueryClaimsParams>,
+    ) -> Result<CallToolResult, McpError> {
         let claims = self
             .store
             .claims_for_topic(&params.topic)
@@ -88,7 +93,10 @@ impl ClaimsMcpServer {
 /// unfiltered. Plain string comparison is correct because every `valid_at`
 /// form (`YYYY`, `YYYY-MM`, `YYYY-MM-DD`) sorts lexicographically the same
 /// as chronologically.
-fn filter_by_asof(claims: Vec<crate::content::Claim>, asof: Option<&str>) -> Vec<crate::content::Claim> {
+fn filter_by_asof(
+    claims: Vec<crate::content::Claim>,
+    asof: Option<&str>,
+) -> Vec<crate::content::Claim> {
     match asof {
         Some(asof) => claims
             .into_iter()
@@ -148,10 +156,15 @@ mod tests {
         // internal content representation.
         let dir = tempfile::tempdir().unwrap();
         let store = ClaimStore::open(&dir.path().join("claims.redb")).unwrap();
-        store.upsert_topic_claims(&[sample("a", "topic-x", None)]).unwrap();
+        store
+            .upsert_topic_claims(&[sample("a", "topic-x", None)])
+            .unwrap();
         let server = ClaimsMcpServer::new(store);
         let result = server
-            .query_claims(Parameters(QueryClaimsParams { topic: "topic-x".to_string(), asof: Some("2026".to_string()) }))
+            .query_claims(Parameters(QueryClaimsParams {
+                topic: "topic-x".to_string(),
+                asof: Some("2026".to_string()),
+            }))
             .await
             .unwrap();
         assert!(!result.content.is_empty());
@@ -173,7 +186,10 @@ mod tests {
 
     #[test]
     fn filter_by_asof_none_returns_everything() {
-        let claims = vec![sample("a", "t", Some("2020")), sample("b", "t", Some("2099"))];
+        let claims = vec![
+            sample("a", "t", Some("2020")),
+            sample("b", "t", Some("2099")),
+        ];
         assert_eq!(filter_by_asof(claims, None).len(), 2);
     }
 }
