@@ -9,7 +9,7 @@ pub mod layout;
 pub mod tenant;
 
 pub use layout::{
-    article, category_index, diff_page, doc_head, footer, header, history_page, home_page,
-    mobile_nav, page, search_results, simple_message, special_list, utility_bar,
+    article, category_index, diff_page, doc_head, doc_head_seo, footer, header, history_page,
+    home_page, mobile_nav, page, search_results, simple_message, special_list, utility_bar,
 };
 pub use tenant::{SiblingWiki, Tenant};

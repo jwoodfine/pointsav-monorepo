@@ -27,6 +27,29 @@ fn count_word(n: usize) -> &'static str {
 /// `<head>` contents (not the `<head>` element itself — `page()` supplies that).
 /// `description` may be empty (e.g. listing pages).
 pub fn doc_head(title: &str, description: &str, tenant: Tenant) -> Markup {
+    doc_head_seo(title, description, tenant, None, None)
+}
+
+/// `doc_head` plus SEO link relations for pages that have a canonical URL
+/// and/or a genuine bilingual counterpart (currently: article pages only —
+/// home/search/category/etc. have no `/es/` pair to alternate against).
+///
+/// `canonical_path` is this page's own canonical route (e.g. `/wiki/{slug}`
+/// or `/es/wiki/{slug}`) — set even when `alt` is `None` so an `?rev=`
+/// as-of view can point `rel=canonical` at the current, unversioned URL
+/// instead of being indexed as a duplicate.
+///
+/// `alt` is `(other_language_path, other_language_hreflang_code)` — the
+/// counterpart's URL and its ISO code (`"es"` or `"en"`), when a genuine
+/// counterpart exists (per the caller's `doc.lang`-guarded check, not just
+/// "was `/es/` requested").
+pub fn doc_head_seo(
+    title: &str,
+    description: &str,
+    tenant: Tenant,
+    canonical_path: Option<&str>,
+    alt: Option<(&str, &str)>,
+) -> Markup {
     // Don't double-brand when the page title already is the site name (home).
     let full_title = if title == tenant.home_label() {
         title.to_string()
@@ -47,6 +70,23 @@ pub fn doc_head(title: &str, description: &str, tenant: Tenant) -> Markup {
         meta property="og:title" content=(full_title);
         @if !description.is_empty() {
             meta property="og:description" content=(description);
+        }
+        @let base = tenant.home_url().trim_end_matches('/');
+        @if let Some(cpath) = canonical_path {
+            link rel="canonical" href=(format!("{base}{cpath}"));
+        }
+        @if let Some((alt_path, alt_code)) = alt {
+            // `alt_code` is the OTHER language's ISO code — this page's own
+            // code is the opposite one (only two languages are served).
+            @let self_code = if alt_code == "es" { "en" } else { "es" };
+            @if let Some(cpath) = canonical_path {
+                link rel="alternate" hreflang=(self_code) href=(format!("{base}{cpath}"));
+            }
+            link rel="alternate" hreflang=(alt_code) href=(format!("{base}{alt_path}"));
+            @let en_path = if self_code == "en" { canonical_path } else { Some(alt_path) };
+            @if let Some(p) = en_path {
+                link rel="alternate" hreflang="x-default" href=(format!("{base}{p}"));
+            }
         }
         // schema.org structured data — identifies the site + its publisher to
         // search engines and AI agents (SYS-ADR-07-safe: static, no user data).
