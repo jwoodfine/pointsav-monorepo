@@ -895,6 +895,49 @@ function toggleHiddenFiles() {
   });
 }
 
+// ── Scoped, debounced sidebar refresh on external file-tree changes ───────────
+// Collapses a burst of SSE "changed" events into a single re-fetch per affected
+// parent directory, and only touches directory nodes that are currently expanded
+// (untouched/collapsed dirs pick up fresh contents on next expand anyway).
+const pendingTreeRefreshDirs = new Set();
+let treeRefreshTimer = null;
+
+function normTreePath(p) {
+  return (p || '').replace(/^\/+/, '').replace(/\/+$/, '') + '/';
+}
+
+function queueTreeRefresh(parentPath) {
+  pendingTreeRefreshDirs.add(parentPath);
+  if (treeRefreshTimer) clearTimeout(treeRefreshTimer);
+  treeRefreshTimer = setTimeout(() => {
+    const parents = Array.from(pendingTreeRefreshDirs);
+    pendingTreeRefreshDirs.clear();
+    treeRefreshTimer = null;
+    parents.forEach(parentPath => {
+      const norm = normTreePath(parentPath);
+      document.querySelectorAll('.tree-item[data-type="dir"]').forEach(item => {
+        if (normTreePath(item.dataset.browse) !== norm) return;
+        if (!item.classList.contains('open') || !item.dataset.loaded) return;
+        const node = item.closest('.tree-node');
+        const children = node && node.querySelector('.tree-children');
+        if (!children) return;
+        item.removeAttribute('data-loaded');
+        children.innerHTML = '';
+        const pl = parseInt(item.style.paddingLeft) || 14;
+        // Cache-bust this one refresh only — set the API url, kick off
+        // loadChildren (its fetch() call reads dataset.api synchronously
+        // before the first await), then restore immediately so any later
+        // reads of dataset.api (e.g. building child item API paths after
+        // the fetch resolves) see the original, un-suffixed value.
+        const originalApi = item.dataset.api;
+        item.dataset.api = originalApi + (originalApi.includes('?') ? '&' : '?') + '_t=' + Date.now();
+        loadChildren(item, children, Math.round(pl / 14));
+        item.dataset.api = originalApi;
+      });
+    });
+  }, 350);
+}
+
 // ── Markdown renderer ─────────────────────────────────────────────────────────
 function mdToHtml(src) {
   const codeBlocks = [];
@@ -2397,6 +2440,11 @@ async function loadChildren(item, childrenEl, depth) {
   const cloneMatch = browse.match(/^\/(_clones\/[^/]+)\/$/);
 
   try {
+    // Timing-critical: item.dataset.api must be read here, synchronously,
+    // before any other await in this function — queueTreeRefresh's cache-bust
+    // (above) mutates dataset.api right before calling loadChildren and
+    // restores it on the very next line, relying on this read happening
+    // first. Do not add an await before this line without re-checking that.
     const res = await fetch(item.dataset.api);
     if (!res.ok) throw new Error(res.status);
     const entries = await res.json();
@@ -3798,6 +3846,11 @@ searchInput.addEventListener('keydown', e => {
           reloadTabContent(idx, changedPath, newMtime);
         }
       });
+
+      // Additionally, refresh the sidebar tree node for the changed path's
+      // parent directory (if it's currently expanded) — scoped + debounced.
+      var parent = changedPath.replace(/[^/]*$/, '');
+      queueTreeRefresh(parent);
     };
 
     es.onerror = function() {
