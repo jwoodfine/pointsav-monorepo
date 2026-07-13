@@ -12,13 +12,15 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::extract::{Path, Query, Request, State};
-use axum::http::{header, StatusCode};
+use axum::http::{header, HeaderMap, StatusCode};
 use axum::middleware::{self, Next};
 use axum::response::{Html, IntoResponse, Response};
 use axum::routing::get;
 use axum::Router;
 
 use crate::assets::StaticAssets;
+use crate::citations::CitationRegistry;
+use crate::claims_store::ClaimStore;
 use crate::config::Config;
 use std::collections::HashMap;
 
@@ -56,6 +58,14 @@ pub struct AppState {
     /// `factory-release-engineering/tokens/legal-tokens-{brand}.yaml`. Falls
     /// back to `LegalTokens::default()` if the file is absent or malformed.
     pub legal: Arc<LegalTokens>,
+    /// The claim graph (Phase 3) — extracted from every mount's claim-
+    /// annotated markdown at startup, persisted in `redb` at
+    /// `<state_dir>/claims.redb`.
+    pub claims: ClaimStore,
+    /// The `citations.yaml` registry every claim's `cites:` resolves
+    /// against. Empty (not an error) if `[citations]` is unset in
+    /// `knowledge.toml` or the file is missing.
+    pub citations: Arc<CitationRegistry>,
 }
 
 impl AppState {
@@ -90,6 +100,30 @@ impl AppState {
         // values if the token file is absent/malformed (see legal.rs).
         let legal = legal::load_default(&config.site.brand).unwrap_or_default();
         let category_counts = index.category_counts();
+
+        let citations = config
+            .citations
+            .as_ref()
+            .map(|c| CitationRegistry::load(&c.path))
+            .unwrap_or_default();
+
+        std::fs::create_dir_all(&config.site.state_dir).ok();
+        let claims = ClaimStore::open(&config.site.state_dir.join("claims.redb"))
+            .expect("open claim store");
+        for doc in index.documents() {
+            if let Ok(parsed) = content::load(doc) {
+                let extracted = content::extract_claims(&doc.slug, &parsed.body_md);
+                if !extracted.is_empty() {
+                    if let Err(e) = claims.upsert_topic_claims(&extracted) {
+                        tracing::warn!("failed to persist claims for {}: {e}", doc.slug);
+                    }
+                }
+            }
+        }
+        if let Err(e) = claims.rebuild_cited_by() {
+            tracing::warn!("failed to rebuild claim cited_by index: {e}");
+        }
+
         Self {
             config: Arc::new(config),
             mounts: Arc::new(mounts),
@@ -101,6 +135,8 @@ impl AppState {
             category_counts: Arc::new(category_counts),
             tenant,
             legal: Arc::new(legal),
+            claims,
+            citations: Arc::new(citations),
         }
     }
 }
@@ -584,8 +620,9 @@ async fn wiki_raw(
     State(state): State<AppState>,
     Path(slug): Path<String>,
     Query(params): Query<HistoryQuery>,
+    headers: HeaderMap,
 ) -> Response {
-    serve_article(state, slug, params, Lang::En).await
+    serve_article(state, slug, params, Lang::En, &headers).await
 }
 
 /// Spanish article route (`/es/wiki/{slug}`) — same handler, `Lang::Es`.
@@ -593,8 +630,75 @@ async fn wiki_es(
     State(state): State<AppState>,
     Path(slug): Path<String>,
     Query(params): Query<HistoryQuery>,
+    headers: HeaderMap,
 ) -> Response {
-    serve_article(state, slug, params, Lang::Es).await
+    serve_article(state, slug, params, Lang::Es, &headers).await
+}
+
+/// `true` when the request's `Accept` header prefers JSON over HTML — the
+/// `GET /wiki/{slug}` content-negotiation branch (Phase 3.7). A plain
+/// substring check, not full quality-value negotiation: this route only
+/// ever serves two representations, so the RFC 7231 machinery is overkill.
+fn wants_json(headers: &HeaderMap) -> bool {
+    headers
+        .get(header::ACCEPT)
+        .and_then(|v| v.to_str().ok())
+        .map(|v| v.contains("application/json") && !v.contains("text/html"))
+        .unwrap_or(false)
+}
+
+/// The `GET /wiki/{slug}` JSON representation (Phase 3.7):
+/// `{frontmatter, body_md, blake3, revision_sha, backlinks}`.
+#[derive(serde::Serialize)]
+struct ArticleJson<'a> {
+    frontmatter: &'a content::Frontmatter,
+    body_md: &'a str,
+    blake3: String,
+    revision_sha: Option<String>,
+    backlinks: Vec<BacklinkRef>,
+}
+
+#[derive(serde::Serialize)]
+struct BacklinkRef {
+    slug: String,
+    title: String,
+}
+
+/// Every other document whose body contains a `[[target]]`/`[[target|label]]`
+/// wikilink pointing at `target_slug`. Computed on demand by scanning the
+/// corpus (no precomputed backlink index exists yet) — fine at this corpus's
+/// size (hundreds of articles); revisit with a cached inverse index if this
+/// becomes a hot path.
+fn compute_backlinks(state: &AppState, target_slug: &str) -> Vec<BacklinkRef> {
+    let mut out = Vec::new();
+    for doc in state.index.documents() {
+        if doc.slug == target_slug {
+            continue;
+        }
+        let Ok(parsed) = content::load(doc) else { continue };
+        if wikilink_targets(&parsed.body_md).iter().any(|t| t == target_slug) {
+            out.push(BacklinkRef { slug: doc.slug.clone(), title: doc.title.clone() });
+        }
+    }
+    out
+}
+
+/// Every `[[target]]` / `[[target|label]]` link target in `body_md` (the
+/// anchor form `[[#heading]]` is excluded — it's in-page, not cross-doc).
+fn wikilink_targets(body_md: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut rest = body_md;
+    while let Some(start) = rest.find("[[") {
+        let after_open = &rest[start + 2..];
+        let Some(end) = after_open.find("]]") else { break };
+        let inner = &after_open[..end];
+        let target = inner.split_once('|').map(|(t, _)| t).unwrap_or(inner).trim();
+        if !target.starts_with('#') && !target.is_empty() {
+            out.push(target.to_string());
+        }
+        rest = &after_open[end + 2..];
+    }
+    out
 }
 
 /// Render an article in `lang` (falls back to English content when no `.es`
@@ -604,6 +708,7 @@ async fn serve_article(
     slug: String,
     params: HistoryQuery,
     lang: Lang,
+    headers: &HeaderMap,
 ) -> Response {
     let slug = slug.trim_end_matches('/');
     let prefix = if lang == Lang::Es { "/es" } else { "" };
@@ -692,6 +797,19 @@ async fn serve_article(
     // Provenance: the short hash of the file's most recent commit.
     let prov = crate::history::file_history(repo_root, rel, 1);
     let sha = prov.first().map(|r| r.short_sha.as_str());
+
+    // Content negotiation (Phase 3.7): `Accept: application/json` returns the
+    // structured representation instead of the HTML chrome.
+    if wants_json(headers) {
+        let json = ArticleJson {
+            frontmatter: &parsed.frontmatter,
+            body_md: &parsed.body_md,
+            blake3: blake3::hash(parsed.body_md.as_bytes()).to_hex().to_string(),
+            revision_sha: prov.first().map(|r| r.sha.clone()),
+            backlinks: compute_backlinks(&state, &doc.slug),
+        };
+        return axum::Json(json).into_response();
+    }
     // Language toggle — only when a genuine counterpart exists.
     let alt_lang: Option<(String, &str)> = if lang == Lang::Es {
         Some((format!("/wiki/{}", doc.slug), "English"))
