@@ -95,7 +95,7 @@ body{{font-family:"Inter","Sans Fallback",system-ui,-apple-system,"Segoe UI",Ari
 .sw-mobile-nav{{display:none;background:var(--sw-topnav-bg);}}
 .sw-mobile-nav a{{display:block;padding:12px 24px;color:var(--sw-on-chrome);text-decoration:none;font-size:14px;border-top:1px solid rgba(255,255,255,.12);}}
 .sw-mobile-nav a:hover{{background:rgba(255,255,255,.06);}}
-.sw-footer{{background:var(--sw-footer-bg);color:var(--sw-footer-fg);width:100%;}}
+.sw-footer{{background:var(--sw-footer-bg);color:var(--sw-footer-fg);width:100%;border-top:1px solid var(--sw-footer-divider);}}
 .sw-footer__inner{{max-width:1280px;margin:0 auto;padding:48px 24px 28px;box-sizing:border-box;}}
 .sw-footer__top{{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:32px;}}
 .sw-footer__brand-name{{color:var(--sw-ink);font-family:Georgia,"Times New Roman",serif;font-weight:700;font-size:18px;}}
@@ -130,7 +130,7 @@ body{{font-family:"Inter","Sans Fallback",system-ui,-apple-system,"Segoe UI",Ari
 .sw-footer__badge-text{{display:flex;flex-direction:column;line-height:1.1;}}
 .sw-footer__badge-label{{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--sw-footer-fg-muted);}}
 .sw-footer__badge-name{{font-size:12px;font-weight:600;color:var(--sw-footer-fg);}}
-.sw-footer__legal{{margin-top:20px;padding-top:18px;border-top:1px solid var(--sw-footer-divider);font-size:11.5px;line-height:1.6;}}
+.sw-footer__legal{{margin-top:20px;padding-top:18px;border-top:1px solid var(--sw-footer-divider);font-size:12px;line-height:1.6;}}
 .sw-footer__copyright{{color:var(--sw-footer-fg-muted);margin:0 0 12px;}}
 .sw-footer__trademark{{margin:0;color:var(--sw-footer-fg-muted);max-width:80ch;}}
 .sw-legal{{max-width:70ch;margin:0 auto;padding:40px 24px 64px;line-height:1.65;}}
