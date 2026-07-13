@@ -53,6 +53,10 @@ fn chrome_style() -> Markup {
 @font-face{{font-family:"Inter";src:url("/static/fonts/Inter-400-normal-latin-ext.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap;unicode-range:U+0100-024F,U+0259,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20CF,U+2113,U+2C60-2C7F,U+A720-A7FF;}}
 @font-face{{font-family:"Inter";src:url("/static/fonts/Inter-600-normal-latin.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;}}
 @font-face{{font-family:"Inter";src:url("/static/fonts/Inter-600-normal-latin-ext.woff2") format("woff2");font-weight:600;font-style:normal;font-display:swap;unicode-range:U+0100-024F,U+0259,U+1E00-1EFF,U+2020,U+20A0-20AB,U+20AD-20CF,U+2113,U+2C60-2C7F,U+A720-A7FF;}}
+@font-face{{font-family:"Source Serif 4";src:url("/static/fonts/Source-Serif-4-400-normal-latin.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+2074,U+20AC,U+2122,U+2212,U+FEFF,U+FFFD;}}
+@font-face{{font-family:"Source Serif 4";src:url("/static/fonts/Source-Serif-4-400-normal-latin-ext.woff2") format("woff2");font-weight:400;font-style:normal;font-display:swap;unicode-range:U+0100-024F,U+1E00-1EFF,U+20A0-20AB,U+2C60-2C7F,U+A720-A7FF;}}
+@font-face{{font-family:"Source Serif 4";src:url("/static/fonts/Source-Serif-4-700-normal-latin.woff2") format("woff2");font-weight:700;font-style:normal;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+2000-206F,U+2074,U+20AC,U+2122,U+2212,U+FEFF,U+FFFD;}}
+@font-face{{font-family:"Source Serif 4";src:url("/static/fonts/Source-Serif-4-700-normal-latin-ext.woff2") format("woff2");font-weight:700;font-style:normal;font-display:swap;unicode-range:U+0100-024F,U+1E00-1EFF,U+20A0-20AB,U+2C60-2C7F,U+A720-A7FF;}}
 :root{{
 --sw-topnav-bg:{topnav};
 --sw-on-chrome:{on_chrome};
@@ -69,12 +73,12 @@ fn chrome_style() -> Markup {
 body{{font-family:"Inter","Sans Fallback",system-ui,-apple-system,"Segoe UI",Arial,sans-serif;}}
 .sw-masthead{{background:var(--sw-topnav-bg);color:var(--sw-on-chrome);width:100%;}}
 .sw-masthead__inner{{display:flex;align-items:center;gap:24px;height:64px;max-width:1280px;margin:0 auto;padding:0 24px;box-sizing:border-box;}}
-.sw-wordmark{{color:var(--sw-on-chrome);text-decoration:none;font-weight:600;font-size:17px;letter-spacing:.005em;flex:0 0 auto;}}
-.sw-masthead__nav{{display:flex;align-items:center;gap:20px;flex:0 0 auto;font-size:13px;letter-spacing:.01em;}}
+.sw-wordmark{{font-family:"Source Serif 4","Serif Fallback",Georgia,serif;color:var(--sw-on-chrome);text-decoration:none;font-weight:700;font-size:21px;letter-spacing:.005em;flex:0 0 auto;}}
+.sw-masthead__nav{{display:flex;align-items:center;gap:20px;flex:0 0 auto;font-size:13px;letter-spacing:.01em;margin-left:auto;}}
 .sw-masthead__nav a{{color:var(--sw-on-chrome-muted);text-decoration:none;padding-block:4px;}}
 .sw-masthead__nav a:hover,.sw-masthead__nav a:focus-visible{{color:var(--sw-on-chrome);}}
-.sw-search{{flex:1 1 auto;display:flex;justify-content:flex-end;}}
-.sw-search__form{{display:flex;width:100%;max-width:320px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);border-radius:6px;overflow:hidden;}}
+.sw-search{{flex:0 0 auto;display:flex;}}
+.sw-search__form{{display:flex;width:260px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);border-radius:6px;overflow:hidden;}}
 .sw-search__input{{flex:1;background:transparent;border:0;color:#fff;padding:8px 12px;font-size:13px;outline:none;}}
 .sw-search__input::placeholder{{color:rgba(255,255,255,.6);}}
 .sw-search__btn{{background:transparent;border:0;color:rgba(255,255,255,.85);padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;}}
@@ -631,6 +635,13 @@ mod tests {
         // Masthead markers.
         assert!(page.contains("sw-masthead"));
         assert!(page.contains(SURFACE.home_label()));
+
+        // Wordmark font — corrected 2026-07-13 from a sans fallback (Georgia/Inter
+        // stand-ins) to the real, self-hosted Source Serif 4, verified byte-for-byte
+        // against home.pointsav.com's own served wordmark font (computed style
+        // check, not assumed) — the prior mismatch was visibly "not the same site."
+        assert!(page.contains(r#"@font-face{font-family:"Source Serif 4""#));
+        assert!(page.contains(r#".sw-wordmark{font-family:"Source Serif 4""#));
 
         // Footer markers: verbatim trademark line, copyright holder, cities.
         assert!(page.contains(SURFACE.trademark_line()));

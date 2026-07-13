@@ -51,10 +51,18 @@ pub const TOPNAV_BG: &str = "#234ed8";
 /// `home.pointsav.com`'s `--m-ink-on-chrome` (`--m-white`); not brand-overridden.
 pub const ON_CHROME: &str = "#ffffff";
 
-/// Muted secondary text on the masthead (e.g. the "Software" subtitle under
-/// the wordmark) — verified against `home.pointsav.com`'s `--m-ink-on-chrome-muted`
-/// (`--m-slate-300`); not brand-overridden, same value for every tenant.
-pub const ON_CHROME_MUTED: &str = "#b4c5d5";
+/// Muted secondary masthead text (e.g. the desktop nav links' resting-state color).
+///
+/// **Corrected 2026-07-13** — the prior value here (`#b4c5d5`, the generic
+/// `:root`-level `--m-ink-on-chrome-muted`/slate-300 base) is exactly the value
+/// `home.pointsav.com`'s own CSS documents replacing: slate-300 measures ~3.77:1
+/// against PointSav's brighter `#234ed8` masthead background, failing WCAG 1.4.3
+/// (needs 4.5:1) — a bug specific to this brand's masthead, not the base token.
+/// PointSav's `--m-masthead-ink-muted` override (`#d5deea`) is the value that
+/// actually ships live on `#234ed8`, verified directly against its served CSS.
+/// This crate shares that exact background color, so it inherits the same bug
+/// unless it also uses the override, not the generic base.
+pub const ON_CHROME_MUTED: &str = "#d5deea";
 
 /// The one accent color — PointSav's brand blue, for links/interactive elements on
 /// light surfaces. Verified against `home.pointsav.com`'s `--m-link`
