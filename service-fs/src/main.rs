@@ -14,6 +14,10 @@ pub extern "C" fn _start() -> ! {
     // 2. Map capability pointers passed by the CBM (Root-Task)
 
     // 3. The Sovereign Polling Loop (Gatekeeper State Machine)
+    // Intentional bare-metal halt stub -- IPC handling not yet implemented
+    // (seL4-track work deferred). Not a busy-wait bug: no scheduler/sleep
+    // primitive exists in this no_std/no_main context yet to yield to.
+    #[allow(clippy::empty_loop)]
     loop {
         // Block and wait for Inter-Process Communication (IPC) from system-network-interface
         // Handle read/write logic strictly within provisioned WORM boundaries
