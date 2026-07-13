@@ -44,9 +44,24 @@ fn set_workbench_port(app_handle: tauri::AppHandle, port: u16) -> Result<(), Str
     Ok(())
 }
 
+/// True once `workbench-config.json` exists in the app data dir — used by the
+/// frontend to decide whether to show the first-run port-configuration dialog.
+#[tauri::command]
+fn has_workbench_config(app_handle: tauri::AppHandle) -> bool {
+    app_handle
+        .path_resolver()
+        .app_data_dir()
+        .map(|dir| dir.join(CONFIG_FILENAME).exists())
+        .unwrap_or(false)
+}
+
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![get_workbench_url, set_workbench_port])
+        .invoke_handler(tauri::generate_handler![
+            get_workbench_url,
+            set_workbench_port,
+            has_workbench_config
+        ])
         .setup(|app| {
             if let Some(dir) = app.path_resolver().app_data_dir() {
                 fs::create_dir_all(&dir).ok();
