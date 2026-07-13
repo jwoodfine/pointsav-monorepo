@@ -43,6 +43,13 @@ anyhow = "1"
 thiserror = "2"
 tantivy = "0.24"
 git2 = "0.20"
+# P9 (claim layer): embedded claim-graph store, content hashing, citation
+# re-verification HTTP client, and the MCP query surface.
+redb = "4"
+blake3 = "1"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls"] }
+rmcp = { version = "2", features = ["transport-io", "schemars"] }
+schemars = "1"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
