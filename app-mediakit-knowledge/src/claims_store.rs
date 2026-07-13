@@ -105,19 +105,30 @@ impl ClaimStore {
 
     /// Rebuild the `cited_by` inverse index from scratch against the current
     /// full claim set. Call after a full-corpus reindex so removed/renamed
-    /// citations don't leave stale entries behind.
+    /// citations don't leave stale entries behind — this actually prunes
+    /// every existing key absent from the freshly-computed index (a prior
+    /// version of this function only ever inserted, never removed, so a
+    /// citation that stopped being cited kept its stale `cited_by` entry
+    /// forever; fixed 2026-07-13 per audit finding).
     pub fn rebuild_cited_by(&self) -> anyhow::Result<()> {
         let all = self.all_claims()?;
+        let mut index: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
+        for c in &all {
+            for citation_id in &c.cites {
+                index.entry(citation_id.clone()).or_default().push(c.global_id());
+            }
+        }
+
         let write = self.db.begin_write()?;
         {
             let mut cited_by = write.open_table(CITED_BY_TABLE)?;
-            // redb has no "clear table" primitive pre-4.x-stable in this
-            // crate's pinned version; deleting known keys is done via a
-            // fresh table build instead — collect then insert.
-            let mut index: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
-            for c in &all {
-                for citation_id in &c.cites {
-                    index.entry(citation_id.clone()).or_default().push(c.global_id());
+            let existing_keys: Vec<String> = cited_by
+                .iter()?
+                .map(|entry| entry.map(|(k, _)| k.value().to_string()))
+                .collect::<Result<_, _>>()?;
+            for key in &existing_keys {
+                if !index.contains_key(key) {
+                    cited_by.remove(key.as_str())?;
                 }
             }
             for (citation_id, list) in &index {
@@ -318,5 +329,24 @@ mod tests {
         store.upsert_topic_claims(&[sample_claim("a", "topic-x", vec!["c1"])]).unwrap();
         store.rebuild_cited_by().unwrap();
         assert_eq!(store.claims_citing("c1").unwrap(), vec!["topic-x:a".to_string()]);
+    }
+
+    #[test]
+    fn rebuild_cited_by_prunes_orphaned_citation_keys() {
+        // A citation id is cited, then the claim citing it is replaced by
+        // one that no longer cites it (simulating an edited/deleted article
+        // via upsert_topic_claims overwriting the same global_id). Before
+        // the fix, claims_citing("stale-cite") would still return the old
+        // claim forever.
+        let dir = tempfile::tempdir().unwrap();
+        let store = ClaimStore::open(&dir.path().join("claims.redb")).unwrap();
+        store.upsert_topic_claims(&[sample_claim("a", "topic-x", vec!["stale-cite"])]).unwrap();
+        store.rebuild_cited_by().unwrap();
+        assert_eq!(store.claims_citing("stale-cite").unwrap(), vec!["topic-x:a".to_string()]);
+
+        // Article re-edited: same claim id, no longer cites "stale-cite".
+        store.upsert_topic_claims(&[sample_claim("a", "topic-x", vec![])]).unwrap();
+        store.rebuild_cited_by().unwrap();
+        assert!(store.claims_citing("stale-cite").unwrap().is_empty(), "orphaned citation key should be pruned, not left stale");
     }
 }

@@ -332,6 +332,7 @@ dependencies = [
  "blake3",
  "clap",
  "comrak",
+ "futures-util",
  "git2",
  "http-body-util",
  "maud",
