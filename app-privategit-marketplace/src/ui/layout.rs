@@ -70,6 +70,9 @@ body{{font-family:"Inter","Sans Fallback",system-ui,-apple-system,"Segoe UI",Ari
 .sw-masthead{{background:var(--sw-topnav-bg);color:var(--sw-on-chrome);width:100%;}}
 .sw-masthead__inner{{display:flex;align-items:center;gap:24px;height:64px;max-width:1280px;margin:0 auto;padding:0 24px;box-sizing:border-box;}}
 .sw-wordmark{{color:var(--sw-on-chrome);text-decoration:none;font-weight:600;font-size:17px;letter-spacing:.005em;flex:0 0 auto;}}
+.sw-masthead__nav{{display:flex;align-items:center;gap:20px;flex:0 0 auto;font-size:13px;letter-spacing:.01em;}}
+.sw-masthead__nav a{{color:var(--sw-on-chrome-muted);text-decoration:none;padding-block:4px;}}
+.sw-masthead__nav a:hover,.sw-masthead__nav a:focus-visible{{color:var(--sw-on-chrome);}}
 .sw-search{{flex:1 1 auto;display:flex;justify-content:flex-end;}}
 .sw-search__form{{display:flex;width:100%;max-width:320px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);border-radius:6px;overflow:hidden;}}
 .sw-search__input{{flex:1;background:transparent;border:0;color:#fff;padding:8px 12px;font-size:13px;outline:none;}}
@@ -130,6 +133,7 @@ body{{font-family:"Inter","Sans Fallback",system-ui,-apple-system,"Segoe UI",Ari
 .sw-legal__copyright,.sw-legal__trademark{{font-size:12px;color:#666;max-width:80ch;}}
 @media (max-width:768px){{
 .sw-search{{display:none;}}
+.sw-masthead__nav{{display:none;}}
 .sw-masthead__inner{{gap:12px;}}
 .sw-footer__top{{grid-template-columns:1fr;gap:24px;}}
 .sw-hamburger{{display:inline-flex;margin-left:auto;}}
@@ -182,6 +186,20 @@ pub fn masthead(surface: SoftwareSurface, lang: Lang, lang_toggle_href: &str) ->
             div."sw-masthead__inner" {
                 a."sw-wordmark" href=(lang.localize("/")) aria-label=(surface.home_label()) {
                     (surface.home_label())
+                }
+                // Real inline nav — verified live on home.pointsav.com that its own
+                // masthead shows its primary destinations directly (not just via the
+                // footer), hidden below 768px and reachable there only through the
+                // hamburger drawer, same breakpoint this crate already uses for
+                // search/hamburger. Mirrors home's own primary/legal split: only the
+                // four commercial pages sit in the masthead nav; Disclaimer/Privacy/
+                // Accessibility stay footer + drawer only, matching how home.pointsav.com
+                // leaves its own Privacy/Disclaimer out of ITS masthead nav too.
+                nav."sw-masthead__nav" aria-label="Primary" {
+                    a href=(lang.localize("/software")) { (nav.products) }
+                    a href=(lang.localize("/pricing")) { (nav.pricing) }
+                    a href=(lang.localize("/licensing")) { (nav.licensing) }
+                    a href="/page/contact" { (nav.contact) }
                 }
                 div."sw-search" {
                     form."sw-search__form" role="search" action=(lang.localize("/software")) method="get" {
@@ -732,6 +750,36 @@ mod tests {
             assert!(
                 html.contains(&format!("href=\"{href}\"")),
                 "mobile nav missing link to {href}"
+            );
+        }
+    }
+
+    #[test]
+    fn masthead_carries_a_real_desktop_nav_matching_home_pointsav_com_pattern() {
+        // Live browser-in-the-loop comparison against home.pointsav.com found our
+        // masthead had zero visible navigation at desktop width — only reachable
+        // via the footer or the mobile drawer. home.pointsav.com's own masthead
+        // shows its primary destinations inline at desktop and hides them behind
+        // the hamburger only below its breakpoint; this closes the same gap here,
+        // reusing the crate's existing 768px breakpoint (chrome_style hides
+        // `.sw-masthead__nav` there, alongside search/hamburger).
+        let html = masthead(SURFACE, Lang::En, "/es/software").into_string();
+        assert!(html.contains(r#"class="sw-masthead__nav""#));
+        for href in ["/software", "/pricing", "/licensing", "/page/contact"] {
+            assert!(
+                html.contains(&format!("href=\"{href}\"")),
+                "desktop masthead nav missing link to {href}"
+            );
+        }
+        // Matches home.pointsav.com's own primary/legal split — Disclaimer/Privacy/
+        // Accessibility stay footer + drawer only, not in the desktop nav row.
+        let nav_start = html.find(r#"class="sw-masthead__nav""#).unwrap();
+        let nav_end = html[nav_start..].find("</nav>").unwrap() + nav_start;
+        let nav_slice = &html[nav_start..nav_end];
+        for absent in ["/page/disclaimer", "/page/privacy", "/page/accessibility"] {
+            assert!(
+                !nav_slice.contains(absent),
+                "desktop nav should not carry legal link {absent}"
             );
         }
     }
