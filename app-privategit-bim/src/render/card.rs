@@ -270,7 +270,7 @@ pub fn render_token_page(category: &str, state: &AppState, lang: &str) -> String
     format!(
         r#"<div class="bim-category-page">
   <div class="bim-breadcrumbs">
-    <a href="/" data-path="/" class="bim-nav-link">{home}</a> / <a href="/tokens" data-path="/tokens" class="bim-nav-link">BIM Objects</a>
+    <a href="{home_href}" data-path="{home_href}" class="bim-nav-link">{home}</a> / <a href="{tokens_href}" data-path="{tokens_href}" class="bim-nav-link">{bim_objects}</a>
   </div>
   <header class="bim-cat-pagehead">
     <span class="bim-cat-kicker">IFC 4.3 · Uniclass 2015</span>
@@ -325,6 +325,9 @@ pub fn render_token_page(category: &str, state: &AppState, lang: &str) -> String
     <div class="bim-spec-card__body"><pre><code>{dtcg_json}</code></pre></div>
   </details>
 </div>"#,
+        home_href = if lang == "es" { "/es" } else { "/" },
+        tokens_href = if lang == "es" { "/es/tokens" } else { "/tokens" },
+        bim_objects = t(lang, "BIM Objects", "Objetos BIM"),
         home = t(lang, "Home", "Inicio"),
         display_name = esc(meta.map(|m| m.display_name.as_str()).unwrap_or(category)),
         intro_html = intro_html,
