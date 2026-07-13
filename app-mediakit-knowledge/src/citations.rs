@@ -51,11 +51,16 @@ impl CitationRegistry {
     /// resolution is actually possible check `is_empty()`.
     pub fn load(path: &Path) -> Self {
         let Ok(text) = std::fs::read_to_string(path) else {
-            tracing::warn!("citations.yaml not found at {}; citation resolution disabled", path.display());
+            tracing::warn!(
+                "citations.yaml not found at {}; citation resolution disabled",
+                path.display()
+            );
             return Self::default();
         };
         match serde_yaml::from_str::<RawRegistry>(&text) {
-            Ok(raw) => Self { entries: raw.citations },
+            Ok(raw) => Self {
+                entries: raw.citations,
+            },
             Err(e) => {
                 tracing::warn!("citations.yaml at {} failed to parse: {e}", path.display());
                 Self::default()
@@ -75,7 +80,10 @@ impl CitationRegistry {
     /// doesn't resolve (an unresolvable citation is a linter concern — see
     /// convention §9 — not a reason to fail rendering).
     pub fn resolve_urls(&self, ids: &[String]) -> Vec<String> {
-        ids.iter().filter_map(|id| self.get(id)).map(|e| e.url.clone()).collect()
+        ids.iter()
+            .filter_map(|id| self.get(id))
+            .map(|e| e.url.clone())
+            .collect()
     }
 
     /// Every registered citation id — the re-verification scheduler's full
