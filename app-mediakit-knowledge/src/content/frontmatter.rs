@@ -8,11 +8,15 @@
 //! repos actually use; unknown keys are ignored so content can carry
 //! editorial metadata the engine does not consume.
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// Parsed frontmatter. Every field is optional — a file with no frontmatter
 /// yields `Frontmatter::default()`.
-#[derive(Debug, Clone, Default, Deserialize)]
+///
+/// `Serialize` is used by the `?format=json` content-negotiation view on
+/// `GET /wiki/{slug}` (Phase 3.7) — this struct is that response's
+/// `frontmatter` field verbatim.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Frontmatter {
     pub title: Option<String>,
     pub slug: Option<String>,
@@ -87,7 +91,7 @@ pub struct Author {
 }
 
 /// One entry of a `references:` list.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Reference {
     #[serde(default, deserialize_with = "scalar_to_string")]
     pub id: String,
