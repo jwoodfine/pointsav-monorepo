@@ -16,9 +16,20 @@ commits, Spanish localization + masthead fixes) the nested clone never received.
 the script twice this session silently pushed the nested clone's stale content to both
 staging mirrors and wrote a `promote-queue.jsonl` entry citing the wrong HEAD.
 
-Flagged to Command (msg-id `command-20260713-correction-my-earlier-foundry-prod-reque`) —
-not resolved here. A manual corrective push from the archive root was correctly blocked
-by the destructive-action classifier as a pipeline bypass.
+Flagged to Command — not resolved here. A manual corrective push from the archive root
+was correctly blocked by the destructive-action classifier as a pipeline bypass.
+
+**Correction, same day:** the first two mailbox messages sent about this
+(`command-20260713-ready-for-foundry-prod-spanish-localizat`,
+`command-20260713-correction-my-earlier-foundry-prod-reque`) both landed in Command's
+inbox with NO YAML frontmatter — a real bug in the `send_mailbox_message` MCP tool (see
+`~/.claude/projects/.../memory/feedback_mailbox_mcp_wrapper_frontmatter_bug.md`), found
+by grepping the destination inbox for the returned msg-ids and finding orphaned body text
+with no header. Re-sent everything as one consolidated message via `bin/mailbox-send.sh`
+directly (bypassing the MCP wrapper), confirmed well-formed:
+`project-software-20260713-consolidated-real-head-20db27a6-full-bro`. **This is the
+message that actually matters — the two earlier msg-ids above may not be visible to
+Command's own tooling at all.**
 
 - [ ] Get archive-root HEAD (`20db27a6`, real code up to `c1572659`) onto the staging
   mirrors — the actual prerequisite for this session's Spanish localization/masthead
@@ -30,6 +41,9 @@ by the destructive-action classifier as a pipeline bypass.
 - [ ] Worth checking whether other archives with a nested `pointsav-monorepo/` sub-clone
   (project-marketing, project-design per this archive's own `.gitignore` comment) have
   hit or could hit the same divergence.
+- [ ] `send_mailbox_message` MCP tool dropped YAML frontmatter on 2 consecutive sends
+  this session (reported `ok:true`/`write_verified:true` both times regardless) —
+  `bin/mailbox-send.sh` direct was reliable. Worth a look independent of the above.
 
 ## Drift flagged 2026-07-11 (sync + localhost catalog fix session)
 
