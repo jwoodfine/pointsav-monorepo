@@ -139,6 +139,11 @@ pub struct CategoryMeta {
     pub property_sets: Vec<(String, String, String)>,
     pub intro_html: String,
     pub section: Section,
+    /// Spanish sidecar intro text from `{slug}.es.md`, if it exists yet —
+    /// the only field of the Spanish sidecar actually rendered so far
+    /// (`/es/tokens/{name}`'s lede). `None` means "no Spanish translation
+    /// staged"; callers fall back to the English `intro_html`.
+    pub intro_html_es: Option<String>,
 }
 
 fn parse_property_sets(raw: &str) -> Vec<(String, String, String)> {
@@ -193,6 +198,9 @@ pub fn load_categories(
 ) -> Vec<CategoryMeta> {
     let dir = site_content_dir.join("categories");
     let mut sidecars: HashMap<String, (u32, HashMap<String, String>, String)> = HashMap::new();
+    // Spanish sidecars (`NN-slug.es.md`), keyed the same way as `sidecars`
+    // but order-independent — English's order already governs display.
+    let mut sidecars_es: HashMap<String, (HashMap<String, String>, String)> = HashMap::new();
     match fs::read_dir(&dir) {
         Ok(rd) => {
             for path in rd
@@ -203,6 +211,20 @@ pub fn load_categories(
                 let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
                     continue;
                 };
+                if let Some(es_stem) = stem.strip_suffix(".es") {
+                    let (_, slug) = match es_stem.split_once('-') {
+                        Some((prefix, rest)) if prefix.chars().all(|c| c.is_ascii_digit()) => {
+                            (prefix.parse::<u32>().unwrap_or(u32::MAX), rest.to_string())
+                        }
+                        _ => (u32::MAX, es_stem.to_string()),
+                    };
+                    let Ok(raw) = fs::read_to_string(&path) else {
+                        continue;
+                    };
+                    let (fields, body) = parse_frontmatter(&raw);
+                    sidecars_es.insert(slug, (fields, body));
+                    continue;
+                }
                 let (order, slug) = match stem.split_once('-') {
                     Some((prefix, rest)) if prefix.chars().all(|c| c.is_ascii_digit()) => {
                         (prefix.parse().unwrap_or(u32::MAX), rest.to_string())
@@ -244,6 +266,15 @@ pub fn load_categories(
                     };
                     let section = Section::from_frontmatter(&field(fields, "section"))
                         .unwrap_or_else(|| Section::fallback_for_slug(slug));
+                    let intro_html_es = sidecars_es.get(slug).and_then(|(es_fields, es_body)| {
+                        let es_card = field(es_fields, "card_desc");
+                        let es_intro_source = if es_body.trim().is_empty() {
+                            es_card.as_str()
+                        } else {
+                            es_body.trim()
+                        };
+                        (!es_intro_source.is_empty()).then(|| render_markdown(es_intro_source))
+                    });
                     (
                         *order,
                         CategoryMeta {
@@ -257,6 +288,7 @@ pub fn load_categories(
                             property_sets: parse_property_sets(&field(fields, "property_sets")),
                             intro_html: render_markdown(intro_source),
                             section,
+                            intro_html_es,
                         },
                     )
                 }
@@ -277,6 +309,7 @@ pub fn load_categories(
                             property_sets: Vec::new(),
                             intro_html: render_markdown(&fallback_desc),
                             section: Section::fallback_for_slug(slug),
+                            intro_html_es: None,
                         },
                     )
                 }
@@ -297,31 +330,7 @@ pub struct PageContent {
     pub sections: Vec<PageSection>,
 }
 
-/// Load a `site-content/pages/<name>.md` file as one rendered HTML blob —
-/// no `## ` section splitting, unlike `load_page`. Used for short,
-/// single-paragraph counsel-owned content (the Important Information band)
-/// where the caller supplies its own safe default if the file is absent,
-/// so `None` is a normal case, not an error to eprintln about.
-pub fn load_simple_page(site_content_dir: &Path, name: &str) -> Option<String> {
-    let path = site_content_dir.join("pages").join(format!("{name}.md"));
-    let raw = fs::read_to_string(&path).ok()?;
-    let (_fields, body) = parse_frontmatter(&raw);
-    Some(render_markdown(body.trim()))
-}
-
-/// Load a `site-content/pages/<name>.md` file: a body split on `## `
-/// headings into (heading, rendered-html) sections. Any frontmatter
-/// scalars are parsed and discarded — the last reader of per-field
-/// frontmatter (the pre-2026-07-03 hero eyebrow/statline/lead) was removed
-/// when the homepage became the Envelope-as-Navigation diagram; this file's
-/// own frontmatter fields are unused now, not an error.
-pub fn load_page(site_content_dir: &Path, name: &str) -> Option<PageContent> {
-    let path = site_content_dir.join("pages").join(format!("{name}.md"));
-    let raw = fs::read_to_string(&path)
-        .map_err(|e| eprintln!("warn: failed to read page {path:?}: {e}"))
-        .ok()?;
-    let (_fields, body) = parse_frontmatter(&raw);
-
+fn parse_page_sections(body: &str) -> Vec<PageSection> {
     let mut sections = Vec::new();
     let mut current_heading: Option<String> = None;
     let mut current_body = String::new();
@@ -346,6 +355,56 @@ pub fn load_page(site_content_dir: &Path, name: &str) -> Option<PageContent> {
             body_html: render_markdown(current_body.trim()),
         });
     }
+    sections
+}
 
-    Some(PageContent { sections })
+/// Load a `site-content/pages/<name>.md` file as one rendered HTML blob —
+/// no `## ` section splitting, unlike `load_page`. Used for short,
+/// single-paragraph counsel-owned content (the Important Information band)
+/// where the caller supplies its own safe default if the file is absent,
+/// so `None` is a normal case, not an error to eprintln about.
+pub fn load_simple_page(site_content_dir: &Path, name: &str) -> Option<String> {
+    let path = site_content_dir.join("pages").join(format!("{name}.md"));
+    let raw = fs::read_to_string(&path).ok()?;
+    let (_fields, body) = parse_frontmatter(&raw);
+    Some(render_markdown(body.trim()))
+}
+
+/// Spanish sibling of `load_simple_page` — reads `<name>.es.md`. `None` when
+/// no Spanish sidecar exists yet; the caller falls back to English (or its
+/// own safe default), never a hard failure.
+pub fn load_simple_page_es(site_content_dir: &Path, name: &str) -> Option<String> {
+    let path = site_content_dir.join("pages").join(format!("{name}.es.md"));
+    let raw = fs::read_to_string(&path).ok()?;
+    let (_fields, body) = parse_frontmatter(&raw);
+    Some(render_markdown(body.trim()))
+}
+
+/// Load a `site-content/pages/<name>.md` file: a body split on `## `
+/// headings into (heading, rendered-html) sections. Any frontmatter
+/// scalars are parsed and discarded — the last reader of per-field
+/// frontmatter (the pre-2026-07-03 hero eyebrow/statline/lead) was removed
+/// when the homepage became the Envelope-as-Navigation diagram; this file's
+/// own frontmatter fields are unused now, not an error.
+pub fn load_page(site_content_dir: &Path, name: &str) -> Option<PageContent> {
+    let path = site_content_dir.join("pages").join(format!("{name}.md"));
+    let raw = fs::read_to_string(&path)
+        .map_err(|e| eprintln!("warn: failed to read page {path:?}: {e}"))
+        .ok()?;
+    let (_fields, body) = parse_frontmatter(&raw);
+    Some(PageContent {
+        sections: parse_page_sections(&body),
+    })
+}
+
+/// Spanish sibling of `load_page` — reads `<name>.es.md`. `None` when no
+/// Spanish sidecar exists yet (not an error — Tier-1 pages are translated
+/// incrementally); callers fall back to the English `PageContent`.
+pub fn load_page_es(site_content_dir: &Path, name: &str) -> Option<PageContent> {
+    let path = site_content_dir.join("pages").join(format!("{name}.es.md"));
+    let raw = fs::read_to_string(&path).ok()?;
+    let (_fields, body) = parse_frontmatter(&raw);
+    Some(PageContent {
+        sections: parse_page_sections(&body),
+    })
 }

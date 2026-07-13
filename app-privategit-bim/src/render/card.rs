@@ -7,7 +7,7 @@ use crate::{
 };
 use serde_json::Value;
 
-use super::shell::esc;
+use super::shell::{esc, t};
 
 /// The real "Browse All BIM Objects" catalog index — every category grouped
 /// under the four Sections the hero's callouts route to. This used to be
@@ -15,10 +15,24 @@ use super::shell::esc;
 /// `/tokens` dead-link bug found in the 2026-07-03 audit); it's now a
 /// distinct page with anchors (`#taxonomy`, `#objects`, `#key-plans`,
 /// `#context`) matching the hero's real-fact hotspot targets.
-pub fn render_tokens_index(state: &AppState) -> String {
+/// Section group heading in the requested language. English `Section::label()`
+/// stays the id-slug source (so URLs/anchors never change with language);
+/// only the displayed `<h2>` text is picked here. "Key Plans" is kept
+/// English per the Round 11 Spanish terminology glossary (2026-07-12) — a
+/// Woodfine coined proper noun, not translated.
+fn section_label(section: Section, lang: &str) -> &'static str {
+    match section {
+        Section::Taxonomy => t(lang, "Taxonomy", "Taxonomía"),
+        Section::Objects => t(lang, "Objects", "Objetos"),
+        Section::Compositions => "Key Plans",
+        Section::Context => t(lang, "Context", "Contexto"),
+    }
+}
+
+pub fn render_tokens_index(state: &AppState, lang: &str) -> String {
     let mut groups = String::new();
     for (i, section) in Section::all().into_iter().enumerate() {
-        let cards = render_category_cards_for_section(state, section);
+        let cards = render_category_cards_for_section(state, section, lang);
         groups.push_str(&format!(
             r#"<section id="{id}" class="bim-tokens-index__group">
   <div class="bim-tokens-sechead">
@@ -29,7 +43,7 @@ pub fn render_tokens_index(state: &AppState) -> String {
 </section>"#,
             id = section.label().to_lowercase().replace(' ', "-"),
             num = i + 1,
-            label = section.label(),
+            label = section_label(section, lang),
             cards = cards,
         ));
     }
@@ -37,12 +51,23 @@ pub fn render_tokens_index(state: &AppState) -> String {
     format!(
         r#"<div class="bim-tokens-index">
   <header class="bim-cat-pagehead">
-    <span class="bim-cat-kicker">BIM Object registry · full taxonomy</span>
-    <h1>BIM Object Catalog</h1>
-    <p class="bim-cat-pagehead__lede">Every BIM Object category, grouped by the four sections the homepage's Key Plan example routes to.</p>
+    <span class="bim-cat-kicker">{kicker}</span>
+    <h1>{title}</h1>
+    <p class="bim-cat-pagehead__lede">{lede}</p>
   </header>
   {groups}
 </div>"#,
+        kicker = t(
+            lang,
+            "BIM Object registry · full taxonomy",
+            "Registro de Objetos BIM · taxonomía completa",
+        ),
+        title = t(lang, "BIM Object Catalog", "Catálogo de Objetos BIM"),
+        lede = t(
+            lang,
+            "Every BIM Object category, grouped by the four sections the homepage's Key Plan example routes to.",
+            "Cada categoría de Objeto BIM, agrupada en las cuatro secciones a las que remite el ejemplo de Key Plan de la página de inicio.",
+        ),
         groups = groups,
     )
 }
@@ -83,7 +108,7 @@ fn strip_internal_maintenance_notes(description: &str) -> String {
     out
 }
 
-pub fn render_token_page(category: &str, state: &AppState) -> String {
+pub fn render_token_page(category: &str, state: &AppState, lang: &str) -> String {
     let meta = state.categories.iter().find(|c| c.slug == category);
 
     let Some(file_val) = state.tokens.get(category) else {
@@ -103,7 +128,20 @@ pub fn render_token_page(category: &str, state: &AppState) -> String {
         }
     };
 
-    let intro_html = meta.map(|m| m.intro_html.as_str()).unwrap_or("");
+    // Only the lede/intro is Tier-1 scope this round (Round 11, 2026-07-12)
+    // — the entity table, property sets, and IFC/Uniclass codes below stay
+    // English-only regardless of `lang` (out of scope per the approved
+    // plan's "Tokens-per-entity-spec-data pages" carve-out).
+    let intro_html = meta
+        .and_then(|m| {
+            if lang == "es" {
+                m.intro_html_es.as_deref()
+            } else {
+                Some(m.intro_html.as_str())
+            }
+        })
+        .or_else(|| meta.map(|m| m.intro_html.as_str()))
+        .unwrap_or("");
     let ifc_anchor = meta.map(|m| m.ifc_anchor.as_str()).unwrap_or("");
     let elements = meta.map(|m| m.elements.as_str()).unwrap_or("");
     let uniclass = meta.map(|m| m.uniclass.as_str()).unwrap_or("—");
@@ -198,7 +236,7 @@ pub fn render_token_page(category: &str, state: &AppState) -> String {
     format!(
         r#"<div class="bim-category-page">
   <div class="bim-breadcrumbs">
-    <a href="/" data-path="/" class="bim-nav-link">Home</a> / <a href="/tokens" data-path="/tokens" class="bim-nav-link">BIM Objects</a>
+    <a href="/" data-path="/" class="bim-nav-link">{home}</a> / <a href="/tokens" data-path="/tokens" class="bim-nav-link">BIM Objects</a>
   </div>
   <header class="bim-cat-pagehead">
     <span class="bim-cat-kicker">IFC 4.3 · Uniclass 2015</span>
@@ -253,6 +291,7 @@ pub fn render_token_page(category: &str, state: &AppState) -> String {
     <div class="bim-spec-card__body"><pre><code>{dtcg_json}</code></pre></div>
   </details>
 </div>"#,
+        home = t(lang, "Home", "Inicio"),
         display_name = esc(meta.map(|m| m.display_name.as_str()).unwrap_or(category)),
         intro_html = intro_html,
         ifc_anchor = esc(ifc_anchor),
@@ -347,7 +386,7 @@ pub fn render_research_item(slug: &str, state: &AppState) -> String {
     )
 }
 
-fn render_category_cards_for_section(state: &AppState, section: Section) -> String {
+fn render_category_cards_for_section(state: &AppState, section: Section, lang: &str) -> String {
     let mut out = String::new();
     for cat in state.categories.iter().filter(|c| c.section == section) {
         let count = count_entities_in_file(state, &cat.slug);
@@ -359,7 +398,11 @@ fn render_category_cards_for_section(state: &AppState, section: Section) -> Stri
             slug = cat.slug,
             display = esc(&cat.display_name),
             count = count,
-            entity_word = if count == 1 { "entity" } else { "entities" },
+            entity_word = if count == 1 {
+                t(lang, "entity", "entidad")
+            } else {
+                t(lang, "entities", "entidades")
+            },
         ));
     }
     out

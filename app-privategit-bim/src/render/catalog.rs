@@ -49,7 +49,7 @@ use crate::state::AppState;
 use serde_json::{json, Map, Value};
 
 use super::card::collect_kp_leaves;
-use super::shell::esc;
+use super::shell::{esc, t};
 use super::svg::render_kp_zone_svg_from_value;
 
 // Category display order + labels shared by cards, facets, and the catalog
@@ -896,7 +896,17 @@ pub(crate) fn render_key_plan_card(c: &Value) -> String {
 // SSR — home (`/`), a compact registry front door
 // ─────────────────────────────────────────────────────────────────────────────
 
-pub fn render_home(state: &AppState) -> String {
+pub fn render_home(state: &AppState, lang: &str) -> String {
+    // Round 11 (2026-07-12): Spanish falls back to the English home_page
+    // when home_page_es isn't staged yet — never a broken /es.
+    let home_page = if lang == "es" {
+        state
+            .home_page_es
+            .as_deref()
+            .unwrap_or(state.home_page.as_ref())
+    } else {
+        state.home_page.as_ref()
+    };
     let objects = build_objects(state);
     // Same visibility gate as render_key_plans_index (Round 6 P2) — the
     // homepage's stated count must agree with what /key-plans actually
@@ -908,19 +918,23 @@ pub fn render_home(state: &AppState) -> String {
     let obj_n = objects.len();
     let kp_n = key_plans.len();
 
-    let lede = state
-        .home_page
+    // Matched by index, not heading text — the Spanish home.es.md carries a
+    // translated first heading that will never equal "The Library" (same
+    // reasoning as about.rs's diagram-injection fix).
+    let lede = home_page
         .sections
-        .iter()
-        .find(|sec| sec.heading == "The Library")
+        .first()
         .map(|sec| sec.body_html.as_str())
-        .unwrap_or("<p>The catalog of specification-ready building parts.</p>");
+        .unwrap_or(t(
+            lang,
+            "<p>The catalog of specification-ready building parts.</p>",
+            "<p>El catálogo de partes de construcción listas para especificar.</p>",
+        ));
 
-    let other_sections: String = state
-        .home_page
+    let other_sections: String = home_page
         .sections
         .iter()
-        .filter(|sec| sec.heading != "The Library")
+        .skip(1)
         .map(|sec| {
             format!(
                 r#"<section class="bim-home-block"><h2>{}</h2>{}</section>"#,
@@ -959,23 +973,23 @@ pub fn render_home(state: &AppState) -> String {
     <div class="bim-home-masthead__text">
       <h1>Woodfine BIM Library</h1>
       <div class="bim-home-masthead__lede">{lede}</div>
-      <p class="bim-home-registry-line">{obj_n} objects &middot; {kp_n} key plans &middot; IFC&nbsp;4.3 &middot; Uniclass&nbsp;2015</p>
+      <p class="bim-home-registry-line">{obj_n} {objects_word} &middot; {kp_n} {kp_word} &middot; IFC&nbsp;4.3 &middot; Uniclass&nbsp;2015</p>
     </div>
     <div class="bim-home-masthead__visual" aria-hidden="true">{hero_svg}</div>
   </section>
 
-  <section class="bim-home-shelves" aria-label="The two shelves">
-    <a class="bim-home-shelf" href="/objects">
-      <span class="bim-home-shelf__kicker">The parts</span>
-      <h2>Objects <span class="bim-cat-count">{obj_n}</span></h2>
-      <p>A smart specification for one part of a building — geometry, data, and the rules it must meet, in one open file.</p>
-      <span class="bim-home-shelf__cta">Browse Objects →</span>
+  <section class="bim-home-shelves" aria-label="{shelves_aria}">
+    <a class="bim-home-shelf" href="{objects_href}">
+      <span class="bim-home-shelf__kicker">{parts_kicker}</span>
+      <h2>{objects_heading} <span class="bim-cat-count">{obj_n}</span></h2>
+      <p>{objects_desc}</p>
+      <span class="bim-home-shelf__cta">{browse_objects} →</span>
     </a>
-    <a class="bim-home-shelf" href="/key-plans">
-      <span class="bim-home-shelf__kicker">The assemblies</span>
+    <a class="bim-home-shelf" href="{key_plans_href}">
+      <span class="bim-home-shelf__kicker">{assemblies_kicker}</span>
       <h2>Key Plans <span class="bim-cat-count">{kp_n}</span></h2>
-      <p>An assembly of Objects — what an architectural drawing becomes once its parts are real, with the rules checked at every join.</p>
-      <span class="bim-home-shelf__cta">Browse Key Plans →</span>
+      <p>{key_plans_desc}</p>
+      <span class="bim-home-shelf__cta">{browse_key_plans} →</span>
     </a>
   </section>
 
@@ -985,6 +999,30 @@ pub fn render_home(state: &AppState) -> String {
         kp_n = kp_n,
         lede = lede,
         other_sections = other_sections,
+        objects_word = t(lang, "objects", "objetos"),
+        kp_word = t(lang, "key plans", "key plans"),
+        shelves_aria = t(lang, "The two shelves", "Los dos estantes"),
+        // Objects/Key Plans stay English-only content this round — the
+        // Spanish homepage links to the plain English URL, matching the
+        // reference site's own graceful-degradation pattern for partial
+        // coverage (no /es/objects or /es/key-plans this round).
+        objects_href = "/objects",
+        key_plans_href = "/key-plans",
+        parts_kicker = t(lang, "The parts", "Las partes"),
+        objects_heading = t(lang, "Objects", "Objetos"),
+        objects_desc = t(
+            lang,
+            "A smart specification for one part of a building — geometry, data, and the rules it must meet, in one open file.",
+            "Una especificación inteligente para una parte de un edificio — geometría, datos y las reglas que debe cumplir, en un solo archivo abierto.",
+        ),
+        browse_objects = t(lang, "Browse Objects", "Explorar Objetos"),
+        assemblies_kicker = t(lang, "The assemblies", "Los conjuntos"),
+        key_plans_desc = t(
+            lang,
+            "An assembly of Objects — what an architectural drawing becomes once its parts are real, with the rules checked at every join.",
+            "Un conjunto de Objetos — lo que un plano arquitectónico se convierte una vez que sus partes son reales, con las reglas verificadas en cada unión.",
+        ),
+        browse_key_plans = t(lang, "Browse Key Plans", "Explorar Key Plans"),
     )
 }
 

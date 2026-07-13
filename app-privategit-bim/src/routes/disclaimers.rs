@@ -3,11 +3,33 @@
 
 use axum::{extract::State, response::Html};
 
-use crate::{render, render::shell::esc, state::AppState};
+use crate::{
+    render,
+    render::shell::{esc, t},
+    state::AppState,
+};
 
 pub async fn disclaimers_handler(State(state): State<AppState>) -> Html<String> {
+    Html(render_disclaimers(&state, "en"))
+}
+
+pub async fn disclaimers_handler_es(State(state): State<AppState>) -> Html<String> {
+    Html(render_disclaimers(&state, "es"))
+}
+
+fn render_disclaimers(state: &AppState, lang: &str) -> String {
+    // Round 11 (2026-07-12): falls back to English disclaimers_page when
+    // disclaimers_page_es isn't staged yet — never a broken /es/disclaimers.
+    let page = if lang == "es" {
+        state
+            .disclaimers_page_es
+            .as_deref()
+            .unwrap_or(state.disclaimers_page.as_ref())
+    } else {
+        state.disclaimers_page.as_ref()
+    };
     let mut sections = String::new();
-    for section in state.disclaimers_page.sections.iter() {
+    for section in page.sections.iter() {
         sections.push_str(&format!(
             "<section><h2>{}</h2>{}</section>",
             esc(&section.heading),
@@ -17,21 +39,31 @@ pub async fn disclaimers_handler(State(state): State<AppState>) -> Html<String> 
 
     let content = format!(
         r#"<div class="bim-breadcrumbs">
-  <a href="/" data-path="/" class="bim-nav-link">Home</a>
+  <a href="/" data-path="/" class="bim-nav-link">{home}</a>
 </div>
 <header class="bim-cat-pagehead">
-  <span class="bim-cat-kicker">Important information</span>
-  <h1>Disclaimers</h1>
+  <span class="bim-cat-kicker">{kicker}</span>
+  <h1>{title}</h1>
 </header>
 <article class="bim-article">
   {sections}
 </article>"#,
+        home = t(lang, "Home", "Inicio"),
+        kicker = t(lang, "Important information", "Información importante"),
+        title = t(lang, "Disclaimers", "Avisos legales"),
     );
 
-    Html(render::shell::page_shell(
-        "Disclaimers",
-        "/disclaimers",
+    let (active_path, alt_path) = if lang == "es" {
+        ("/es/disclaimers", Some("/disclaimers"))
+    } else {
+        ("/disclaimers", Some("/es/disclaimers"))
+    };
+    render::shell::page_shell_lang(
+        t(lang, "Disclaimers", "Avisos legales"),
+        active_path,
         &content,
-        &state,
-    ))
+        state,
+        lang,
+        alt_path,
+    )
 }

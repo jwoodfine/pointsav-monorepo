@@ -23,6 +23,12 @@ fn build_app(app_state: state::AppState, static_dir: PathBuf) -> Router {
     Router::new()
         // Full-page routes
         .route("/", get(routes::home::home_handler))
+        // Spanish routes (Round 11, 2026-07-12) — thin paired registrations,
+        // each calling the same handler family with lang="es" baked in.
+        // Tier 1 only this round: home, method, disclaimers, tokens index +
+        // category ledes. Objects/Key Plans/Research/Search stay English-
+        // only — no /es counterpart registered for them.
+        .route("/es", get(routes::home::home_handler_es))
         // "The Plan Room" (2026-07-09 v3 redesign) — Objects/Key Plans are
         // real server-rendered routes, not client-only modal state. Search
         // and facet filters are GET query params (?q=, ?uni=, ?mfr=, ?use=,
@@ -73,14 +79,24 @@ fn build_app(app_state: state::AppState, static_dir: PathBuf) -> Router {
             get(routes::compositions::composition_object_redirect),
         )
         .route("/method", get(routes::about::about_handler))
+        .route("/es/method", get(routes::about::about_handler_es))
         .route(
             "/disclaimers",
             get(routes::disclaimers::disclaimers_handler),
         )
+        .route(
+            "/es/disclaimers",
+            get(routes::disclaimers::disclaimers_handler_es),
+        )
         .route("/tokens", get(routes::tokens::tokens_index_handler))
+        .route("/es/tokens", get(routes::tokens::tokens_index_handler_es))
         .route(
             "/tokens/{name}",
             get(routes::tokens::token_category_handler),
+        )
+        .route(
+            "/es/tokens/{name}",
+            get(routes::tokens::token_category_handler_es),
         )
         .route("/furniture", get(routes::furniture::furniture_handler))
         .route(
