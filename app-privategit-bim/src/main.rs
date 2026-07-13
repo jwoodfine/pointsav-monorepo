@@ -23,17 +23,20 @@ fn build_app(app_state: state::AppState, static_dir: PathBuf) -> Router {
     Router::new()
         // Full-page routes
         .route("/", get(routes::home::home_handler))
-        // Spanish routes (Round 11, 2026-07-12) — thin paired registrations,
-        // each calling the same handler family with lang="es" baked in.
-        // Tier 1 only this round: home, method, disclaimers, tokens index +
-        // category ledes. Objects/Key Plans/Research/Search stay English-
-        // only — no /es counterpart registered for them.
+        // Spanish routes — thin paired registrations, each calling the same
+        // handler family with lang="es" baked in. Round 11 (2026-07-12)
+        // shipped Tier 1: home, method, disclaimers, tokens. Round 12
+        // (2026-07-13) extended this to Objects/Search/full tokens entity
+        // data, per operator request to translate everything except the
+        // Research essays and the Key Plans pages themselves — those two
+        // stay English-only, no /es counterpart registered for them.
         .route("/es", get(routes::home::home_handler_es))
         // "The Plan Room" (2026-07-09 v3 redesign) — Objects/Key Plans are
         // real server-rendered routes, not client-only modal state. Search
         // and facet filters are GET query params (?q=, ?uni=, ?mfr=, ?use=,
         // ?layout=), so Back/reload/link-sharing all work by construction.
         .route("/objects", get(routes::objects::objects_index_handler))
+        .route("/es/objects", get(routes::objects::objects_index_handler_es))
         // Registered ahead of the `/objects/{slug}` wildcard for clarity —
         // axum/matchit already disambiguates a literal static segment over a
         // param segment at the same position regardless of registration
@@ -43,8 +46,16 @@ fn build_app(app_state: state::AppState, static_dir: PathBuf) -> Router {
             get(routes::objects::objects_compare_handler),
         )
         .route(
+            "/es/objects/compare",
+            get(routes::objects::objects_compare_handler_es),
+        )
+        .route(
             "/objects/{slug}",
             get(routes::objects::object_detail_handler),
+        )
+        .route(
+            "/es/objects/{slug}",
+            get(routes::objects::object_detail_handler_es),
         )
         // Round 9 (2026-07-11): "Compositions" retired as a public concept —
         // these are, and always were, Key Plans (see catalog.rs module doc).
@@ -113,6 +124,7 @@ fn build_app(app_state: state::AppState, static_dir: PathBuf) -> Router {
             get(routes::research::research_item_handler),
         )
         .route("/search", get(routes::search::search_handler))
+        .route("/es/search", get(routes::search::search_handler_es))
         .route("/edit/{slug}", get(routes::editor::edit_get))
         .route("/edit/{slug}", post(routes::editor::edit_post))
         // Fragment routes (content-only; same handlers, X-Fragment header also works)

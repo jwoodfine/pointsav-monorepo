@@ -314,6 +314,14 @@ pub(crate) fn build_objects(state: &AppState) -> Vec<Value> {
                 .get("$description")
                 .and_then(Value::as_str)
                 .unwrap_or("");
+            // Round 12 (2026-07-13): optional Spanish sibling, staged
+            // wherever Tier 3 translation exists — consumers that need it
+            // (render_object_detail) pick this field explicitly by `lang`;
+            // absent on categories deliberately excluded from Tier 3.
+            let description_es = entity
+                .get("$description_es")
+                .and_then(Value::as_str)
+                .unwrap_or("");
 
             let expected_ifc = format!("{group}-{slug}.ifc");
             let ifc_file = if ifc_files.contains(&expected_ifc) {
@@ -394,6 +402,7 @@ pub(crate) fn build_objects(state: &AppState) -> Vec<Value> {
             e.insert("ifc_file".into(), ifc_file);
             e.insert("url".into(), val.get("url").cloned().unwrap_or(Value::Null));
             e.insert("description".into(), json!(description));
+            e.insert("description_es".into(), json!(description_es));
             e.insert("spec".into(), Value::Array(spec));
             e.insert("search".into(), json!(search));
             out.push(Value::Object(e));
@@ -1002,11 +1011,11 @@ pub fn render_home(state: &AppState, lang: &str) -> String {
         objects_word = t(lang, "objects", "objetos"),
         kp_word = t(lang, "key plans", "key plans"),
         shelves_aria = t(lang, "The two shelves", "Los dos estantes"),
-        // Objects/Key Plans stay English-only content this round — the
-        // Spanish homepage links to the plain English URL, matching the
-        // reference site's own graceful-degradation pattern for partial
-        // coverage (no /es/objects or /es/key-plans this round).
-        objects_href = "/objects",
+        // Round 12 (2026-07-13): Objects is now bilingual; Key Plans stays
+        // English-only by design (excluded scope), so its homepage shelf
+        // link never gains an /es prefix — same graceful-degradation
+        // pattern the reference site uses for partial coverage.
+        objects_href = if lang == "es" { "/es/objects" } else { "/objects" },
         key_plans_href = "/key-plans",
         parts_kicker = t(lang, "The parts", "Las partes"),
         objects_heading = t(lang, "Objects", "Objetos"),
@@ -1035,7 +1044,9 @@ pub fn render_objects_index(
     q: &str,
     uni: Option<&str>,
     mfr: Option<&str>,
+    lang: &str,
 ) -> String {
+    let objects_path = if lang == "es" { "/es/objects" } else { "/objects" };
     let objects = build_objects(state);
     let tokens = search_tokens(q);
 
@@ -1054,7 +1065,14 @@ pub fn render_objects_index(
         .collect();
 
     let cards: String = if matches.is_empty() {
-        r#"<p class="bim-empty">No objects match the current filters.</p>"#.to_string()
+        format!(
+            r#"<p class="bim-empty">{}</p>"#,
+            t(
+                lang,
+                "No objects match the current filters.",
+                "Ningún objeto coincide con los filtros actuales.",
+            )
+        )
     } else {
         matches.iter().map(|o| render_object_card(o)).collect()
     };
@@ -1062,8 +1080,8 @@ pub fn render_objects_index(
     let uni_pairs = counted_pairs(uni_items);
     let mfr_pairs = counted_pairs(mfr_items);
     let uni_chips = chip_row(
-        "Uniclass Pr — product type",
-        "/objects",
+        t(lang, "Uniclass Pr — product type", "Uniclass Pr — tipo de producto"),
+        objects_path,
         "uni",
         &uni_pairs,
         uni,
@@ -1071,8 +1089,8 @@ pub fn render_objects_index(
         &[("mfr", mfr)],
     );
     let mfr_chips = chip_row(
-        "Manufacturer",
-        "/objects",
+        t(lang, "Manufacturer", "Fabricante"),
+        objects_path,
         "mfr",
         &mfr_pairs,
         mfr,
@@ -1083,31 +1101,51 @@ pub fn render_objects_index(
     format!(
         r##"<div class="bim-catalog-page">
   <header class="bim-cat-pagehead">
-    <span class="bim-cat-kicker">The parts</span>
-    <h1>Objects</h1>
-    <p class="bim-cat-pagehead__lede">A smart specification for one part of a building — geometry, data, and the rules it must meet, in one open file that travels with the part through every tool that touches it.</p>
+    <span class="bim-cat-kicker">{kicker}</span>
+    <h1>{title}</h1>
+    <p class="bim-cat-pagehead__lede">{lede}</p>
   </header>
-  <form class="bim-cat-searchform" method="get" action="/objects">
+  <form class="bim-cat-searchform" method="get" action="{objects_path}">
     <label class="bim-cat-search">
       <span class="bim-cat-search__ico" aria-hidden="true">⌕</span>
-      <input type="search" name="q" value="{q}" placeholder="Search the registry" aria-label="Search Objects">
+      <input type="search" name="q" value="{q}" placeholder="{search_ph}" aria-label="{search_aria}">
     </label>
     {uni_hidden}{mfr_hidden}
-    <button class="bim-cat-searchform__submit" type="submit">Search</button>
+    <button class="bim-cat-searchform__submit" type="submit">{search_btn}</button>
   </form>
   <div class="bim-cat-filters">{uni_chips}{mfr_chips}</div>
   <div class="bim-cat-gridhead">
-    <div class="bim-cat-res"><b>{n}</b> of {total} objects</div>
+    <div class="bim-cat-res"><b>{n}</b> {of} {total} {objects_word}</div>
   </div>
-  <form method="get" action="/objects/compare" id="bim-compare-form">
+  <form method="get" action="{objects_path}/compare" id="bim-compare-form">
     <div class="bim-cat-grid bim-cat-grid--obj">{cards}</div>
     <div class="bim-compare-bar" id="bim-compare-bar">
-      <span class="bim-compare-bar__label" id="bim-compare-label">Check 2 or more Objects to compare their dimensions.</span>
-      <button type="submit" class="bim-compare-bar__go" id="bim-compare-go">Compare selected</button>
-      <button type="button" class="bim-compare-bar__clear" id="bim-compare-clear">Clear</button>
+      <span class="bim-compare-bar__label" id="bim-compare-label">{compare_hint}</span>
+      <button type="submit" class="bim-compare-bar__go" id="bim-compare-go">{compare_selected}</button>
+      <button type="button" class="bim-compare-bar__clear" id="bim-compare-clear">{clear}</button>
     </div>
   </form>
 </div>"##,
+        kicker = t(lang, "The parts", "Las partes"),
+        title = t(lang, "Objects", "Objetos"),
+        lede = t(
+            lang,
+            "A smart specification for one part of a building — geometry, data, and the rules it must meet, in one open file that travels with the part through every tool that touches it.",
+            "Una especificación inteligente para una parte de un edificio — geometría, datos y las reglas que debe cumplir, en un solo archivo abierto que viaja con la parte a través de cada herramienta que la toca.",
+        ),
+        objects_path = objects_path,
+        search_ph = t(lang, "Search the registry", "Buscar en el registro"),
+        search_aria = t(lang, "Search Objects", "Buscar Objetos"),
+        search_btn = t(lang, "Search", "Buscar"),
+        of = t(lang, "of", "de"),
+        objects_word = t(lang, "objects", "objetos"),
+        compare_hint = t(
+            lang,
+            "Check 2 or more Objects to compare their dimensions.",
+            "Marque 2 o más Objetos para comparar sus dimensiones.",
+        ),
+        compare_selected = t(lang, "Compare selected", "Comparar selección"),
+        clear = t(lang, "Clear", "Limpiar"),
         q = esc(q),
         uni_hidden = uni
             .map(|v| format!(r#"<input type="hidden" name="uni" value="{}">"#, esc(v)))
@@ -1327,7 +1365,8 @@ fn compare_dims_cell(o: &Value) -> String {
 /// object record, so a compare feature covering those (as the homepage copy
 /// mentions) isn't buildable honestly yet; this ships the real, dimensioned
 /// slice rather than fabricating the rest.
-pub fn render_objects_compare(state: &AppState, ids: &[String]) -> String {
+pub fn render_objects_compare(state: &AppState, ids: &[String], lang: &str) -> String {
+    let objects_path = if lang == "es" { "/es/objects" } else { "/objects" };
     let objects = build_objects(state);
     // Preserve the order ids were checked in; drop unknown/duplicate ids
     // silently rather than erroring — a stale/hand-edited URL just compares
@@ -1340,24 +1379,38 @@ pub fn render_objects_compare(state: &AppState, ids: &[String]) -> String {
         .collect();
 
     if selected.len() < 2 {
-        return r##"<div class="bim-catalog-page">
+        return format!(
+            r##"<div class="bim-catalog-page">
   <header class="bim-cat-pagehead">
-    <span class="bim-cat-kicker">The parts</span>
-    <h1>Compare Objects</h1>
-    <p class="bim-cat-pagehead__lede">Select 2 or more Objects from the catalog to compare their dimensions side by side.</p>
+    <span class="bim-cat-kicker">{kicker}</span>
+    <h1>{title}</h1>
+    <p class="bim-cat-pagehead__lede">{lede}</p>
   </header>
-  <p class="bim-empty">Nothing to compare yet — check the box on 2 or more <a href="/objects" data-path="/objects">Object cards</a>, then use Compare.</p>
-</div>"##
-            .to_string();
+  <p class="bim-empty">{empty_pre} <a href="{objects_path}" data-path="{objects_path}">{empty_link}</a>{empty_post}</p>
+</div>"##,
+            kicker = t(lang, "The parts", "Las partes"),
+            title = t(lang, "Compare Objects", "Comparar Objetos"),
+            lede = t(
+                lang,
+                "Select 2 or more Objects from the catalog to compare their dimensions side by side.",
+                "Seleccione 2 o más Objetos del catálogo para comparar sus dimensiones lado a lado.",
+            ),
+            objects_path = objects_path,
+            empty_pre = t(lang, "Nothing to compare yet — check the box on 2 or more", "Aún no hay nada que comparar — marque la casilla en 2 o más"),
+            empty_link = t(lang, "Object cards", "tarjetas de Objeto"),
+            empty_post = t(lang, ", then use Compare.", ", luego use Comparar."),
+        );
     }
 
-    type CompareRow = (&'static str, fn(&Value) -> String);
+    type CompareRow = (&'static str, &'static str, fn(&Value) -> String);
     let rows: [CompareRow; 5] = [
-        ("Name", |o| esc(s(o, "name"))),
-        ("Manufacturer", |o| esc(s(o, "manufacturer"))),
-        ("Dimensions", |o| esc(&compare_dims_cell(o))),
-        ("IFC 4.3 entity class", |o| esc(s(o, "ifc_class"))),
-        ("Uniclass 2015 (Pr)", |o| {
+        ("Name", "Nombre", |o| esc(s(o, "name"))),
+        ("Manufacturer", "Fabricante", |o| esc(s(o, "manufacturer"))),
+        ("Dimensions", "Dimensiones", |o| esc(&compare_dims_cell(o))),
+        ("IFC 4.3 entity class", "Clase de entidad IFC 4.3", |o| {
+            esc(s(o, "ifc_class"))
+        }),
+        ("Uniclass 2015 (Pr)", "Uniclass 2015 (Pr)", |o| {
             let code = s(o, "uniclass_pr");
             let title = s(o, "uniclass_pr_title");
             if title.is_empty() {
@@ -1372,7 +1425,7 @@ pub fn render_objects_compare(state: &AppState, ids: &[String]) -> String {
         .iter()
         .map(|o| {
             format!(
-                r#"<th><a href="/objects/{id}">{name}</a></th>"#,
+                r#"<th><a href="{objects_path}/{id}">{name}</a></th>"#,
                 id = esc(s(o, "id")),
                 name = esc(s(o, "name")),
             )
@@ -1381,7 +1434,8 @@ pub fn render_objects_compare(state: &AppState, ids: &[String]) -> String {
 
     let body_rows: String = rows
         .iter()
-        .map(|(label, f)| {
+        .map(|(label_en, label_es, f)| {
+            let label = t(lang, label_en, label_es);
             let cells: String = selected
                 .iter()
                 .map(|o| format!("<td>{}</td>", f(o)))
@@ -1390,14 +1444,12 @@ pub fn render_objects_compare(state: &AppState, ids: &[String]) -> String {
         })
         .collect();
 
-    let clear_href = "/objects";
-
     format!(
         r##"<div class="bim-catalog-page">
   <header class="bim-cat-pagehead">
-    <span class="bim-cat-kicker">The parts</span>
-    <h1>Compare Objects</h1>
-    <p class="bim-cat-pagehead__lede">{n} Objects, compared by dimensions — the fields every entry in this catalog actually carries. IFC class and Uniclass 2015 code are included for registry cross-reference.</p>
+    <span class="bim-cat-kicker">{kicker}</span>
+    <h1>{title}</h1>
+    <p class="bim-cat-pagehead__lede">{lede}</p>
   </header>
   <div class="bim-table-wrap">
     <table class="bim-cat-spectable bim-compare-table">
@@ -1405,12 +1457,19 @@ pub fn render_objects_compare(state: &AppState, ids: &[String]) -> String {
       <tbody>{body_rows}</tbody>
     </table>
   </div>
-  <p class="bim-cat-note"><a href="{clear_href}" data-path="{clear_href}">← Back to Objects</a></p>
+  <p class="bim-cat-note"><a href="{objects_path}" data-path="{objects_path}">{back}</a></p>
 </div>"##,
-        n = selected.len(),
+        kicker = t(lang, "The parts", "Las partes"),
+        title = t(lang, "Compare Objects", "Comparar Objetos"),
+        lede = t(
+            lang,
+            &format!("{n} Objects, compared by dimensions — the fields every entry in this catalog actually carries. IFC class and Uniclass 2015 code are included for registry cross-reference.", n = selected.len()),
+            &format!("{n} Objetos, comparados por dimensiones — los campos que efectivamente lleva cada entrada de este catálogo. La clase IFC y el código Uniclass 2015 se incluyen para referencia cruzada de registro.", n = selected.len()),
+        ),
         header_cells = header_cells,
         body_rows = body_rows,
-        clear_href = clear_href,
+        objects_path = objects_path,
+        back = t(lang, "← Back to Objects", "← Volver a Objetos"),
     )
 }
 
@@ -1418,7 +1477,7 @@ pub fn render_objects_compare(state: &AppState, ids: &[String]) -> String {
 // SSR — `/objects/{slug}` detail page
 // ─────────────────────────────────────────────────────────────────────────────
 
-pub fn render_object_detail(state: &AppState, slug: &str) -> Option<(String, String)> {
+pub fn render_object_detail(state: &AppState, slug: &str, lang: &str) -> Option<(String, String)> {
     let objects = build_objects(state);
     let key_plans = build_key_plans(state, &objects);
     let o = objects.iter().find(|o| s(o, "id") == slug)?;
@@ -1430,7 +1489,12 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<(String, Str
     let uni_pr = s(o, "uniclass_pr");
     let uni_title = s(o, "uniclass_pr_title");
     let reference = s(o, "ref");
-    let description = s(o, "description");
+    let description_es = s(o, "description_es");
+    let description = if lang == "es" && !description_es.is_empty() {
+        description_es
+    } else {
+        s(o, "description")
+    };
     let width_mm = o.get("dims_w_mm").and_then(Value::as_i64);
     let dim_label = super::plan_symbols::dim_annotation(width_mm);
     let symbol = super::plan_symbols::plan_symbol_svg(group, slug, &dim_label);
@@ -1443,12 +1507,18 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<(String, Str
 
     let dl = match o.get("ifc_file").and_then(Value::as_str) {
         Some(f) => format!(
-            r#"<a class="bim-cat-btn" href="/furniture/download/{}">Download IFC (.ifc)</a>"#,
-            esc(f)
+            r#"<a class="bim-cat-btn" href="/furniture/download/{}">{}</a>"#,
+            esc(f),
+            t(lang, "Download IFC (.ifc)", "Descargar IFC (.ifc)")
         ),
-        None => {
-            r#"<p class="bim-cat-note">No IFC block published for this object yet.</p>"#.to_string()
-        }
+        None => format!(
+            r#"<p class="bim-cat-note">{}</p>"#,
+            t(
+                lang,
+                "No IFC block published for this object yet.",
+                "Aún no se ha publicado un bloque IFC para este objeto.",
+            )
+        ),
     };
     let src = match o
         .get("url")
@@ -1456,7 +1526,8 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<(String, Str
         .filter(|u| !u.is_empty())
     {
         Some(u) => format!(
-            r#"<p class="bim-cat-note">Manufacturer source: <a href="{u}" target="_blank" rel="noopener">{u}</a></p>"#,
+            r#"<p class="bim-cat-note">{label}: <a href="{u}" target="_blank" rel="noopener">{u}</a></p>"#,
+            label = t(lang, "Manufacturer source", "Fuente del fabricante"),
             u = esc(u)
         ),
         None => String::new(),
@@ -1492,39 +1563,45 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<(String, Str
         String::new()
     } else {
         format!(
-            r#"<div class="bim-cat-secth">Used in</div><div class="bim-usedin">{used_in}</div>"#
+            r#"<div class="bim-cat-secth">{used_in_h}</div><div class="bim-usedin">{used_in}</div>"#,
+            used_in_h = t(lang, "Used in", "Usado en"),
         )
     };
 
+    let objects_href = if lang == "es" { "/es/objects" } else { "/objects" };
     let html = format!(
         r#"<div class="bim-detail-page bim-detail-page--object">
-  <nav class="bim-breadcrumbs"><a href="/">Home</a> / <a href="/objects">Objects</a> / <span>{name}</span></nav>
+  <nav class="bim-breadcrumbs"><a href="{home_href}">{home}</a> / <a href="{objects_href}">{objects_label}</a> / <span>{name}</span></nav>
   <header class="bim-detail-head">
     <div class="bim-detail-head__symbol">{symbol}</div>
     <div class="bim-detail-head__main">
       <div class="bim-chip-row">
         <span class="bim-cat-chip bim-cat-chip--pr"><span class="bim-cat-chip__lv">Pr</span>{uni_pr}</span>
         <span class="bim-cat-chip bim-cat-chip--plain">{ifc_class}</span>
-        <span class="bim-cat-chip bim-cat-chip--machine" title="Real, downloadable machine-readable data — see Download below">IFC 4.3 &middot; DTCG</span>
+        <span class="bim-cat-chip bim-cat-chip--machine" title="{machine_title}">IFC 4.3 &middot; DTCG</span>
       </div>
       <h1>{name}</h1>
-      <p class="bim-detail-head__prov">{mfr} &middot; BIM Object</p>
+      <p class="bim-detail-head__prov">{mfr} &middot; {bim_object}</p>
     </div>
   </header>
   <p class="bim-cat-desc">{description}</p>
-  <div class="bim-cat-secth">Specification &amp; property set</div>
+  <div class="bim-cat-secth">{spec_h}</div>
   <table class="bim-cat-spectable"><tbody>{spec_rows}</tbody></table>
-  <div class="bim-cat-secth">Classification &amp; registry</div>
+  <div class="bim-cat-secth">{class_h}</div>
   <div class="bim-cat-classblock">
-    <div class="bim-cat-clrow"><span class="bim-cat-clrow__k">IFC 4.3 entity class</span><span class="bim-cat-clrow__v">{ifc_class}</span></div>
+    <div class="bim-cat-clrow"><span class="bim-cat-clrow__k">{ifc_class_label}</span><span class="bim-cat-clrow__v">{ifc_class}</span></div>
     <div class="bim-cat-clrow"><span class="bim-cat-clrow__k">Uniclass 2015 — Pr (Products)</span><span class="bim-cat-clrow__v">{uni_pr}<small>{uni_title}</small></span></div>
-    <div class="bim-cat-clrow"><span class="bim-cat-clrow__k">Registry reference</span><span class="bim-cat-clrow__v">{reference}</span></div>
+    <div class="bim-cat-clrow"><span class="bim-cat-clrow__k">{registry_ref_label}</span><span class="bim-cat-clrow__v">{reference}</span></div>
   </div>
   {used_in_block}
-  <div class="bim-cat-secth">Download <span class="bim-cat-chip bim-cat-chip--machine">machine-readable</span></div>
+  <div class="bim-cat-secth">{download_h} <span class="bim-cat-chip bim-cat-chip--machine">{machine_readable}</span></div>
   {dl}
   {src}
 </div>"#,
+        home_href = if lang == "es" { "/es" } else { "/" },
+        home = t(lang, "Home", "Inicio"),
+        objects_href = objects_href,
+        objects_label = t(lang, "Objects", "Objetos"),
         name = esc(name),
         mfr = esc(manufacturer),
         ifc_class = esc(ifc_class),
@@ -1537,6 +1614,18 @@ pub fn render_object_detail(state: &AppState, slug: &str) -> Option<(String, Str
         used_in_block = used_in_block,
         dl = dl,
         src = src,
+        machine_title = t(
+            lang,
+            "Real, downloadable machine-readable data — see Download below",
+            "Datos reales, descargables y legibles por máquina — ver Descargar más abajo",
+        ),
+        bim_object = t(lang, "BIM Object", "Objeto BIM"),
+        spec_h = t(lang, "Specification & property set", "Especificación y conjunto de propiedades"),
+        class_h = t(lang, "Classification & registry", "Clasificación y registro"),
+        ifc_class_label = t(lang, "IFC 4.3 entity class", "Clase de entidad IFC 4.3"),
+        registry_ref_label = t(lang, "Registry reference", "Referencia de registro"),
+        download_h = t(lang, "Download", "Descargar"),
+        machine_readable = t(lang, "machine-readable", "legible por máquina"),
     );
     Some((name.to_string(), html))
 }
