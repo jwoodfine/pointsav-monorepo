@@ -24,6 +24,13 @@ pub struct AppState {
     /// long-form. `None` when the file is absent; `page_shell` supplies the
     /// safe issuer-aware default in that case (never a hard failure).
     pub important_information: Option<Arc<str>>,
+    /// Spanish siblings (Round 11, 2026-07-12). `None` when no `.es.md`
+    /// sidecar exists yet — `/es/*` handlers fall back to the English
+    /// `PageContent` rather than serving a broken page.
+    pub home_page_es: Option<Arc<PageContent>>,
+    pub about_page_es: Option<Arc<PageContent>>,
+    pub disclaimers_page_es: Option<Arc<PageContent>>,
+    pub important_information_es: Option<Arc<str>>,
     pub events_tx: broadcast::Sender<String>,
 }
 
@@ -46,6 +53,14 @@ impl AppState {
             content::load_simple_page(&site_content_dir, "important-information")
                 .map(|html| Arc::from(html.as_str()));
 
+        let home_page_es = content::load_page_es(&site_content_dir, "home").map(Arc::new);
+        let about_page_es = content::load_page_es(&site_content_dir, "about").map(Arc::new);
+        let disclaimers_page_es =
+            content::load_page_es(&site_content_dir, "disclaimers").map(Arc::new);
+        let important_information_es =
+            content::load_simple_page_es(&site_content_dir, "important-information")
+                .map(|html| Arc::from(html.as_str()));
+
         let (events_tx, _) = broadcast::channel::<String>(64);
         Ok(Self {
             config: Arc::new(config.clone()),
@@ -58,6 +73,10 @@ impl AppState {
             about_page: Arc::new(about_page),
             disclaimers_page: Arc::new(disclaimers_page),
             important_information,
+            home_page_es,
+            about_page_es,
+            disclaimers_page_es,
+            important_information_es,
             events_tx,
         })
     }
