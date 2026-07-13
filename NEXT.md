@@ -219,9 +219,40 @@ Playwright) before considering a Command handoff. See
   `SOURCE_BIND=127.0.0.1:9201` (source defaults to test port 19201) and `VERIFY_KEY_PUB`
   on the marketplace unit (so the keypair self-test actually runs there instead of
   silently `Skipped`) — config verification, Command's domain, not this archive's code.
+- [x] `[2026-07-13]` Desktop masthead product nav (M4 remainder) — added, see below.
 - [ ] Chromed 404/500 + router `.fallback()` (M2); order-pending auto-refresh (M3);
-  desktop masthead product nav (M4 remainder); per-version MANIFEST dead route + the
-  product-detail SHA-fetch's hardcoded absolute URL tripping CSP on non-prod hosts
-  (S2/M10, sharpened this pass); rate limiting; Range/caching headers; RwLock poison
-  handling; unified error schema; product-detail JSON-LD/BreadcrumbList; sitemap
-  product-page entries. Full list with severity in the readiness BRIEF.
+  per-version MANIFEST dead route + the product-detail SHA-fetch's hardcoded absolute URL
+  tripping CSP on non-prod hosts (S2/M10, sharpened this pass); rate limiting;
+  Range/caching headers; RwLock poison handling; unified error schema; product-detail
+  JSON-LD/BreadcrumbList; sitemap product-page entries. Full list with severity in the
+  readiness BRIEF.
+
+## 2026-07-13 — Spanish localization + masthead/footer parity with home.pointsav.com
+
+Full detail: `.agent/briefs/BRIEF-software-spanish-localization.md`. Summary:
+
+- [x] Full-site Spanish localization — every page has a real `/es/*` sibling (software,
+  pricing, licensing, contact, disclaimer, privacy, accessibility, checkout, order).
+  Scope grew from MVL to full parity after checking home.pointsav.com's actual served
+  HTML showed it translates everything, including its footer trademark line.
+- [x] Desktop masthead nav added (Products/Pricing/Licensing/Contact) — previously zero
+  visible navigation at desktop width.
+- [x] Wordmark font corrected Inter→Source Serif 4 (vendored real font files).
+- [x] Nav-link color corrected to home.pointsav.com's own WCAG-fixed override.
+- [x] Two real masthead bugs at 769-1024px viewport (lang-toggle stranded from hamburger;
+  mobile dropdown invisible due to breakpoint mismatch) — only reproduced after asking the
+  operator for their exact window size (850×870); phone-width-only testing had missed both.
+- [x] Lang-toggle pill pixel-matched to home.pointsav.com's exact CSS tokens.
+- [x] Footer: added missing border-top, matched legal-text size to cities row — checked
+  against Command's relayed footer-scheme spec (project-marketing's audit); everything else
+  already matched.
+- [x] Licensing page: dropped redundant "$" from "CAD $30,000" → "CAD 30,000".
+
+12 commits, 102 tests passing throughout. **Not yet on foundry-prod** — `self-service-
+promote.sh` run (staging mirrors updated, HEAD `60c2c412`), Command asked to push after
+canonical merge (msg-id `command-20260713-ready-for-foundry-prod-spanish-localizat`).
+
+- [ ] `[2026-07-13]` Verify with Command/foundry-prod that this batch actually landed on
+  the real public site before assuming any of it is customer-visible.
+- [ ] `[2026-07-13]` Product-detail page (`/software/:id`) not extended to `/es/*` — out
+  of this session's agreed scope, reasonable follow-up if full parity is wanted there too.
