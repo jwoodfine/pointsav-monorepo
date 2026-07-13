@@ -400,6 +400,20 @@ pub fn article(
                 }
             }
             h1."k-article__title" { (title) }
+            @if asof.is_none() {
+                // Print-only citation stamp (Phase 9 — .k-print-citation is
+                // display:none on screen, shown only in @media print). A
+                // historical (asof) view already carries its own "Revision as
+                // of" banner above, so this doesn't duplicate for that case.
+                p."k-print-citation" {
+                    "Cite this record: /wiki/" (slug)
+                    @if let Some(s) = sha { " \u{2014} revision " code { (s) } }
+                    @if let Some(d) = updated.filter(|s| !s.trim().is_empty()) {
+                        ", last updated " (format_date(d))
+                    }
+                    "."
+                }
+            }
             div."k-prose" { (PreEscaped(body_html)) }
         }
     }
