@@ -579,6 +579,40 @@ header .tag {
   border-radius: 3px; padding: 2px 10px; cursor: pointer; font-size: 12px;
 }
 .wb-toast-action:hover { background: #444; }
+
+/* ── Command palette ──────────────────────────────────────────────── */
+#cmdpal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 4000;
+  background: rgba(0,0,0,0.35);
+  align-items: flex-start; justify-content: center;
+  padding-top: 12vh;
+}
+#cmdpal-overlay.visible { display: flex; }
+#cmdpal-box {
+  width: 560px; max-width: 90vw; max-height: 60vh;
+  background: #f0f0f0; border: 1px solid #bbbbbb; border-radius: 6px;
+  box-shadow: 0 8px 30px rgba(0,0,0,.55);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+#cmdpal-input {
+  background: #ffffff; border: none; border-bottom: 1px solid #cccccc;
+  color: #111111; font-size: 14px; padding: 10px 14px; outline: none;
+  width: 100%; box-sizing: border-box;
+}
+#cmdpal-list { overflow-y: auto; flex: 1; padding: 4px 0; }
+.cmdpal-item {
+  padding: 6px 14px; font-size: 12.5px; color: #333333; cursor: pointer;
+  display: flex; align-items: center; gap: 10px;
+  overflow: hidden; white-space: nowrap;
+}
+.cmdpal-item:hover, .cmdpal-item.cmdpal-focused { background: #cce5ff; color: #111111; }
+.cmdpal-item-category {
+  color: #0066cc; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;
+  flex-shrink: 0; width: 60px; overflow: hidden; text-overflow: ellipsis;
+}
+.cmdpal-item-title { flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.cmdpal-item-shortcut { color: #999999; font-size: 11px; flex-shrink: 0; white-space: nowrap; }
+.cmdpal-empty { padding: 14px; font-size: 11px; color: #999999; text-align: center; }
 </style>
 </head>
 <body>
@@ -586,80 +620,80 @@ header .tag {
 <header>
   <h1>Foundry Intranet</h1>
   <span class="tag">private</span>
-  <div class="search-wrap">
-    <input type="text" id="search-input" placeholder="Search files…" autocomplete="off" spellcheck="false">
-    <span id="search-status">indexing…</span>
+  <div class="search-wrap" role="search">
+    <input type="text" id="search-input" placeholder="Search files…" autocomplete="off" spellcheck="false" aria-label="Search files">
+    <span id="search-status" role="status" aria-live="polite">indexing…</span>
   </div>
 </header>
 
-<div id="tab-bar"></div>
+<div id="tab-bar" role="tablist" aria-label="Open files"></div>
 
 <div class="layout">
 
   <div class="sidebar" id="sidebar">
 
-    <div id="sidebar-toolbar">
-      <button id="sb-toggle-btn" class="sb-tool-btn" title="Toggle sidebar (collapse/expand)">☰</button>
-      <button id="sb-hidden-btn" class="sb-tool-btn" title="Toggle hidden files (.agent, .claude, etc.)">👁</button>
+    <div id="sidebar-toolbar" role="toolbar" aria-label="Sidebar tools">
+      <button id="sb-toggle-btn" class="sb-tool-btn" title="Toggle sidebar (collapse/expand)" aria-label="Toggle sidebar (collapse/expand)">☰</button>
+      <button id="sb-hidden-btn" class="sb-tool-btn" title="Toggle hidden files (.agent, .claude, etc.)" aria-label="Toggle hidden files" aria-pressed="false">👁</button>
     </div>
 
     <div id="search-panel">
       <div id="search-results"></div>
     </div>
 
-    <div id="tree-panel">
+    <div id="tree-panel" role="tree" aria-label="File tree">
 
       <div id="pinned-section">
-        <div class="section-header open" style="cursor:default;">📌 Pinned</div>
-        <div id="pinned-body" class="section-body"></div>
+        <div class="section-header open" style="cursor:default;" aria-label="Pinned">📌 Pinned</div>
+        <div id="pinned-body" class="section-body" role="group" aria-label="Pinned items"></div>
       </div>
 
-      <div class="section-header open" data-section="command">
+      <div class="section-header open" data-section="command" role="button" tabindex="0" aria-expanded="true">
         <span class="arrow">▶</span> ~/Foundry
       </div>
-      <div class="section-body" id="section-command">
+      <div class="section-body" id="section-command" role="group" aria-label="~/Foundry">
         <div class="tree-node">
-          <div class="tree-item" data-api="/_api/command/" data-browse="/_command/" data-type="dir" style="padding-left:14px">
+          <div class="tree-item" data-api="/_api/command/" data-browse="/_command/" data-type="dir" style="padding-left:14px" role="treeitem" aria-label="~/Foundry" aria-expanded="false" aria-selected="false" tabindex="0">
             <span class="arrow">▶</span><span class="icon">📁</span><span class="label">~/Foundry</span>
           </div>
-          <div class="tree-children collapsed" style="padding-left:12px"></div>
+          <div class="tree-children collapsed" style="padding-left:12px" role="group"></div>
         </div>
       </div>
 
-      <div class="section-header open" data-section="clones">
+      <div class="section-header open" data-section="clones" role="button" tabindex="0" aria-expanded="true">
         <span class="arrow">▶</span> 📁 clones/
       </div>
-      <div class="section-body" id="section-clones">
+      <div class="section-body" id="section-clones" role="group" aria-label="clones/">
         <div class="loading">Loading archives…</div>
       </div>
 
-      <div class="section-header" data-section="staged">
+      <div class="section-header" data-section="staged" role="button" tabindex="0" aria-expanded="false">
         <span class="arrow">▶</span> Staged Outputs
       </div>
-      <div class="section-body collapsed" id="section-staged">
+      <div class="section-body collapsed" id="section-staged" role="group" aria-label="Staged Outputs">
         <div class="tree-node">
-          <div class="tree-item" data-api="/_api/staged/bim/" data-browse="/bim/" data-type="dir" style="padding-left:14px">
+          <div class="tree-item" data-api="/_api/staged/bim/" data-browse="/bim/" data-type="dir" style="padding-left:14px" role="treeitem" aria-label="bim" aria-expanded="false" aria-selected="false" tabindex="0">
             <span class="arrow">▶</span><span class="icon">📁</span><span class="label">bim</span>
           </div>
-          <div class="tree-children collapsed" style="padding-left:12px"></div>
+          <div class="tree-children collapsed" style="padding-left:12px" role="group"></div>
         </div>
         <div class="tree-node">
-          <div class="tree-item" data-api="/_api/staged/bookkeeping/" data-browse="/bookkeeping/" data-type="dir" style="padding-left:14px">
+          <div class="tree-item" data-api="/_api/staged/bookkeeping/" data-browse="/bookkeeping/" data-type="dir" style="padding-left:14px" role="treeitem" aria-label="bookkeeping" aria-expanded="false" aria-selected="false" tabindex="0">
             <span class="arrow">▶</span><span class="icon">📁</span><span class="label">bookkeeping</span>
           </div>
-          <div class="tree-children collapsed" style="padding-left:12px"></div>
+          <div class="tree-children collapsed" style="padding-left:12px" role="group"></div>
         </div>
         <div class="tree-node">
-          <div class="tree-item" data-api="/_api/staged/legal/" data-browse="/legal/" data-type="dir" style="padding-left:14px">
+          <div class="tree-item" data-api="/_api/staged/legal/" data-browse="/legal/" data-type="dir" style="padding-left:14px" role="treeitem" aria-label="legal" aria-expanded="false" aria-selected="false" tabindex="0">
             <span class="arrow">▶</span><span class="icon">📁</span><span class="label">legal</span>
           </div>
-          <div class="tree-children collapsed" style="padding-left:12px"></div>
+          <div class="tree-children collapsed" style="padding-left:12px" role="group"></div>
         </div>
         <div class="tree-node">
-          <div class="tree-item" data-api="/_api/staged/staging/" data-browse="/staging/" data-type="dir" style="padding-left:14px">
+          <div class="tree-item" data-api="/_api/staged/staging/" data-browse="/staging/" data-type="dir" style="padding-left:14px" role="treeitem" aria-label="staging" aria-expanded="false" aria-selected="false" tabindex="0">
             <span class="arrow">▶</span><span class="icon">📁</span><span class="label">staging</span>
           </div>
-          <div class="tree-children collapsed" style="padding-left:12px"></div>
+          <div class="tree-children collapsed" style="padding-left:12px" role="group"></div>
         </div>
       </div>
 
@@ -671,8 +705,8 @@ header .tag {
   <div id="main-area">
 
     <div class="viewer" id="viewer">
-      <div class="viewer-bar" id="viewer-bar">
-        <span class="bar-path" id="bar-path">No file selected</span>
+      <div class="viewer-bar" id="viewer-bar" role="toolbar" aria-label="File actions">
+        <span class="bar-path" id="bar-path" role="status" aria-live="polite">No file selected</span>
       </div>
       <div class="viewer-placeholder" id="viewer-placeholder">
         <h2>Select a file to preview</h2>
@@ -688,41 +722,41 @@ header .tag {
     <div class="resizer" id="resizer2" style="display:none"></div>
 
     <div id="editor-panel">
-      <div class="editor-bar">
-        <button class="bar-btn" id="ed-collapse-btn" onclick="toggleEditorCollapse()" title="Collapse editor">◀</button>
+      <div class="editor-bar" role="toolbar" aria-label="Editor tools">
+        <button class="bar-btn" id="ed-collapse-btn" onclick="toggleEditorCollapse()" title="Collapse editor" aria-label="Collapse editor">◀</button>
         <span class="editor-title">Editor</span>
         <span id="editor-cursor"></span>
-        <span id="editor-dirty" style="display:none" title="Unsaved changes">●</span>
-        <span id="editor-status"></span>
-        <button class="bar-btn" id="outline-btn" onclick="showOutline()" title="Document outline (Cmd+Shift+O)">Outline</button>
-        <button class="bar-btn" id="comment-btn" onclick="toggleLineComment()" title="Toggle line comment">Comment</button>
-        <input id="ln-jump-input" type="text" inputmode="numeric" placeholder="Ln" title="Go to line (Enter)" autocomplete="off">
-        <button class="bar-btn" id="save-btn" onclick="saveFile()">Save</button>
+        <span id="editor-dirty" style="display:none" title="Unsaved changes" aria-hidden="true">●</span>
+        <span id="editor-status" role="status" aria-live="polite"></span>
+        <button class="bar-btn" id="outline-btn" onclick="showOutline()" title="Document outline (Cmd+Shift+O)" aria-label="Document outline (Cmd or Ctrl+Shift+O)">Outline</button>
+        <button class="bar-btn" id="comment-btn" onclick="toggleLineComment()" title="Toggle line comment" aria-label="Toggle line comment">Comment</button>
+        <input id="ln-jump-input" type="text" inputmode="numeric" placeholder="Ln" title="Go to line (Enter)" autocomplete="off" aria-label="Go to line number">
+        <button class="bar-btn" id="save-btn" onclick="saveFile()" aria-label="Save file (Cmd or Ctrl+S)">Save</button>
       </div>
-      <div id="goto-bar">
-        <span class="goto-label">Go to line:</span>
-        <input id="goto-input" type="number" min="1" placeholder="…" autocomplete="off">
+      <div id="goto-bar" role="group" aria-label="Go to line">
+        <span class="goto-label" id="goto-label">Go to line:</span>
+        <input id="goto-input" type="number" min="1" placeholder="…" autocomplete="off" aria-labelledby="goto-label">
         <span class="goto-hint">↵ jump · Esc close</span>
       </div>
-      <div id="outline-panel">
-        <input id="outline-filter" type="text" placeholder="Filter symbols…" autocomplete="off" spellcheck="false">
-        <div id="outline-list"></div>
+      <div id="outline-panel" role="dialog" aria-label="Document outline">
+        <input id="outline-filter" type="text" placeholder="Filter symbols…" autocomplete="off" spellcheck="false" aria-label="Filter outline symbols" role="combobox" aria-expanded="true" aria-controls="outline-list" aria-autocomplete="list">
+        <div id="outline-list" role="listbox" aria-label="Document symbols"></div>
       </div>
-      <div id="find-bar">
+      <div id="find-bar" role="search" aria-label="Find and replace">
         <div class="find-row">
-          <input id="find-input" type="text" placeholder="Find…" autocomplete="off" spellcheck="false">
-          <span id="find-count"></span>
-          <button class="find-btn" id="find-prev" title="Previous (Shift+Enter)">↑</button>
-          <button class="find-btn" id="find-next" title="Next (Enter)">↓</button>
-          <button class="find-btn" id="find-close" title="Close (Esc)">✕</button>
+          <input id="find-input" type="text" placeholder="Find…" autocomplete="off" spellcheck="false" aria-label="Find in file">
+          <span id="find-count" role="status" aria-live="polite"></span>
+          <button class="find-btn" id="find-prev" title="Previous (Shift+Enter)" aria-label="Previous match">↑</button>
+          <button class="find-btn" id="find-next" title="Next (Enter)" aria-label="Next match">↓</button>
+          <button class="find-btn" id="find-close" title="Close (Esc)" aria-label="Close find bar">✕</button>
         </div>
         <div class="find-row">
-          <input id="replace-input" type="text" placeholder="Replace with…" autocomplete="off" spellcheck="false">
-          <button class="find-btn" id="replace-one">Replace</button>
-          <button class="find-btn" id="replace-all-btn">All</button>
+          <input id="replace-input" type="text" placeholder="Replace with…" autocomplete="off" spellcheck="false" aria-label="Replace with">
+          <button class="find-btn" id="replace-one" aria-label="Replace this match">Replace</button>
+          <button class="find-btn" id="replace-all-btn" aria-label="Replace all matches">All</button>
         </div>
       </div>
-      <div id="recovery-bar">
+      <div id="recovery-bar" role="alert" aria-live="assertive">
         <span id="recovery-msg"></span>
         <button id="recovery-restore">Restore</button>
         <button id="recovery-discard">Discard</button>
@@ -738,6 +772,17 @@ header .tag {
 
   </div><!-- /main-area -->
 
+</div>
+
+<!-- ── Command palette (Cmd/Ctrl+Shift+P) ────────────────────────────────── -->
+<div id="cmdpal-overlay">
+  <div id="cmdpal-box" role="dialog" aria-modal="true" aria-label="Command Palette">
+    <input id="cmdpal-input" type="text" placeholder="Type a command…" autocomplete="off" spellcheck="false"
+           role="combobox" aria-expanded="true" aria-controls="cmdpal-list" aria-autocomplete="list"
+           aria-label="Command palette input">
+    <div id="cmdpal-list" role="listbox" aria-label="Available commands"></div>
+    <div id="cmdpal-empty" class="cmdpal-empty" hidden>No matching commands</div>
+  </div>
 </div>
 
 <script>
@@ -881,7 +926,7 @@ function toggleHiddenFiles() {
   localStorage.setItem('wb-show-hidden', showHidden ? '1' : '0');
   logActivity('toggle-hidden', null, { show: showHidden });
   const btn = document.getElementById('sb-hidden-btn');
-  if (btn) btn.classList.toggle('active', showHidden);
+  if (btn) { btn.classList.toggle('active', showHidden); btn.setAttribute('aria-pressed', String(showHidden)); }
   // Reload all expanded directory nodes so the new filter applies.
   document.querySelectorAll('.tree-item[data-type="dir"][data-loaded]').forEach(item => {
     item.removeAttribute('data-loaded');
@@ -1586,6 +1631,7 @@ function updateBar(name, path) {
   copyBtn.className = 'bar-btn';
   copyBtn.textContent = '⎘ Copy name';
   copyBtn.title = 'Copy filename to clipboard';
+  copyBtn.setAttribute('aria-label', 'Copy filename to clipboard');
   copyBtn.addEventListener('click', () => {
     const confirm = () => {
       copyBtn.textContent = '✓ Copied';
@@ -1615,6 +1661,7 @@ function updateBar(name, path) {
     pdfBtn.className = 'bar-btn';
     pdfBtn.textContent = '⬇ PDF';
     pdfBtn.title = 'Download PDF (platform rendering)';
+    pdfBtn.setAttribute('aria-label', 'Download PDF (platform rendering)');
     pdfBtn.addEventListener('click', () => showPdfDialog(apiPath, name));
     bar.appendChild(pdfBtn);
   }
@@ -1622,6 +1669,7 @@ function updateBar(name, path) {
   const printBtn = document.createElement('button');
   printBtn.className = 'bar-btn';
   printBtn.textContent = '⎙ Print';
+  printBtn.setAttribute('aria-label', 'Print current file');
   printBtn.addEventListener('click', printCurrent);
   bar.appendChild(printBtn);
 
@@ -1630,6 +1678,7 @@ function updateBar(name, path) {
   dlBtn.href = path;
   dlBtn.download = name;
   dlBtn.textContent = '⬇ Download';
+  dlBtn.setAttribute('aria-label', 'Download ' + name);
   bar.appendChild(dlBtn);
 
   const link = document.createElement('a');
@@ -1638,12 +1687,14 @@ function updateBar(name, path) {
   link.target = '_blank';
   link.rel = 'noreferrer';
   link.textContent = 'open in new tab ↗';
+  link.setAttribute('aria-label', 'Open ' + name + ' in new tab');
   bar.appendChild(link);
 
   const reloadBtn = document.createElement('button');
   reloadBtn.className = 'bar-btn';
   reloadBtn.textContent = '↻ Reload';
   reloadBtn.title = 'Reload page — reopens this file automatically';
+  reloadBtn.setAttribute('aria-label', 'Reload page');
   reloadBtn.addEventListener('click', () => location.reload());
   bar.appendChild(reloadBtn);
 
@@ -1651,6 +1702,7 @@ function updateBar(name, path) {
   closeBtn.className = 'bar-btn';
   closeBtn.textContent = '✕';
   closeBtn.title = 'Close file';
+  closeBtn.setAttribute('aria-label', 'Close file');
   closeBtn.addEventListener('click', closeFile);
   bar.appendChild(closeBtn);
 }
@@ -1673,12 +1725,14 @@ function addRenameDuplicateButtons() {
   renameBtn.className = 'bar-btn';
   renameBtn.textContent = '✎ Rename';
   renameBtn.title = 'Rename this file';
+  renameBtn.setAttribute('aria-label', 'Rename this file');
   renameBtn.addEventListener('click', renameCurrent);
 
   const dupBtn = document.createElement('button');
   dupBtn.className = 'bar-btn';
   dupBtn.textContent = '⧉ Duplicate';
   dupBtn.title = 'Duplicate this file in place';
+  dupBtn.setAttribute('aria-label', 'Duplicate this file in place');
   dupBtn.addEventListener('click', duplicateCurrent);
 
   if (anchor && anchor.nextSibling) {
@@ -2272,9 +2326,12 @@ function renderOutline(filter) {
     outlineFocusIdx = -1;
     return;
   }
-  shown.forEach(item => {
+  shown.forEach((item, i) => {
     const div   = document.createElement('div');
     div.className = 'outline-item';
+    div.id = 'outline-item-' + i;
+    div.setAttribute('role', 'option');
+    div.setAttribute('aria-label', item.label);
     const tag   = item.depth < 0 ? '§' : 'H' + item.depth;
     const indent = item.depth > 1 ? (item.depth - 1) * 10 : 0;
     div.style.paddingLeft = (10 + indent) + 'px';
@@ -2315,17 +2372,29 @@ document.getElementById('outline-filter').addEventListener('input', e => {
 
 document.getElementById('outline-filter').addEventListener('keydown', e => {
   const list  = document.getElementById('outline-list');
+  const input = document.getElementById('outline-filter');
   const items = list.querySelectorAll('.outline-item');
+  const syncActive = () => {
+    items.forEach(it => it.setAttribute('aria-selected', 'false'));
+    if (outlineFocusIdx >= 0 && items[outlineFocusIdx]) {
+      items[outlineFocusIdx].setAttribute('aria-selected', 'true');
+      input.setAttribute('aria-activedescendant', items[outlineFocusIdx].id);
+    } else {
+      input.setAttribute('aria-activedescendant', '');
+    }
+  };
   if (e.key === 'ArrowDown') {
     e.preventDefault();
     if (outlineFocusIdx >= 0) items[outlineFocusIdx].classList.remove('outline-focused');
     outlineFocusIdx = Math.min(outlineFocusIdx + 1, items.length - 1);
     if (outlineFocusIdx >= 0) { items[outlineFocusIdx].classList.add('outline-focused'); items[outlineFocusIdx].scrollIntoView({ block: 'nearest' }); }
+    syncActive();
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
     if (outlineFocusIdx >= 0) items[outlineFocusIdx].classList.remove('outline-focused');
     outlineFocusIdx = Math.max(outlineFocusIdx - 1, 0);
     if (outlineFocusIdx >= 0) { items[outlineFocusIdx].classList.add('outline-focused'); items[outlineFocusIdx].scrollIntoView({ block: 'nearest' }); }
+    syncActive();
   } else if (e.key === 'Enter') {
     e.preventDefault();
     const focused = list.querySelector('.outline-focused') || list.querySelector('.outline-item');
@@ -2336,8 +2405,185 @@ document.getElementById('outline-filter').addEventListener('keydown', e => {
   }
 });
 
+// ── Command palette (Cmd/Ctrl+Shift+P) ─────────────────────────────────────────
+// Additive, read-only-of-existing-behavior: every command below just calls an
+// existing function unchanged (saveFile, printCurrent, showFindBar, etc.). No
+// existing shortcut's dispatch logic is modified — this is a separate,
+// discoverable index into the same actions, not a replacement for them.
+function editorPanelVisible() {
+  const p = document.getElementById('editor-panel');
+  return !!p && p.classList.contains('visible');
+}
+
+const COMMANDS = [
+  { id: 'save',            title: 'Save File',              category: 'File',     shortcut: '⌘S / Ctrl+S',       when: () => !!editorPath,                                              run: saveFile },
+  { id: 'print',           title: 'Print Current File',     category: 'File',     shortcut: '⌘P / Ctrl+P',       when: () => true,                                                      run: printCurrent },
+  { id: 'rename',          title: 'Rename File',            category: 'File',     shortcut: '',                  when: () => !!editorPath,                                              run: renameCurrent },
+  { id: 'duplicate',       title: 'Duplicate File',         category: 'File',     shortcut: '',                  when: () => !!editorPath,                                              run: duplicateCurrent },
+  { id: 'close-file',      title: 'Close File / Tab',       category: 'File',     shortcut: '',                  when: () => !!currentPath || activeTabIdx >= 0,                        run: closeFile },
+  { id: 'copy-path',       title: 'Copy File Path',         category: 'File',     shortcut: '',                  when: () => !!currentPath,                                             run: () => { if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(currentPath); } showWbToast('Path copied'); } },
+  { id: 'reload',          title: 'Reload Page',            category: 'File',     shortcut: '',                  when: () => true,                                                      run: () => location.reload() },
+  { id: 'find',            title: 'Find in File',           category: 'Edit',     shortcut: '⌘F / Ctrl+F',       when: () => editorPanelVisible(),                                      run: showFindBar },
+  { id: 'goto-line',       title: 'Go to Line…',            category: 'Edit',     shortcut: '',                  when: () => editorPanelVisible(),                                      run: showGotoBar },
+  { id: 'toggle-comment',  title: 'Toggle Line Comment',    category: 'Edit',     shortcut: '',                  when: () => editorPanelVisible(),                                      run: toggleLineComment },
+  { id: 'undo-last',       title: 'Undo Last Action',       category: 'Edit',     shortcut: '⌘Z / Ctrl+Z',       when: () => !!lastUndoFn,                                              run: () => { const fn = lastUndoFn; lastUndoFn = null; document.getElementById('wb-toast').classList.remove('show'); fn(); } },
+  { id: 'outline',         title: 'Document Outline',       category: 'View',     shortcut: '⌘⇧O / Ctrl+Shift+O',when: () => editorPanelVisible(),                                      run: showOutline },
+  { id: 'toggle-sidebar',  title: 'Toggle Sidebar',         category: 'View',     shortcut: '',                  when: () => true,                                                      run: toggleSidebar },
+  { id: 'toggle-hidden',   title: 'Toggle Hidden Files',    category: 'View',     shortcut: '',                  when: () => true,                                                      run: toggleHiddenFiles },
+  { id: 'toggle-editor',   title: 'Toggle Editor Panel',    category: 'View',     shortcut: '',                  when: () => editorPanelVisible(),                                      run: toggleEditorCollapse },
+  { id: 'focus-search',    title: 'Focus File Search',      category: 'Navigate', shortcut: '',                  when: () => true,                                                      run: () => document.getElementById('search-input').focus() },
+];
+
+let cmdpalFocusIdx  = -1;
+let cmdpalFiltered  = [];
+let cmdpalLastFocus = null;
+
+// Simple substring-first, then in-order-fuzzy scorer. Good enough at the
+// dozens-of-commands scale this app has — VS Code's full fuzzy scorer is
+// overkill here per the roadmap's own B1 note.
+function cmdpalScore(cmd, query) {
+  const hay = (cmd.category + ' ' + cmd.title).toLowerCase();
+  const q = (query || '').toLowerCase().trim();
+  if (!q) return 0;
+  const idx = hay.indexOf(q);
+  if (idx >= 0) return idx;
+  let hi = 0;
+  for (let i = 0; i < q.length; i++) {
+    hi = hay.indexOf(q[i], hi);
+    if (hi === -1) return null;
+    hi++;
+  }
+  return 1000;
+}
+
+function renderCommandPalette(query) {
+  const list  = document.getElementById('cmdpal-list');
+  const empty = document.getElementById('cmdpal-empty');
+  const input = document.getElementById('cmdpal-input');
+  const available = COMMANDS.filter(c => { try { return c.when(); } catch (e) { return false; } });
+  const scored = available
+    .map(c => ({ c, s: cmdpalScore(c, query) }))
+    .filter(x => x.s !== null)
+    .sort((a, b) => a.s - b.s);
+  cmdpalFiltered = scored.map(x => x.c);
+  list.innerHTML = '';
+  cmdpalFocusIdx = cmdpalFiltered.length ? 0 : -1;
+  cmdpalFiltered.forEach((cmd, i) => {
+    const item = document.createElement('div');
+    item.className = 'cmdpal-item' + (i === 0 ? ' cmdpal-focused' : '');
+    item.id = 'cmdpal-item-' + i;
+    item.setAttribute('role', 'option');
+    item.setAttribute('aria-selected', i === 0 ? 'true' : 'false');
+    const cat = document.createElement('span');
+    cat.className = 'cmdpal-item-category';
+    cat.textContent = cmd.category;
+    const title = document.createElement('span');
+    title.className = 'cmdpal-item-title';
+    title.textContent = cmd.title;
+    item.appendChild(cat);
+    item.appendChild(title);
+    if (cmd.shortcut) {
+      const sc = document.createElement('span');
+      sc.className = 'cmdpal-item-shortcut';
+      sc.textContent = cmd.shortcut;
+      item.appendChild(sc);
+    }
+    item.addEventListener('click', () => runCommandPaletteItem(i));
+    item.addEventListener('mousemove', () => cmdpalSetFocus(i));
+    list.appendChild(item);
+  });
+  empty.hidden = cmdpalFiltered.length > 0;
+  input.setAttribute('aria-activedescendant', cmdpalFocusIdx >= 0 ? ('cmdpal-item-' + cmdpalFocusIdx) : '');
+}
+
+function cmdpalSetFocus(i) {
+  const list  = document.getElementById('cmdpal-list');
+  const input = document.getElementById('cmdpal-input');
+  const items = list.querySelectorAll('.cmdpal-item');
+  items.forEach(el => { el.classList.remove('cmdpal-focused'); el.setAttribute('aria-selected', 'false'); });
+  cmdpalFocusIdx = i;
+  if (i >= 0 && items[i]) {
+    items[i].classList.add('cmdpal-focused');
+    items[i].setAttribute('aria-selected', 'true');
+    items[i].scrollIntoView({ block: 'nearest' });
+  }
+  input.setAttribute('aria-activedescendant', i >= 0 ? ('cmdpal-item-' + i) : '');
+}
+
+function runCommandPaletteItem(i) {
+  const cmd = cmdpalFiltered[i];
+  if (!cmd) return;
+  closeCommandPalette();
+  logActivity('cmdpal-run', currentPath, { command: cmd.id });
+  try { cmd.run(); } catch (e) { showWbToast('Command failed: ' + cmd.title); }
+}
+
+function openCommandPalette() {
+  cmdpalLastFocus = document.activeElement;
+  document.getElementById('cmdpal-overlay').classList.add('visible');
+  const input = document.getElementById('cmdpal-input');
+  input.value = '';
+  renderCommandPalette('');
+  input.focus();
+  logActivity('cmdpal-open', currentPath, {});
+}
+
+function closeCommandPalette() {
+  document.getElementById('cmdpal-overlay').classList.remove('visible');
+  if (cmdpalLastFocus && typeof cmdpalLastFocus.focus === 'function') {
+    cmdpalLastFocus.focus();
+  }
+  cmdpalLastFocus = null;
+}
+
+function toggleCommandPalette() {
+  const open = document.getElementById('cmdpal-overlay').classList.contains('visible');
+  if (open) closeCommandPalette(); else openCommandPalette();
+}
+
+function isCommandPaletteOpen() {
+  return document.getElementById('cmdpal-overlay').classList.contains('visible');
+}
+
+document.getElementById('cmdpal-input').addEventListener('input', e => {
+  renderCommandPalette(e.target.value);
+});
+
+document.getElementById('cmdpal-input').addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown') {
+    e.preventDefault(); e.stopPropagation();
+    if (cmdpalFiltered.length) cmdpalSetFocus(Math.min(cmdpalFocusIdx + 1, cmdpalFiltered.length - 1));
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault(); e.stopPropagation();
+    if (cmdpalFiltered.length) cmdpalSetFocus(Math.max(cmdpalFocusIdx - 1, 0));
+  } else if (e.key === 'Enter') {
+    e.preventDefault(); e.stopPropagation();
+    if (cmdpalFocusIdx >= 0) runCommandPaletteItem(cmdpalFocusIdx);
+  } else if (e.key === 'Escape') {
+    e.preventDefault(); e.stopPropagation();
+    closeCommandPalette();
+  }
+});
+
+document.getElementById('cmdpal-overlay').addEventListener('click', e => {
+  if (e.target.id === 'cmdpal-overlay') closeCommandPalette();
+});
+
 // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 window.addEventListener('keydown', e => {
+  // Cmd/Ctrl+Shift+P — command palette. Checked first against a shortcut this
+  // app does not already use (grep-confirmed before picking it: Cmd/Ctrl+P is
+  // Print, Cmd/Ctrl+Shift+O is Outline; Cmd/Ctrl+Shift+P was free).
+  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'P') {
+    e.preventDefault();
+    toggleCommandPalette();
+    return;
+  }
+  // While the palette is open, its own input owns the keyboard (see the
+  // dedicated keydown listener above) — every other global shortcut below is
+  // suppressed so e.g. Cmd+S while typing a filter doesn't fire Save.
+  if (isCommandPaletteOpen()) return;
+
   if ((e.metaKey || e.ctrlKey) && e.key === 'p') { e.preventDefault(); printCurrent(); }
   if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); saveFile(); }
   if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
@@ -2364,9 +2610,9 @@ window.addEventListener('keydown', e => {
 
 // ── Mark a tree item active ───────────────────────────────────────────────────
 function setTreeActive(el) {
-  if (activeTreeEl) activeTreeEl.classList.remove('active');
+  if (activeTreeEl) { activeTreeEl.classList.remove('active'); activeTreeEl.setAttribute('aria-selected', 'false'); }
   activeTreeEl = el;
-  if (el) el.classList.add('active');
+  if (el) { el.classList.add('active'); el.setAttribute('aria-selected', 'true'); }
 }
 
 // ── File icon ─────────────────────────────────────────────────────────────────
@@ -2401,11 +2647,16 @@ function buildItem(entry, apiBase, browseBase, depth) {
   const item = document.createElement('div');
   item.className = 'tree-item' + (isViewable ? ' viewable' : '');
   item.style.paddingLeft = indent + 'px';
+  item.setAttribute('role', 'treeitem');
+  item.setAttribute('aria-label', name);
+  item.setAttribute('aria-selected', 'false');
+  item.tabIndex = 0;
 
   if (isDir) {
     item.dataset.api    = apiBase + name + '/';
     item.dataset.browse = browseBase + name + '/';
     item.dataset.type   = 'dir';
+    item.setAttribute('aria-expanded', 'false');
     item.innerHTML =
       `<span class="arrow">▶</span>` +
       `<span class="icon">${iconFor(name, true)}</span>` +
@@ -2424,6 +2675,7 @@ function buildItem(entry, apiBase, browseBase, depth) {
   const children = document.createElement('div');
   children.className = 'tree-children collapsed';
   children.style.paddingLeft = '12px';
+  children.setAttribute('role', 'group');
 
   node.appendChild(item);
   node.appendChild(children);
@@ -2482,7 +2734,17 @@ function wireItem(item, childrenEl, depth) {
     }
     const isOpen = item.classList.toggle('open');
     childrenEl.classList.toggle('collapsed', !isOpen);
+    item.setAttribute('aria-expanded', String(isOpen));
     if (isOpen) { logActivity('tree-expand', item.dataset.browse || item.dataset.href || '', { depth }); await loadChildren(item, childrenEl, depth); }
+  });
+  // Enter/Space activates a treeitem the same way a click does — treeitem
+  // role requires keyboard operability, and these items already carry
+  // tabindex="0" (set in buildItem()/the static pre-rendered markup).
+  item.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      item.click();
+    }
   });
   attachContextMenu(item);
 }
@@ -2503,8 +2765,14 @@ document.querySelectorAll('.section-header').forEach(hdr => {
   hdr.addEventListener('click', () => {
     const open = hdr.classList.toggle('open');
     body.classList.toggle('collapsed', !open);
+    if (hdr.hasAttribute('aria-expanded')) hdr.setAttribute('aria-expanded', String(open));
     if (open) logActivity('section-expand', null, { section: hdr.dataset.section || hdr.textContent.trim().slice(0, 30) });
   });
+  if (hdr.hasAttribute('role') && hdr.getAttribute('role') === 'button') {
+    hdr.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hdr.click(); }
+    });
+  }
 });
 
 // ── Load cluster archive list ─────────────────────────────────────────────────
@@ -2678,6 +2946,10 @@ function renderTabBar() {
     const el = document.createElement('div');
     el.className = 'tab' + (i === activeTabIdx ? ' active' : '');
     el.title = tab.path;
+    el.setAttribute('role', 'tab');
+    el.setAttribute('aria-selected', i === activeTabIdx ? 'true' : 'false');
+    el.setAttribute('aria-label', tab.name + (tab.dirty ? ' (unsaved changes)' : ''));
+    el.tabIndex = i === activeTabIdx ? 0 : -1;
     const nameEl = document.createElement('span');
     nameEl.className = 'tab-name';
     nameEl.textContent = tab.name;
@@ -2686,17 +2958,22 @@ function renderTabBar() {
       const d = document.createElement('span');
       d.className = 'tab-dirty';
       d.textContent = '●';
+      d.setAttribute('aria-hidden', 'true');
       el.appendChild(d);
     }
     const closeBtn = document.createElement('button');
     closeBtn.className = 'tab-close';
     closeBtn.title = 'Close';
     closeBtn.textContent = '×';
+    closeBtn.setAttribute('aria-label', 'Close ' + tab.name);
     closeBtn.addEventListener('click', e => { e.stopPropagation(); closeTab(i); });
     el.appendChild(closeBtn);
     el.addEventListener('click', e => {
       if (e.target.classList.contains('tab-close')) return;
       switchTab(i);
+    });
+    el.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchTab(i); }
     });
     bar.appendChild(el);
   });
@@ -3014,6 +3291,7 @@ function showCtxMenu(x, y, items) {
     }
     const btn = document.createElement('button');
     btn.textContent = item.label;
+    btn.setAttribute('role', 'menuitem');
     btn.addEventListener('click', () => { hideCtxMenu(); item.action(); });
     menu.appendChild(btn);
   });
@@ -3790,6 +4068,7 @@ searchInput.addEventListener('keydown', e => {
   const hiddenBtn = document.getElementById('sb-hidden-btn');
   if (hiddenBtn) {
     hiddenBtn.classList.toggle('active', showHidden);
+    hiddenBtn.setAttribute('aria-pressed', String(showHidden));
     hiddenBtn.addEventListener('click', e => { e.stopPropagation(); toggleHiddenFiles(); });
   }
 
@@ -3811,7 +4090,7 @@ searchInput.addEventListener('keydown', e => {
 })();
 </script>
 
-<div id="ctx-menu"></div>
+<div id="ctx-menu" role="menu" aria-label="File actions"></div>
 
 <script>
 // ---------------------------------------------------------------------------
@@ -3972,7 +4251,7 @@ searchInput.addEventListener('keydown', e => {
 })();
 </script>
 
-<div id="wb-toast"></div>
+<div id="wb-toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
 </body>
 </html>
