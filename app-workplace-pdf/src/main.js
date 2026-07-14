@@ -101,6 +101,7 @@ async function showPage(index) {
     });
     if (token !== renderToken) return; // superseded by a newer request
     el.pageImage.src = uri;
+    el.pageImage.alt = "Page " + (clamped + 1) + " of " + state.pageCount + (state.fileName ? " — " + state.fileName : "");
     el.pageImage.hidden = false;
     el.emptyState.hidden = true;
     setStatus("");
