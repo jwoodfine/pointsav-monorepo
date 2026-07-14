@@ -948,10 +948,18 @@ pub fn research_landing(title: &str, authors: &[Author], abstract_html: &str, sl
 /// `/research/{slug}/full` — the full-text rendition (SPEC §0): the ~22-
 /// section body plus the generated References section (already appended to
 /// `body_html` by `content::render_journal_doc`), reachable in one click
-/// from the landing page.
-pub fn research_fulltext(title: &str, authors: &[Author], body_html: &str) -> Markup {
+/// from the landing page. `geospatial` (`Frontmatter::is_geospatial`, SPEC
+/// §10.1) scopes the `.full-bleed`/`.wide` figure-width CSS classes (SPEC
+/// §10.2) — those classes are usable today via hand-authored raw HTML
+/// `<figure>` blocks (comrak's unsafe rendering already passes them
+/// through); the Markdown attribute shorthand `{#fig-id .full-bleed}` SPEC
+/// §10.2 also describes is deferred (no comrak attribute-extension exists to
+/// build on — confirmed against comrak 0.52's `Extension` options — so it
+/// needs a hand-rolled parser, not yet justified with zero real geospatial
+/// papers locally to validate one against).
+pub fn research_fulltext(title: &str, authors: &[Author], body_html: &str, geospatial: bool) -> Markup {
     html! {
-        article."k-research k-research--fulltext" {
+        article."k-research k-research--fulltext"."k-research--geospatial"[geospatial] {
             (masthead(title, authors))
             div."k-prose" { (PreEscaped(body_html)) }
         }
@@ -1168,6 +1176,14 @@ mod tests {
         // Blocked stub (SPEC §4) — must not fabricate disclosure text locally.
         let html = notice_banner(Some("draft"), Some("0.4.0"), Some("2026-07-02"), Some("CC BY 4.0"), Some("a@example.com"), Some("Woodfine (2026)")).into_string();
         assert_eq!(html, "");
+    }
+
+    #[test]
+    fn research_fulltext_carries_geospatial_class_only_when_requested() {
+        let with_class = research_fulltext("T", &[], "<p>body</p>", true).into_string();
+        assert!(with_class.contains("k-research--geospatial"));
+        let without_class = research_fulltext("T", &[], "<p>body</p>", false).into_string();
+        assert!(!without_class.contains("k-research--geospatial"));
     }
 
     #[test]
