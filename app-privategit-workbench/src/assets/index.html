@@ -613,6 +613,13 @@ header .tag {
 .cmdpal-item-title { flex: 1; overflow: hidden; text-overflow: ellipsis; }
 .cmdpal-item-shortcut { color: #999999; font-size: 11px; flex-shrink: 0; white-space: nowrap; }
 .cmdpal-empty { padding: 14px; font-size: 11px; color: #999999; text-align: center; }
+
+/* Visible to assistive tech only — used for aria-live announcements that would be
+   redundant noise on screen (e.g. the palette's result count). */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
 </style>
 </head>
 <body>
@@ -638,62 +645,62 @@ header .tag {
     </div>
 
     <div id="search-panel">
-      <div id="search-results"></div>
+      <div id="search-results" role="region" aria-live="polite" aria-label="Search results"></div>
     </div>
 
     <div id="tree-panel" role="tree" aria-label="File tree">
 
-      <div id="pinned-section">
-        <div class="section-header open" style="cursor:default;" aria-label="Pinned">📌 Pinned</div>
+      <div id="pinned-section" role="none">
+        <div class="section-header open" style="cursor:default;" role="treeitem" aria-label="Pinned" aria-expanded="true" aria-owns="pinned-body" tabindex="-1">📌 Pinned</div>
         <div id="pinned-body" class="section-body" role="group" aria-label="Pinned items"></div>
       </div>
 
-      <div class="section-header open" data-section="command" role="button" tabindex="0" aria-expanded="true">
+      <div class="section-header open" data-section="command" role="treeitem" tabindex="-1" aria-expanded="true" aria-owns="section-command" aria-label="~/Foundry">
         <span class="arrow">▶</span> ~/Foundry
       </div>
       <div class="section-body" id="section-command" role="group" aria-label="~/Foundry">
-        <div class="tree-node">
-          <div class="tree-item" data-api="/_api/command/" data-browse="/_command/" data-type="dir" style="padding-left:14px" role="treeitem" aria-label="~/Foundry" aria-expanded="false" aria-selected="false" tabindex="0">
+        <div class="tree-node" role="none">
+          <div class="tree-item" data-api="/_api/command/" data-browse="/_command/" data-type="dir" style="padding-left:14px" role="treeitem" aria-label="~/Foundry" aria-expanded="false" aria-selected="false" aria-owns="tc-command" tabindex="-1">
             <span class="arrow">▶</span><span class="icon">📁</span><span class="label">~/Foundry</span>
           </div>
-          <div class="tree-children collapsed" style="padding-left:12px" role="group"></div>
+          <div id="tc-command" class="tree-children collapsed" style="padding-left:12px" role="group"></div>
         </div>
       </div>
 
-      <div class="section-header open" data-section="clones" role="button" tabindex="0" aria-expanded="true">
+      <div class="section-header open" data-section="clones" role="treeitem" tabindex="-1" aria-expanded="true" aria-owns="section-clones" aria-label="clones/">
         <span class="arrow">▶</span> 📁 clones/
       </div>
       <div class="section-body" id="section-clones" role="group" aria-label="clones/">
         <div class="loading">Loading archives…</div>
       </div>
 
-      <div class="section-header" data-section="staged" role="button" tabindex="0" aria-expanded="false">
+      <div class="section-header" data-section="staged" role="treeitem" tabindex="-1" aria-expanded="false" aria-owns="section-staged" aria-label="Staged Outputs">
         <span class="arrow">▶</span> Staged Outputs
       </div>
       <div class="section-body collapsed" id="section-staged" role="group" aria-label="Staged Outputs">
-        <div class="tree-node">
-          <div class="tree-item" data-api="/_api/staged/bim/" data-browse="/bim/" data-type="dir" style="padding-left:14px" role="treeitem" aria-label="bim" aria-expanded="false" aria-selected="false" tabindex="0">
+        <div class="tree-node" role="none">
+          <div class="tree-item" data-api="/_api/staged/bim/" data-browse="/bim/" data-type="dir" style="padding-left:14px" role="treeitem" aria-label="bim" aria-expanded="false" aria-selected="false" aria-owns="tc-staged-bim" tabindex="-1">
             <span class="arrow">▶</span><span class="icon">📁</span><span class="label">bim</span>
           </div>
-          <div class="tree-children collapsed" style="padding-left:12px" role="group"></div>
+          <div id="tc-staged-bim" class="tree-children collapsed" style="padding-left:12px" role="group"></div>
         </div>
-        <div class="tree-node">
-          <div class="tree-item" data-api="/_api/staged/bookkeeping/" data-browse="/bookkeeping/" data-type="dir" style="padding-left:14px" role="treeitem" aria-label="bookkeeping" aria-expanded="false" aria-selected="false" tabindex="0">
+        <div class="tree-node" role="none">
+          <div class="tree-item" data-api="/_api/staged/bookkeeping/" data-browse="/bookkeeping/" data-type="dir" style="padding-left:14px" role="treeitem" aria-label="bookkeeping" aria-expanded="false" aria-selected="false" aria-owns="tc-staged-bookkeeping" tabindex="-1">
             <span class="arrow">▶</span><span class="icon">📁</span><span class="label">bookkeeping</span>
           </div>
-          <div class="tree-children collapsed" style="padding-left:12px" role="group"></div>
+          <div id="tc-staged-bookkeeping" class="tree-children collapsed" style="padding-left:12px" role="group"></div>
         </div>
-        <div class="tree-node">
-          <div class="tree-item" data-api="/_api/staged/legal/" data-browse="/legal/" data-type="dir" style="padding-left:14px" role="treeitem" aria-label="legal" aria-expanded="false" aria-selected="false" tabindex="0">
+        <div class="tree-node" role="none">
+          <div class="tree-item" data-api="/_api/staged/legal/" data-browse="/legal/" data-type="dir" style="padding-left:14px" role="treeitem" aria-label="legal" aria-expanded="false" aria-selected="false" aria-owns="tc-staged-legal" tabindex="-1">
             <span class="arrow">▶</span><span class="icon">📁</span><span class="label">legal</span>
           </div>
-          <div class="tree-children collapsed" style="padding-left:12px" role="group"></div>
+          <div id="tc-staged-legal" class="tree-children collapsed" style="padding-left:12px" role="group"></div>
         </div>
-        <div class="tree-node">
-          <div class="tree-item" data-api="/_api/staged/staging/" data-browse="/staging/" data-type="dir" style="padding-left:14px" role="treeitem" aria-label="staging" aria-expanded="false" aria-selected="false" tabindex="0">
+        <div class="tree-node" role="none">
+          <div class="tree-item" data-api="/_api/staged/staging/" data-browse="/staging/" data-type="dir" style="padding-left:14px" role="treeitem" aria-label="staging" aria-expanded="false" aria-selected="false" aria-owns="tc-staged-staging" tabindex="-1">
             <span class="arrow">▶</span><span class="icon">📁</span><span class="label">staging</span>
           </div>
-          <div class="tree-children collapsed" style="padding-left:12px" role="group"></div>
+          <div id="tc-staged-staging" class="tree-children collapsed" style="padding-left:12px" role="group"></div>
         </div>
       </div>
 
@@ -781,7 +788,8 @@ header .tag {
            role="combobox" aria-expanded="true" aria-controls="cmdpal-list" aria-autocomplete="list"
            aria-label="Command palette input">
     <div id="cmdpal-list" role="listbox" aria-label="Available commands"></div>
-    <div id="cmdpal-empty" class="cmdpal-empty" hidden>No matching commands</div>
+    <div id="cmdpal-empty" class="cmdpal-empty" role="status" aria-live="polite" hidden>No matching commands</div>
+    <div id="cmdpal-status" class="sr-only" role="status" aria-live="polite"></div>
   </div>
 </div>
 
@@ -2533,6 +2541,14 @@ function renderCommandPalette(query) {
   });
   empty.hidden = cmdpalFiltered.length > 0;
   input.setAttribute('aria-activedescendant', cmdpalFocusIdx >= 0 ? ('cmdpal-item-' + cmdpalFocusIdx) : '');
+  // Announce the result count. Sighted users see the list shrink as they type;
+  // without this a screen-reader user gets no feedback at all until they arrow into it.
+  const status = document.getElementById('cmdpal-status');
+  if (status) {
+    const n = cmdpalFiltered.length;
+    status.textContent = n === 0 ? 'No matching commands'
+                                 : `${n} command${n === 1 ? '' : 's'} available`;
+  }
 }
 
 function cmdpalSetFocus(i) {
@@ -2601,6 +2617,12 @@ document.getElementById('cmdpal-input').addEventListener('keydown', e => {
   } else if (e.key === 'Escape') {
     e.preventDefault(); e.stopPropagation();
     closeCommandPalette();
+  } else if (e.key === 'Tab') {
+    // Focus trap. The dialog is aria-modal="true", which tells AT that everything
+    // behind it is inert — but without this, Tab walked focus straight out into
+    // those "inert" controls. The input is the only tabbable element in the box,
+    // so containment means keeping focus here.
+    e.preventDefault(); e.stopPropagation();
   }
 });
 
@@ -2608,12 +2630,51 @@ document.getElementById('cmdpal-overlay').addEventListener('click', e => {
   if (e.target.id === 'cmdpal-overlay') closeCommandPalette();
 });
 
+// ── Tree arrow-key navigation ─────────────────────────────────────────────────
+(function () {
+  const panel = document.getElementById('tree-panel');
+  if (!panel) return;
+  panel.addEventListener('keydown', e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;   // don't shadow Alt+Up/Down etc.
+    const el = e.target.closest && e.target.closest('[role="treeitem"]');
+    if (!el) return;
+    const expandable = el.hasAttribute('aria-expanded');
+    const expanded   = el.getAttribute('aria-expanded') === 'true';
+    switch (e.key) {
+      case 'ArrowDown':  e.preventDefault(); treeStep(el, 1);  break;
+      case 'ArrowUp':    e.preventDefault(); treeStep(el, -1); break;
+      case 'Home':       e.preventDefault(); treeFocus(treeNodes()[0]); break;
+      case 'End':        e.preventDefault(); { const n = treeNodes(); treeFocus(n[n.length - 1]); } break;
+      case 'ArrowRight':
+        e.preventDefault();
+        if (expandable && !expanded) el.click();        // expand
+        else if (expanded) treeStep(el, 1);             // already open — descend
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        if (expandable && expanded) el.click();         // collapse
+        else treeFocus(treeParentOf(el));               // leaf/closed — go to parent
+        break;
+      default: return;
+    }
+  });
+  // Whatever the user focuses becomes the tree's single tabbable entry point.
+  panel.addEventListener('focusin', e => {
+    const el = e.target.closest && e.target.closest('[role="treeitem"]');
+    if (el) { treeNodes().forEach(n => { n.tabIndex = -1; }); el.tabIndex = 0; }
+  });
+})();
+
 // ── Keyboard shortcuts ────────────────────────────────────────────────────────
 window.addEventListener('keydown', e => {
-  // Cmd/Ctrl+Shift+P — command palette. Checked first against a shortcut this
-  // app does not already use (grep-confirmed before picking it: Cmd/Ctrl+P is
-  // Print, Cmd/Ctrl+Shift+O is Outline; Cmd/Ctrl+Shift+P was free).
-  if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'P') {
+  // Command palette. F1 is the primary binding: Cmd/Ctrl+Shift+P is reserved by the
+  // browser itself (Firefox opens a private window) and preventDefault() cannot block
+  // a browser-chrome shortcut — this app is served in a plain browser tab, not an
+  // embedded WebView, so Ctrl+Shift+P alone left the palette unreachable by keyboard
+  // in Firefox. Ctrl+Shift+P is kept because it is the shortcut people expect from
+  // VS Code and it does work in Chromium. F1 matches app-workplace-proforma's help
+  // overlay, so it is already precedent in this family.
+  if (e.key === 'F1' || ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'P')) {
     e.preventDefault();
     toggleCommandPalette();
     return;
@@ -2674,6 +2735,56 @@ function iconFor(name, isDir) {
 }
 
 // ── Build a tree item element ─────────────────────────────────────────────────
+// ── Tree keyboard navigation (WAI-ARIA roving tabindex) ───────────────────────
+// The tree announces role=tree but every node used to carry tabindex=0, which is the
+// opposite of a roving tabindex: Tab walked through hundreds of files instead of
+// entering the tree once and navigating with arrows. Exactly one node is tabbable at
+// a time; arrows move focus within.
+let treeGroupSeq = 0;
+
+function treeNodes() {
+  const panel = document.getElementById('tree-panel');
+  if (!panel) return [];
+  // offsetParent is null for anything inside a display:none .collapsed group,
+  // so this yields exactly the nodes a sighted user can see, in visual order.
+  return Array.from(panel.querySelectorAll('[role="treeitem"]'))
+              .filter(el => el.offsetParent !== null);
+}
+
+function treeSyncRoving() {
+  const nodes = treeNodes();
+  if (!nodes.length) return;
+  if (nodes.some(n => n.tabIndex === 0)) return;   // already have an entry point
+  nodes.forEach(n => { n.tabIndex = -1; });
+  nodes[0].tabIndex = 0;
+}
+
+function treeFocus(el) {
+  if (!el) return;
+  treeNodes().forEach(n => { n.tabIndex = -1; });
+  el.tabIndex = 0;
+  el.focus();
+}
+
+function treeStep(from, delta) {
+  const nodes = treeNodes();
+  const i = nodes.indexOf(from);
+  if (i === -1) return;
+  treeFocus(nodes[i + delta]);
+}
+
+function treeParentOf(el) {
+  const grp = el.parentElement && el.parentElement.closest('[role="group"]');
+  if (!grp) return null;
+  if (grp.classList.contains('tree-children')) {
+    // .tree-children is a sibling of its owning .tree-item inside a .tree-node
+    return grp.parentElement.querySelector(':scope > [role="treeitem"]');
+  }
+  // .section-body / #pinned-body — its header is the previous sibling
+  const hdr = grp.previousElementSibling;
+  return hdr && hdr.getAttribute('role') === 'treeitem' ? hdr : null;
+}
+
 function buildItem(entry, apiBase, browseBase, depth) {
   const isDir      = entry.type === 'directory';
   const name       = entry.name.replace(/\/$/, '');
@@ -2682,6 +2793,9 @@ function buildItem(entry, apiBase, browseBase, depth) {
 
   const node = document.createElement('div');
   node.className = 'tree-node';
+  // role=none: the wrapper is a layout div, not a tree node. Without this it sits
+  // between a role=group and its role=treeitem children, which is a spec violation.
+  node.setAttribute('role', 'none');
 
   const item = document.createElement('div');
   item.className = 'tree-item' + (isViewable ? ' viewable' : '');
@@ -2689,7 +2803,7 @@ function buildItem(entry, apiBase, browseBase, depth) {
   item.setAttribute('role', 'treeitem');
   item.setAttribute('aria-label', name);
   item.setAttribute('aria-selected', 'false');
-  item.tabIndex = 0;
+  item.tabIndex = -1;   // roving tabindex — treeSyncRoving() grants 0 to exactly one node
 
   if (isDir) {
     item.dataset.api    = apiBase + name + '/';
@@ -2715,6 +2829,10 @@ function buildItem(entry, apiBase, browseBase, depth) {
   children.className = 'tree-children collapsed';
   children.style.paddingLeft = '12px';
   children.setAttribute('role', 'group');
+  // The children group is a DOM *sibling* of its item, not a descendant. aria-owns
+  // re-parents it in the accessibility tree so AT reports the real hierarchy.
+  children.id = 'tc-' + (++treeGroupSeq);
+  item.setAttribute('aria-owns', children.id);
 
   node.appendChild(item);
   node.appendChild(children);
@@ -2755,6 +2873,7 @@ async function loadChildren(item, childrenEl, depth) {
       childrenEl.appendChild(node);
       wireItem(node.querySelector('.tree-item'), node.querySelector('.tree-children'), depth + 1);
     });
+    treeSyncRoving();   // keep exactly one tabbable entry point as the tree grows
     // Fetch git status after tree renders — badges appear ~1s later, non-blocking
     if (cloneMatch) fetchGitStatus(cloneMatch[1]);
   } catch(e) {
@@ -2801,13 +2920,22 @@ document.querySelectorAll('.tree-item[data-type]').forEach(item => {
 // ── Section collapse ──────────────────────────────────────────────────────────
 document.querySelectorAll('.section-header').forEach(hdr => {
   const body = document.getElementById('section-' + hdr.dataset.section);
+  // The pinned header carries .section-header but has no data-section and is not
+  // collapsible, so `body` is null for it. Guard rather than throw: previously this
+  // was latent (nobody clicks a cursor:default label), but keyboard tree navigation
+  // now reaches it, and ArrowLeft synthesises a click.
+  if (!body) return;
   hdr.addEventListener('click', () => {
     const open = hdr.classList.toggle('open');
     body.classList.toggle('collapsed', !open);
     if (hdr.hasAttribute('aria-expanded')) hdr.setAttribute('aria-expanded', String(open));
     if (open) logActivity('section-expand', null, { section: hdr.dataset.section || hdr.textContent.trim().slice(0, 30) });
   });
-  if (hdr.hasAttribute('role') && hdr.getAttribute('role') === 'button') {
+  // Section headers are role=treeitem (they were role=button until the tree was made
+  // spec-valid — role=button is not a permitted child of role=tree). Enter/Space must
+  // still toggle them either way.
+  const role = hdr.getAttribute('role');
+  if (role === 'treeitem' || role === 'button') {
     hdr.addEventListener('keydown', e => {
       if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); hdr.click(); }
     });
@@ -4129,6 +4257,17 @@ searchInput.addEventListener('keydown', e => {
       if (!s.classList.contains('sb-collapsed')) collapseSidebar();
     });
   }
+})();
+
+// Establish the tree's single tabbable entry point once the static tree is up.
+// loadChildren() re-runs this as the tree grows; the sections load async, so retry
+// briefly until at least one node is visible.
+(function () {
+  let tries = 0;
+  (function seed() {
+    treeSyncRoving();
+    if (!treeNodes().some(n => n.tabIndex === 0) && ++tries < 20) setTimeout(seed, 250);
+  })();
 })();
 </script>
 
