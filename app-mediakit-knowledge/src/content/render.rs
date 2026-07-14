@@ -196,8 +196,11 @@ pub fn render_journal_doc(
 /// bracket-hygiene rule in SPEC §1.2 item 8. Numbering is by first
 /// appearance (IEEE-style), stable across renditions. Returns
 /// (rewritten_body, first-appearance id order, ids that look like a citation
-/// but don't resolve in `registry`).
-fn resolve_citations(md: &str, registry: &CitationRegistry) -> (String, Vec<String>, Vec<String>) {
+/// but don't resolve in `registry`). Exposed `pub` (not just crate-internal)
+/// so the golden-fixture suite (`tests/journal_golden.rs`, SPEC §0.5) can
+/// build its normalized comparison summary directly from the same id-order
+/// data `render_journal_doc` uses, without re-parsing rendered HTML.
+pub fn resolve_citations(md: &str, registry: &CitationRegistry) -> (String, Vec<String>, Vec<String>) {
     let mut order: Vec<String> = Vec::new();
     let mut numbers: HashMap<String, usize> = HashMap::new();
     let mut unresolved: Vec<String> = Vec::new();
