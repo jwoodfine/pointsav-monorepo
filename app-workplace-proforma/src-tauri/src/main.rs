@@ -7,6 +7,36 @@
 
 use tauri::api::dialog;
 
+// ─── Local Service Endpoint Configuration (declaration only) ────────────────
+//
+// NEXT.md (Wave 2 pending) asks to "wire endpoint configuration" for the
+// workspace's local-only developer services: `local-proofreader` (:9097)
+// and Doorman/`service-slm` (:9092). This struct declares the configurable
+// defaults and makes them available as Tauri managed state for a future
+// Phase 2+ command to read.
+//
+// It intentionally does NOT open any connection: no HTTP client dependency
+// is added to Cargo.toml, and no code path below calls out to either URL.
+// Actually dialing either endpoint would require reconciling the "Never add
+// a network call" / `connect-src 'none'` hard rule in this crate's
+// CLAUDE.md first — that reconciliation is out of scope here and is
+// flagged back rather than decided unilaterally.
+#[derive(serde::Deserialize, serde::Serialize, Debug, Clone)]
+struct ServiceEndpoints {
+    proofreader_url: String,
+    doorman_url: String,
+}
+
+impl Default for ServiceEndpoints {
+    fn default() -> Self {
+        Self {
+            // Workspace-standard localhost ports (per AGENT.md / infrastructure/).
+            proofreader_url: "http://127.0.0.1:9097".to_string(),
+            doorman_url: "http://127.0.0.1:9092".to_string(),
+        }
+    }
+}
+
 // ─── IPC Commands ────────────────────────────────────────────────────────────
 //
 // The IPC surface is intentionally minimal: three commands only.
@@ -15,6 +45,9 @@ use tauri::api::dialog;
 //
 // Phase 1 MVP: three commands (open_file, save_file, get_app_data_dir).
 // Phase 2 adds IronCalc engine commands: evaluate_workbook, parse_formula.
+// ServiceEndpoints (above) is deliberately NOT a fourth command — exposing
+// it over IPC would expand the frozen 3-command (Phase 1) / 6-command
+// (Phase 2 ceiling) surface for no functional gain yet.
 
 /// Open a native OS file picker and return the contents of the selected
 /// .json proforma file as a UTF-8 string.
@@ -103,6 +136,7 @@ fn get_app_data_dir(app_handle: tauri::AppHandle) -> Result<String, String> {
 
 fn main() {
     tauri::Builder::default()
+        .manage(ServiceEndpoints::default())
         .invoke_handler(tauri::generate_handler![
             open_file,
             save_file,
