@@ -15,5 +15,5 @@ pub mod walk;
 pub use claims::{extract_claims, Claim, Confidence};
 pub use frontmatter::{parse, Frontmatter, ParsedDoc};
 pub use mount::{Mount, MountSet};
-pub use render::{render, render_doc, syntax_css, Heading, Rendered};
+pub use render::{render, render_doc, render_journal_doc, syntax_css, Heading, Rendered};
 pub use walk::{load, ContentIndex, DocRef, Lang};
