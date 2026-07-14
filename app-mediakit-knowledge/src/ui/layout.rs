@@ -13,6 +13,7 @@ use maud::{html, Markup, PreEscaped, DOCTYPE};
 use serde_json::json;
 
 use super::tenant::Tenant;
+use crate::content::frontmatter::Author;
 use crate::content::render::Heading;
 use crate::history::{FileDiff, Revision};
 use crate::legal::LegalTokens;
@@ -863,6 +864,66 @@ pub fn article_jsonld(
     }
 }
 
+/// JOURNAL paper masthead (SPEC-journal-wiki-render-contract.md §5 item 1):
+/// title + authors + affiliations + correspondence, generated from
+/// frontmatter. A JOURNAL body has no h1 — this element IS the title (the
+/// engine owns it, same as it owns References and the notice banners; see
+/// §1.2 item 4 for why the body never writes any of these itself).
+/// Correspondence renders for every author carrying an email — the frontmatter
+/// schema has no dedicated "is corresponding author" flag, so this is a
+/// simplification (all listed emails are contactable), not a spec-mandated
+/// single-author pick.
+pub fn masthead(title: &str, authors: &[Author]) -> Markup {
+    html! {
+        header."k-masthead" {
+            h1."k-masthead__title" { (title) }
+            @if !authors.is_empty() {
+                p."k-masthead__authors" {
+                    @for (i, author) in authors.iter().enumerate() {
+                        @if i > 0 { span."k-masthead__author-sep" aria-hidden="true" { ", " } }
+                        span."k-masthead__author" {
+                            @if let Some(name) = author.name.as_deref() { (name) }
+                            @if let Some(aff) = author.affiliation.as_deref().filter(|a| !a.is_empty()) {
+                                sup."k-masthead__affiliation" { (aff) }
+                            }
+                        }
+                    }
+                }
+            }
+            @for author in authors {
+                @if let Some(email) = author.email.as_deref().filter(|e| !e.is_empty()) {
+                    p."k-masthead__correspondence" {
+                        "Correspondence: "
+                        a href={ "mailto:" (email) } { (email) }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Working-paper / disclosure notice banner (SPEC §4) — **not yet
+/// implemented**. Blocked on Command's placement decision for the canonical
+/// notice-text data source (routed 2026-07-10 by project-editorial, still
+/// open as of BRIEF-knowledge-ng-rewrite.md's 2026-07-11 status update). The
+/// banner text (working-paper notice, forward-looking-statements advisory,
+/// citation banner, superseded notice) is disclosure copy this engine must
+/// never author locally — every word has to load verbatim from wherever that
+/// canonical file lands, the same discipline `legal.rs` already follows for
+/// trademark/copyright text. This signature is final per SPEC §4's table, so
+/// wiring it up once the data source exists is a one-line load-and-template
+/// change here, not a redesign — until then it renders nothing.
+pub fn notice_banner(
+    _state: Option<&str>,
+    _version: Option<&str>,
+    _preprint_posted_date: Option<&str>,
+    _license: Option<&str>,
+    _corresponding_author: Option<&str>,
+    _cite_as: Option<&str>,
+) -> Markup {
+    html! {}
+}
+
 /// Shift every `<h1...>`/`</h1>` in comrak-rendered HTML down to `<h2>` — used
 /// for embedded content (the Important Information band) that must never
 /// introduce a second `<h1>` alongside the page's own article title. Comrak's
@@ -1027,6 +1088,52 @@ mod tests {
     fn jsonld_neutralizes_script_breakout() {
         let evil = article_jsonld(Tenant::Corporate, "</script><script>alert(1)</script>", "", "https://corporate.woodfinegroup.com/wiki/x", None).into_string();
         assert!(!evil.contains("</script><script>alert"), "raw script-breakout sequence must not survive into the HTML: {evil}");
+    }
+
+    fn test_author(name: &str, affiliation: &str, email: &str) -> Author {
+        Author {
+            name: Some(name.to_string()),
+            affiliation: Some(affiliation.to_string()),
+            email: Some(email.to_string()),
+            orcid: None,
+            credit_roles: vec![],
+        }
+    }
+
+    #[test]
+    fn masthead_renders_title_as_h1_and_lists_authors() {
+        let authors = vec![
+            test_author("J. Woodfine", "PointSav Digital Systems", "j@example.com"),
+            test_author("P. Woodfine", "Woodfine Management Corp", "p@example.com"),
+        ];
+        let html = masthead("Capability Geometry", &authors).into_string();
+        assert!(html.contains("<h1"));
+        assert!(html.contains("Capability Geometry"));
+        assert!(html.contains("J. Woodfine"));
+        assert!(html.contains("P. Woodfine"));
+        assert!(html.contains("PointSav Digital Systems"));
+    }
+
+    #[test]
+    fn masthead_renders_correspondence_for_every_author_with_an_email() {
+        let authors = vec![test_author("A. One", "Org", "a@example.com"), test_author("B. Two", "Org", "b@example.com")];
+        let html = masthead("Title", &authors).into_string();
+        assert!(html.contains(r#"href="mailto:a@example.com""#));
+        assert!(html.contains(r#"href="mailto:b@example.com""#));
+    }
+
+    #[test]
+    fn masthead_with_no_authors_still_renders_the_title() {
+        let html = masthead("Solo Title", &[]).into_string();
+        assert!(html.contains("Solo Title"));
+        assert!(!html.contains("k-masthead__authors"));
+    }
+
+    #[test]
+    fn notice_banner_renders_nothing_until_the_data_source_exists() {
+        // Blocked stub (SPEC §4) — must not fabricate disclosure text locally.
+        let html = notice_banner(Some("draft"), Some("0.4.0"), Some("2026-07-02"), Some("CC BY 4.0"), Some("a@example.com"), Some("Woodfine (2026)")).into_string();
+        assert_eq!(html, "");
     }
 
     #[test]
