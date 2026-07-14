@@ -552,7 +552,12 @@ async fn research_fulltext(State(state): State<AppState>, Path(slug): Path<Strin
         .unwrap_or_else(|| doc.title.clone());
     let description = parsed.frontmatter.short_description.clone().unwrap_or_default();
     let rendered = content::render_journal_doc(&parsed, &state.citations);
-    let body = ui::research_fulltext(&title, &parsed.frontmatter.authors, &rendered.html);
+    let body = ui::research_fulltext(
+        &title,
+        &parsed.frontmatter.authors,
+        &rendered.html,
+        parsed.frontmatter.is_geospatial(),
+    );
     let path = format!("/research/{}/full", doc.slug);
     let head = ui::doc_head(&title, &description, tenant, &path, false);
     Html(
