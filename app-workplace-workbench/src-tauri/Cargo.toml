@@ -19,3 +19,6 @@ tauri-build = { version = "1.5", features = [] }
 tauri = { version = "1.7", features = ["window-all"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Shared get_X/set_X/has_X_config JSON config-store logic — see
+# ../../workplace-shell-chrome/README.md for why/what.
+workplace-shell-chrome = { path = "../../workplace-shell-chrome" }

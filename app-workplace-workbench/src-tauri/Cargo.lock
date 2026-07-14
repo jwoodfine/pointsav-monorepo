@@ -3747,6 +3747,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "workplace-shell-chrome"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "workplace-workbench"
 version = "0.1.0"
 dependencies = [
@@ -3754,6 +3762,7 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-build",
+ "workplace-shell-chrome",
 ]
 
 [[package]]

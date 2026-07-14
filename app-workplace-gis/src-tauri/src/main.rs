@@ -6,7 +6,6 @@
 
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::path::PathBuf;
 use tauri::Manager;
 
 /// Default tile-source endpoint used until the operator configures one via
@@ -54,21 +53,16 @@ struct GeoJsonFile {
     contents: String,
 }
 
-fn config_path(app_data_dir: &PathBuf) -> PathBuf {
-    app_data_dir.join(CONFIG_FILENAME)
-}
-
-fn load_config(app_data_dir: &PathBuf) -> Option<GisConfig> {
-    let content = fs::read_to_string(config_path(app_data_dir)).ok()?;
-    serde_json::from_str(&content).ok()
-}
+// `config_path`/`load_config` helpers moved to the shared
+// `workplace-shell-chrome` crate (2026-07-14 retrofit) — see that crate's
+// README for why. `GisConfig`'s shape stays here since it's app-specific.
 
 #[tauri::command]
 fn get_tile_endpoint(app_handle: tauri::AppHandle) -> String {
     app_handle
         .path_resolver()
         .app_data_dir()
-        .and_then(|dir| load_config(&dir))
+        .and_then(|dir| workplace_shell_chrome::load_config::<GisConfig>(&dir, CONFIG_FILENAME))
         .map(|cfg| cfg.endpoint)
         .unwrap_or_else(|| DEFAULT_ENDPOINT.to_string())
 }
@@ -79,11 +73,7 @@ fn set_tile_endpoint(app_handle: tauri::AppHandle, endpoint: String) -> Result<(
         .path_resolver()
         .app_data_dir()
         .ok_or("Cannot resolve app data directory")?;
-    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let config = GisConfig { endpoint };
-    let serialized = serde_json::to_string(&config).map_err(|e| e.to_string())?;
-    fs::write(config_path(&dir), serialized).map_err(|e| e.to_string())?;
-    Ok(())
+    workplace_shell_chrome::save_config(&dir, CONFIG_FILENAME, &GisConfig { endpoint })
 }
 
 /// True once `gis-config.json` exists — used by the frontend to decide
@@ -93,7 +83,7 @@ fn has_gis_config(app_handle: tauri::AppHandle) -> bool {
     app_handle
         .path_resolver()
         .app_data_dir()
-        .map(|dir| config_path(&dir).exists())
+        .map(|dir| workplace_shell_chrome::has_config(&dir, CONFIG_FILENAME))
         .unwrap_or(false)
 }
 
@@ -144,7 +134,7 @@ fn main() {
         ])
         .setup(|app| {
             if let Some(dir) = app.path_resolver().app_data_dir() {
-                fs::create_dir_all(&dir).ok();
+                workplace_shell_chrome::ensure_app_data_dir(&dir).ok();
             }
             Ok(())
         })
