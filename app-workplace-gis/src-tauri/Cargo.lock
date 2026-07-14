@@ -3853,6 +3853,15 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-build",
+ "workplace-shell-chrome",
+]
+
+[[package]]
+name = "workplace-shell-chrome"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
