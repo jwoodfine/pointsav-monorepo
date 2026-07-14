@@ -29,8 +29,9 @@ fn load_port(app_data_dir: &PathBuf) -> u16 {
 #[tauri::command]
 fn get_workbench_url(app_handle: tauri::AppHandle) -> String {
     let port = app_handle
-        .path_resolver()
+        .path()
         .app_data_dir()
+        .ok()
         .map(|dir| load_port(&dir))
         .unwrap_or(DEFAULT_PORT);
     format!("http://127.0.0.1:{}", port)
@@ -39,8 +40,9 @@ fn get_workbench_url(app_handle: tauri::AppHandle) -> String {
 #[tauri::command]
 fn set_workbench_port(app_handle: tauri::AppHandle, port: u16) -> Result<(), String> {
     let dir = app_handle
-        .path_resolver()
+        .path()
         .app_data_dir()
+        .ok()
         .ok_or("Cannot resolve app data directory")?;
     workplace_shell_chrome::save_config(&dir, CONFIG_FILENAME, &WorkbenchConfig { port })
 }
@@ -50,8 +52,9 @@ fn set_workbench_port(app_handle: tauri::AppHandle, port: u16) -> Result<(), Str
 #[tauri::command]
 fn has_workbench_config(app_handle: tauri::AppHandle) -> bool {
     app_handle
-        .path_resolver()
+        .path()
         .app_data_dir()
+        .ok()
         .map(|dir| workplace_shell_chrome::has_config(&dir, CONFIG_FILENAME))
         .unwrap_or(false)
 }
@@ -64,7 +67,8 @@ fn main() {
             has_workbench_config
         ])
         .setup(|app| {
-            if let Some(dir) = app.path_resolver().app_data_dir() {
+            // v2: path_resolver() -> path(), and app_data_dir() returns Result, not Option.
+            if let Ok(dir) = app.path().app_data_dir() {
                 workplace_shell_chrome::ensure_app_data_dir(&dir).ok();
             }
             Ok(())
