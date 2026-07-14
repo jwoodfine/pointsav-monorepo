@@ -582,6 +582,32 @@
   text-decoration: none;
 }
 
+/* --- Geospatial research papers (SPEC-journal-wiki-render-contract.md §10) -
+   .full-bleed / .wide figure-width classes, scoped to .k-research--geospatial
+   so an ordinary article accidentally using either class is unaffected.
+   NOT browser-verified (no live geospatial paper content exists yet to check
+   against — see research_fulltext()'s doc comment). .wide is a conservative,
+   low-risk column-width increase; .full-bleed is currently only "fills the
+   prose column" (max-width: 100%), not a true viewport-width grid breakout
+   past the sidebar — that needs .k-shell grid restructuring this pass didn't
+   attempt without something real to visually verify it against. */
+.k-research--geospatial .k-prose figure.wide {
+  max-width: calc(var(--k-prose-measure) * 1.5);
+}
+.k-research--geospatial .k-prose figure.full-bleed {
+  max-width: 100%;
+}
+.k-research--geospatial .k-prose figure.wide img,
+.k-research--geospatial .k-prose figure.full-bleed img {
+  width: 100%;
+  height: auto;
+}
+.k-research--geospatial .k-prose figcaption {
+  font-size: 0.875rem;
+  color: var(--k-ink-muted);
+  margin-top: var(--k-space-2);
+}
+
 /* --- Print ---------------------------------------------------------------- */
 @media print {
   .k-codeblock__copy { display: none !important; }

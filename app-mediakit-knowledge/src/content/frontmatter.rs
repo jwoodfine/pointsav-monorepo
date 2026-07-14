@@ -79,6 +79,14 @@ pub struct Frontmatter {
     pub doi: Option<String>,
 }
 
+impl Frontmatter {
+    /// SPEC §10.1: `paper_class: geospatial` is the only non-default value —
+    /// absent or any other value means the standard single-column layout.
+    pub fn is_geospatial(&self) -> bool {
+        self.paper_class.as_deref() == Some("geospatial")
+    }
+}
+
 /// One JOURNAL paper author (SPEC-journal-wiki-render-contract.md, masthead fields).
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Author {
@@ -338,5 +346,15 @@ mod tests {
         assert!(!fm.forbidden_terms_cleared);
         assert!(fm.authors.is_empty());
         assert!(fm.keywords.is_empty());
+    }
+
+    #[test]
+    fn is_geospatial_matches_paper_class_exactly() {
+        let mut fm = Frontmatter::default();
+        assert!(!fm.is_geospatial(), "absent paper_class must default to standard");
+        fm.paper_class = Some("standard".to_string());
+        assert!(!fm.is_geospatial());
+        fm.paper_class = Some("geospatial".to_string());
+        assert!(fm.is_geospatial());
     }
 }
