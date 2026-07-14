@@ -88,14 +88,20 @@
     <p id="msg">Connecting to workbench…</p>
   </div>
   <script type="module">
-    const { invoke } = window.__TAURI__.tauri;
-    const appWindow = window.__TAURI__.window.appWindow;
+    // Tauri v2: invoke moved from __TAURI__.tauri to __TAURI__.core, and the
+    // appWindow singleton was replaced by window.getCurrentWindow(). Destructuring
+    // the old __TAURI__.tauri here would throw a TypeError before any UI renders —
+    // i.e. a blank white window on an otherwise clean build.
+    const { invoke } = window.__TAURI__.core;
+    const appWindow = window.__TAURI__.window.getCurrentWindow();
     const statusEl = document.getElementById('status');
     const CONNECT_TIMEOUT_MS = 3000;
 
     function setTitle(suffix) {
-      // withGlobalTauri + window.all=true (tauri.conf.json) expose appWindow
-      // directly to the frontend — no extra IPC command needed for this.
+      // withGlobalTauri (tauri.conf.json app.withGlobalTauri) exposes the window API
+      // directly to the frontend — no extra IPC command needed. setTitle is a window
+      // *setter*, which core:default does not grant: capabilities/default.json must
+      // list core:window:allow-set-title or this is denied at runtime.
       appWindow.setTitle(suffix ? `Workplace Workbench — ${suffix}` : 'Workplace Workbench').catch(() => {});
     }
 
