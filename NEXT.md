@@ -59,12 +59,12 @@ unverified until re-checked against the deployed binary.
 
 ## Active (Totebox scope)
 
-- [ ] **🔴 OPERATOR — browser click-through never run.** No session can drive a browser.
-      Needs a human pass once Command deploys: open a real `.docx` (should show the
-      "no preview" placeholder, **not** freeze the tab), exercise the command palette,
-      and the "⎘ Copy name" / "⎘ Copy path" buttons. Also: **the palette is unreachable by
-      keyboard in Firefox** — `Ctrl+Shift+P` is browser-reserved and `preventDefault()`
-      cannot block it; there is no fallback binding. See BRIEF §S5.
+- [ ] **🔴 OPERATOR — screen-reader pass.** The ARIA work (`032a992a`) is verified by
+      headless-Chromium keypresses, which proves the *keyboard contract* but not what a
+      screen reader actually announces. Needs a pass with real assistive technology.
+      Also worth a human eye once Command deploys: open a real `.docx` (should show the
+      "no preview" placeholder, **not** freeze the tab), and the "⎘ Copy name" /
+      "⎘ Copy path" buttons. Palette now opens with **F1** (or Ctrl+Shift+P outside Firefox).
 - [ ] **Tauri 2 migration (6 crates)** — operator-approved 2026-07-14, replacing the
       impossible `libsoup2.4-dev` plan (BRIEF §S2). Zero new apt packages. Pilot
       `workbench` (only crate needing zero plugins); `presentation` **last** (its frontend
@@ -77,8 +77,12 @@ unverified until re-checked against the deployed binary.
       that merely shares the name (BRIEF §S4). `app-workplace-http-prototype`'s workbench
       (4,744 lines) still has **zero** command palette and **one** ARIA attribute. Rename
       the crate when building the real module.
-- [ ] **5 ARIA findings (A–E)** on `app-privategit-workbench`, all re-verified still true
-      2026-07-14. Fix (B) first — the Firefox keybinding above. F1 is available precedent.
+- [x] ~~**5 ARIA findings (A–E)** on `app-privategit-workbench`~~ — **DONE 2026-07-14
+      (`032a992a`).** F1 fallback (palette was unreachable by keyboard in Firefox), roving
+      tabindex + arrow-key tree traversal, focus trap, pinned-header role, live regions.
+      Verified 13/13 by driving real headless Chromium over CDP with real keypresses. Also
+      fixed a pre-existing latent null-deref crash and a role-gated Enter/Space handler the
+      role change would have silently killed. **Screen-reader pass still recommended.**
 - [ ] **`bin/capture-trajectory.sh`** (L2 trajectory capture) — never started. Spec at
       `conventions/trajectory-substrate.md` says **one week**, not the BRIEF's "one evening".
 - [ ] **Correct the schema-framework matrix** in `BRIEF-workplace-workbench.md:122-133` —
