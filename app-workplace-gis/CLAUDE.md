@@ -11,7 +11,13 @@
 loading a MapLibre GL-based tile viewer that connects to gis.woodfinegroup.com
 (or a local tile server) over WireGuard PPN.
 
-Platform: macOS 10.13 High Sierra (Tauri v1). Apache-2.0 licence.
+Platform: macOS 10.15 Catalina or later (Tauri v2). Apache-2.0 licence.
+
+> **Tauri v1 → v2, 2026-07-14 (operator-approved).** Tauri 1.x cannot be built on this
+> host — Ubuntu 24.04 dropped the webkit2gtk-4.0 ABI. Tauri 2 targets webkit2gtk-4.1 +
+> libsoup-3.0 (already installed). The `dialog-open` allowlist feature became the
+> `tauri-plugin-dialog` crate; the native GeoJSON picker (`load_geojson_file`) now uses
+> `DialogExt` + `blocking_pick_file()` from Rust. Accepted cost: macOS floor 10.13 → 10.15.
 
 ## Architecture
 
@@ -28,14 +34,20 @@ configured endpoint. MapLibre GL JS runs inside the WebView.
 
 ## Before first build on macOS
 
-1. Copy icons: `cp -r ../app-workplace-memo/src-tauri/icons src-tauri/`
+1. Icons are already in `src-tauri/icons/`.
 2. `npm install`
 3. `npm run build` (or `npm run dev` for development)
 
 ## Hard rules
 
-- `minimumSystemVersion: "10.13"` in tauri.conf.json
-- CSP allows tile server endpoint and MapLibre CDN (or bundle MapLibre locally)
+- ~~`minimumSystemVersion: "10.13"`~~ — **retired 2026-07-14**; floor is now **10.15**
+  (Tauri v2 migration; keeping 10.13 would mean keeping v1, which is unbuildable on this host).
+- CSP allows tile server endpoint and MapLibre CDN (or bundle MapLibre locally). In v2 the
+  `connect-src` directive must keep `ipc: http://ipc.localhost` — `invoke()` rides a
+  custom-protocol fetch; removing it silently breaks every IPC command.
+- `tauri-plugin-dialog` must stay registered in `main.rs` (`.plugin(tauri_plugin_dialog::init())`).
+  The dialog is called from Rust, so it needs **no** `dialog:*` capability entry — but the
+  plugin registration is still mandatory or `app.dialog()` panics at runtime.
 - Apache-2.0; MapLibre GL JS is BSD-3-Clause — clean to bundle
 
 ## Implementation status (2026-07-13)
