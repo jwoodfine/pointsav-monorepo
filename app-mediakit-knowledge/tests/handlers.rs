@@ -40,6 +40,18 @@ fn test_state() -> AppState {
         "redirects.yaml",
         "redirects:\n  - from: /moved-away\n    to: /wiki/zero-container-inference\n",
     );
+    write(
+        root,
+        "research/test-paper.md",
+        "---\ntitle: Test Paper\nslug: test-paper\ncategory: research\nabstract: |\n  A short test abstract.\ncites: [test-citation]\n---\n## 1. Introduction\n\nSee [test-citation] for details.\n",
+    );
+
+    let citations_path = root.join("citations.yaml");
+    std::fs::write(
+        &citations_path,
+        "citations:\n  test-citation:\n    type: vendor-doc\n    title: Test Citation\n    url: https://example.com/test-citation\n",
+    )
+    .unwrap();
 
     // Leak the tempdirs for the duration of the test process — `AppState`
     // holds owned PathBufs into these directories and this helper is only
@@ -50,9 +62,10 @@ fn test_state() -> AppState {
     std::mem::forget(state_dir);
 
     let toml = format!(
-        "[site]\ntitle = \"Test Wiki\"\nbrand = \"pointsav\"\nbind = \"127.0.0.1:0\"\nstate_dir = \"{}\"\ninstance = \"documentation\"\n\n[[mount]]\npath = \"{}\"\nrole = \"primary\"\n",
+        "[site]\ntitle = \"Test Wiki\"\nbrand = \"pointsav\"\nbind = \"127.0.0.1:0\"\nstate_dir = \"{}\"\ninstance = \"documentation\"\n\n[[mount]]\npath = \"{}\"\nrole = \"primary\"\n\n[citations]\npath = \"{}\"\n",
         state_path.display(),
         content_path.display(),
+        citations_path.display(),
     );
     let config: Config = toml::from_str(&toml).unwrap();
     AppState::build(config)
@@ -234,6 +247,97 @@ async fn unknown_static_asset_returns_404() {
         .oneshot(
             Request::builder()
                 .uri("/static/does-not-exist.css")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn research_index_lists_the_paper() {
+    let app = router(test_state());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/research")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let text = body_text(resp).await;
+    assert!(text.contains("Test Paper"), "got: {text}");
+}
+
+#[tokio::test]
+async fn research_landing_shows_masthead_and_abstract_not_full_body() {
+    let app = router(test_state());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/research/test-paper")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let text = body_text(resp).await;
+    assert!(text.contains("Test Paper"), "got: {text}");
+    assert!(text.contains("A short test abstract"), "got: {text}");
+    assert!(text.contains("Read the full text"), "got: {text}");
+    // The landing page must not contain the full-text body's "Introduction"
+    // section — that's a distinct click-through, not interleaved (SPEC §0).
+    assert!(!text.contains("Introduction"), "got: {text}");
+}
+
+#[tokio::test]
+async fn research_fulltext_resolves_citation_and_generates_references() {
+    let app = router(test_state());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/research/test-paper/full")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let text = body_text(resp).await;
+    assert!(text.contains("Introduction"), "got: {text}");
+    assert!(text.contains("References"), "got: {text}");
+    assert!(text.contains("Test Citation"), "got: {text}");
+    assert!(text.contains(r#"id="ref-1""#), "got: {text}");
+}
+
+#[tokio::test]
+async fn research_unknown_slug_returns_404() {
+    let app = router(test_state());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/research/does-not-exist")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn non_research_doc_is_not_reachable_via_research_namespace() {
+    // zero-container-inference is category: architecture — /research/{slug}
+    // must not serve it just because the slug happens to resolve.
+    let app = router(test_state());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/research/zero-container-inference")
                 .body(Body::empty())
                 .unwrap(),
         )
