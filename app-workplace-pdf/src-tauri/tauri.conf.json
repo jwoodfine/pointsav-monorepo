@@ -1,0 +1,69 @@
+{
+  "package": {
+    "productName": "Workplace PDF",
+    "version": "0.1.0"
+  },
+  "tauri": {
+    "allowlist": {
+      "all": false,
+      "window": {
+        "print": true
+      }
+    },
+    "bundle": {
+      "active": true,
+      "targets": "all",
+      "identifier": "systems.pointsav.workplace-pdf",
+      "icon": [
+        "icons/32x32.png",
+        "icons/128x128.png",
+        "icons/128x128@2x.png",
+        "icons/icon.icns",
+        "icons/icon.ico"
+      ],
+      "copyright": "© 2026 PointSav Digital Systems",
+      "category": "Productivity",
+      "shortDescription": "Sovereign desktop PDF viewer and print tool",
+      "longDescription": "Sovereign desktop PDF viewer and print tool. Renders PDF documents locally with the PDFium engine — open, navigate, zoom, and print via the OS print dialogue. No document data leaves the machine.",
+      "macOS": {
+        "minimumSystemVersion": "10.13"
+      }
+    },
+    "security": {
+      "csp": "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'"
+    },
+    "windows": [
+      {
+        "label": "main",
+        "title": "Workplace PDF",
+        "url": "index.html",
+        "width": 1280,
+        "height": 900,
+        "minWidth": 900,
+        "minHeight": 600,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true,
+        "decorations": true,
+        "transparent": false
+      }
+    ],
+    "updater": {
+      "active": false
+    }
+  },
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "devPath": "../src",
+    "distDir": "../src",
+    "withGlobalTauri": true
+  },
+  "_notes": {
+    "tauri-version": "v1.x — required for macOS 10.13 High Sierra. Upgrade to v2 when dev machine targets macOS 10.15+.",
+    "pdfium": "Rendering uses pdfium-render bound dynamically to libpdfium at runtime (see src-tauri/pdfium/README.md for provenance + search order). The shipped macOS build must statically link libpdfium.a per CLAUDE.md — switch pdfium-render to its 'static' feature for release.",
+    "print": "Print renders every page to PNG at 1600px width in a hidden print container, then calls appWindow.print() (allowlist window.print) so macOS shows the native print dialogue; falls back to window.print(). Output is raster at the render width, not vector.",
+    "csp": "img-src allows data: because rendered pages arrive as base64 PNG data URIs over IPC.",
+    "icons": "Copy icons from app-workplace-memo/src-tauri/icons/ before first macOS build."
+  }
+}

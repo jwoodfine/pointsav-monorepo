@@ -1,0 +1,46 @@
+# Exclude this crate from the parent monorepo workspace.
+# Each app-workplace-* is an independent Tauri application with its own
+# dependency tree, even though it lives inside the monorepo.
+[workspace]
+
+[package]
+name = "workplace-pdf"
+version = "0.1.0"
+description = "Sovereign desktop PDF viewer and print tool — PointSav Digital Systems"
+authors = ["PointSav Digital Systems"]
+license = "Apache-2.0"
+repository = ""
+edition = "2021"
+rust-version = "1.70"
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+# Tauri v1 — required for macOS 10.13 High Sierra compatibility.
+# Tauri v2 requires macOS 10.15+.
+# "dialog"       — Rust-side file picker (tauri::api::dialog); no JS allowlist needed.
+# "window-print" — appWindow.print() from the frontend (OS print dialogue on macOS).
+tauri = { version = "1.7", features = ["dialog", "window-print"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# PDF engine: idiomatic Rust binding to Google PDFium (Apache 2.0) via FFI.
+# Development binds dynamically at runtime — libpdfium.so/.dylib is searched in
+# $PDFIUM_DYNAMIC_LIB_PATH, the executable directory, ../Frameworks (macOS
+# bundle), then ./pdfium/ (see src/main.rs init_pdfium). For the shipped macOS
+# build, CLAUDE.md requires static linking: enable the "static" feature and link
+# libpdfium.a instead. NOTE (0.9.x): the library binding is a process-wide
+# OnceCell — bind exactly once; see the pdf-worker thread in src/main.rs.
+pdfium-render = "0.9"
+
+# PNG encoding of rendered page bitmaps. Must stay on the same major version as
+# pdfium-render's default `image_latest` feature (image 0.25) so that
+# PdfBitmap::as_image()'s DynamicImage type matches.
+image = "0.25"
+base64 = "0.22"
+
+[features]
+# This feature is used for production builds or when `devPath` points to the filesystem
+# DO NOT REMOVE!!
+custom-protocol = ["tauri/custom-protocol"]
