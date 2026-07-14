@@ -7,7 +7,8 @@
 // browser in this session — this is a headless Linux VM with no WebView/GPU
 // surface — so treat this as hand-reviewed code, not smoke-tested code.
 
-const { invoke } = window.__TAURI__.tauri;
+// Tauri v2: invoke moved from __TAURI__.tauri to __TAURI__.core.
+const { invoke } = window.__TAURI__.core;
 
 const overlay = document.getElementById('overlay');
 const overlayPanel = document.getElementById('overlay-panel');

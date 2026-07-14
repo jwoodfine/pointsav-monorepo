@@ -1,40 +1,16 @@
 {
-  "package": {
-    "productName": "Workplace GIS",
-    "version": "0.1.0"
+  "productName": "Workplace GIS",
+  "mainBinaryName": "Workplace GIS",
+  "version": "0.1.0",
+  "identifier": "systems.pointsav.workplace-gis",
+  "build": {
+    "beforeDevCommand": "",
+    "beforeBuildCommand": "",
+    "frontendDist": "../src"
   },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "window": {
-        "all": true
-      },
-      "dialog": {
-        "open": true
-      }
-    },
-    "bundle": {
-      "active": true,
-      "targets": "all",
-      "identifier": "systems.pointsav.workplace-gis",
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ],
-      "copyright": "© 2026 PointSav Digital Systems",
-      "category": "DeveloperTool",
-      "shortDescription": "Sovereign desktop GIS viewer",
-      "longDescription": "Native desktop shell for the PointSav sovereign GIS tile viewer. Renders a locally-vendored MapLibre GL map against a configurable tile-source endpoint (gis.woodfinegroup.com or a PPN/WireGuard address) inside a native macOS window.",
-      "macOS": {
-        "minimumSystemVersion": "10.13"
-      }
-    },
-    "security": {
-      "csp": "default-src 'self'; connect-src 'self' https: http: ; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http: ; worker-src 'self' blob: ; font-src 'self' data:"
-    },
+  "plugins": {},
+  "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "label": "main",
@@ -48,24 +24,30 @@
         "fullscreen": false,
         "center": true,
         "decorations": true,
-        "transparent": false
+        "transparent": false,
+        "useHttpsScheme": true
       }
     ],
-    "updater": {
-      "active": false
+    "security": {
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https: http: ; script-src 'self' 'unsafe-eval' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http: ; worker-src 'self' blob: ; font-src 'self' data:"
     }
   },
-  "build": {
-    "beforeDevCommand": "",
-    "beforeBuildCommand": "",
-    "devPath": "../src",
-    "distDir": "../src",
-    "withGlobalTauri": true
-  },
-  "_notes": {
-    "tauri-version": "v1.x — required for macOS 10.13 High Sierra. Upgrade to v2 when dev machine targets macOS 10.15+.",
-    "maplibre": "MapLibre GL JS 4.7.1 (BSD-3-Clause) vendored locally at src/vendor/maplibre-gl/ — no CDN reference, works offline/air-gapped.",
-    "csp": "connect-src/img-src allow both https: and http: broadly because the tile endpoint is operator-configurable at runtime (public HTTPS host or a bare-IP PPN/WireGuard address) — narrow to the specific configured host once the endpoint is fixed in a given deployment.",
-    "icons": "Copy icons from app-workplace-memo/src-tauri/icons/ before first macOS build."
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "copyright": "© 2026 PointSav Digital Systems",
+    "category": "DeveloperTool",
+    "shortDescription": "Sovereign desktop GIS viewer",
+    "longDescription": "Native desktop shell for the PointSav sovereign GIS tile viewer. Renders a locally-vendored MapLibre GL map against a configurable tile-source endpoint (gis.woodfinegroup.com or a PPN/WireGuard address) inside a native macOS window.",
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    }
   }
 }
