@@ -798,6 +798,12 @@ button:disabled { cursor: default; }
 /* server-side ?format=pdf route rendering this stylesheet via headless      */
 /* Chromium — Wikipedia's actual Proton pattern — not a client library.       */
 /* ========================================================================== */
+/* .k-print-citation is print-only chrome; hidden on screen by default here,
+   BEFORE the @media print block below overrides it — same-specificity rules
+   resolve by source order, so this must come first or the print override
+   (later in the cascade) would lose to this one even while printing. */
+.k-print-citation { display: none; }
+
 @media print {
   .k-skip-link,
   .k-utility,
@@ -867,11 +873,6 @@ button:disabled { cursor: default; }
   .k-footer__grid { grid-template-columns: repeat(3, 1fr); }
   .k-footer__brand-tagline { color: #333; }
 }
-
-/* .k-print-citation is print-only chrome; hide it on screen unconditionally
-   (outside the @media print block so it never flashes on-screen even before
-   print stylesheets apply). */
-.k-print-citation { display: none; }
 
 /* ========================================================================== */
 /* Reduced motion                                                             */
