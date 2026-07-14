@@ -80,7 +80,7 @@ pub struct Frontmatter {
 }
 
 /// One JOURNAL paper author (SPEC-journal-wiki-render-contract.md, masthead fields).
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct Author {
     pub name: Option<String>,
     pub affiliation: Option<String>,
