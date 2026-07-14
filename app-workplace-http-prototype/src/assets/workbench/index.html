@@ -1082,11 +1082,26 @@ const INDEXABLE_RE = /\.(html?|md|txt|pdf|csv|json|yaml|yml)$/i;
 // JSON schema detection (proforma, etc.) happens in openFile() after content is fetched.
 const DOCUMENT_EXTS = new Set(['geojson']);
 
+// Known-binary formats — never fetch-and-render as text (freezes the tab on
+// large files; the raw bytes get decoded as one giant garbled UTF-8 string).
+// Unrecognized extensions NOT in this set still fall through to 'text' below,
+// since this monorepo has many legitimate unlisted-extension text files
+// (Cargo.lock, Dockerfile, .gitignore, etc.) that must keep working.
+const BINARY_EXTS = new Set([
+  'docx','doc','xlsx','xls','pptx','ppt','odt','ods','odp',
+  'zip','tar','gz','tgz','bz2','xz','7z','rar',
+  'exe','dll','so','dylib','bin','wasm','class','jar',
+  'sqlite','sqlite3','db','iso','dmg',
+  'woff','woff2','ttf','otf','eot',
+  'mp3','mp4','mov','avi','mkv','wav','flac','ogg','webm',
+]);
+
 function fileMode(name) {
   const ext = name.split('.').pop().toLowerCase();
   if (IFRAME_EXTS.has(ext))    return 'iframe';
   if (IMAGE_EXTS.has(ext))     return 'image';
   if (DOCUMENT_EXTS.has(ext))  return 'document';
+  if (BINARY_EXTS.has(ext))    return 'unsupported';
   if (TEXT_EXTS.has(ext))      return 'text';
   return 'text';
 }
@@ -1841,6 +1856,26 @@ function hideViewerContent() {
   document.getElementById('image-viewer').style.display       = 'none';
 }
 
+function copyToClipboard(text, btnEl, idleLabel) {
+  const confirm = () => {
+    if (!btnEl) return;
+    btnEl.textContent = '✓ Copied';
+    setTimeout(() => { btnEl.textContent = idleLabel; }, 1500);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(confirm);
+  } else {
+    const tmp = document.createElement('textarea');
+    tmp.value = text;
+    tmp.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
+    document.body.appendChild(tmp);
+    tmp.select();
+    document.execCommand('copy');
+    document.body.removeChild(tmp);
+    confirm();
+  }
+}
+
 function updateBar(name, path) {
   orgEditMode = false;
   document.getElementById('bar-path').textContent = name;
@@ -1851,25 +1886,15 @@ function updateBar(name, path) {
   copyBtn.className = 'bar-btn';
   copyBtn.textContent = '⎘ Copy name';
   copyBtn.title = 'Copy filename to clipboard';
-  copyBtn.addEventListener('click', () => {
-    const confirm = () => {
-      copyBtn.textContent = '✓ Copied';
-      setTimeout(() => { copyBtn.textContent = '⎘ Copy name'; }, 1500);
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(name).then(confirm);
-    } else {
-      const tmp = document.createElement('textarea');
-      tmp.value = name;
-      tmp.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
-      document.body.appendChild(tmp);
-      tmp.select();
-      document.execCommand('copy');
-      document.body.removeChild(tmp);
-      confirm();
-    }
-  });
+  copyBtn.addEventListener('click', () => copyToClipboard(name, copyBtn, '⎘ Copy name'));
   bar.appendChild(copyBtn);
+
+  const copyPathBtn = document.createElement('button');
+  copyPathBtn.className = 'bar-btn';
+  copyPathBtn.textContent = '⎘ Copy path';
+  copyPathBtn.title = 'Copy file path to clipboard';
+  copyPathBtn.addEventListener('click', () => copyToClipboard(path, copyPathBtn, '⎘ Copy path'));
+  bar.appendChild(copyPathBtn);
 
   // Platform PDF button — server-side WeasyPrint rendering (opens config dialog)
   const pdfExts = new Set(['html','htm','geojson']);
@@ -2146,6 +2171,19 @@ async function openFile(path, name) {
     const frame = document.getElementById('preview-frame');
     frame.style.display = 'block';
     frame.src = '/_api/edit/document?path=' + encodeURIComponent(apiPath);
+
+  } else if (mode === 'unsupported') {
+    // Known-binary format — no in-browser preview. Skip fetching the file
+    // entirely (avoids downloading + garbling large binary content) and
+    // point at the Download button already built into the toolbar above.
+    viewMode = 'text';
+    const tv = document.getElementById('text-viewer');
+    const tc = document.getElementById('text-content');
+    tv.style.display = 'block';
+    tc.className = 'code-view';
+    const ext = fname.split('.').pop().toUpperCase();
+    tc.textContent = 'Preview not available for ' + ext + ' files.\n\nUse the ⬇ Download button above to save it locally.';
+    hideEditorPanel();
 
   } else {
     viewMode = 'text';
@@ -3378,6 +3416,7 @@ function renderRecentSection() {
       e.preventDefault();
       showCtxMenu(e.clientX, e.clientY, [
         { label: 'Open', action: () => openFile(r.path, r.name) },
+        { label: '⎘ Copy path', action: () => copyToClipboard(r.path) },
         '-',
         { label: '📌 Pin to top', action: () => { pinFile(r.path, r.name); } },
         '-',
@@ -3470,6 +3509,7 @@ function attachContextMenu(item) {
     } else if (isFile && writable) {
       items = [
         { label: 'Open', action: () => openFile(path, name) },
+        { label: '⎘ Copy path', action: () => copyToClipboard(path) },
         '-',
         { label: '📌 Pin to top', action: () => pinFile(path, name) },
         { label: '✎ Rename',    action: () => renameByPath(path, name) },
@@ -3480,13 +3520,17 @@ function attachContextMenu(item) {
     } else if (isFile) {
       items = [
         { label: 'Open', action: () => openFile(path, name) },
+        { label: '⎘ Copy path', action: () => copyToClipboard(path) },
         { label: '📌 Pin to top', action: () => pinFile(path, name) },
       ];
     } else if (isDir) {
       const browse = item.dataset.browse || '';
       const api    = item.dataset.api || '';
       const isWritableDir = browse && !browse.startsWith('/_command/');
-      items = [{ label: '📁 Pin folder', action: () => pinFolder(browse, name, api) }];
+      items = [
+        { label: '📁 Pin folder', action: () => pinFolder(browse, name, api) },
+        { label: '⎘ Copy path',   action: () => copyToClipboard(browse) },
+      ];
       if (api) {
         items.push('-');
         items.push({ label: '⬇ Download as ZIP', action: () => {
