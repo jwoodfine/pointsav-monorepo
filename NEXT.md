@@ -3,57 +3,86 @@
 > Hot open items. ≤200 lines. Backlog at `.agent/next-backlog.md` (not yet created).
 > **Scope: this archive only.** Cross-repo and workspace-level items live at `~/Foundry/NEXT.md`.
 
-Last updated: 2026-07-10
+Last updated: 2026-07-14
 
 ---
 
 ## Blocked — Command Session (route via outbox)
 
-- [ ] **Stage 6 discrepancy re: 2026-07-04 partial-promote message** — Command's message
-      cites 4 deferred-item commit hashes that don't exist anywhere in the `pointsav-monorepo`
-      sub-clone's history; direct file comparison shows the SessionState item already matches
-      canonical, the watcher-refactor item has no trace either side, and the UI item is backwards
-      (local already exceeds canonical). Replied via outbox 2026-07-06 asking Command to reconcile
-      which state that message was generated against — no rework attempted pending that reply.
-      **2026-07-07 update:** likely root cause found — see new duplication finding below.
-- [ ] **Stage 6 pending — pointsav-monorepo sub-clone** — 20 commits ahead of origin/main as of
-      2026-07-07 (confirmed still 20, sub-clone still clean, as of 2026-07-08). 14 pre-existing +
-      6 new from the 2026-07-07 session: moonshot workspace-table fix, fmt fix, smoke tests,
-      app-privategit-workbench workspace-membership regression fix, unwrap fixes,
-      anyhow::Result main() refactor. **Correction (2026-07-08):** the 2026-07-07 session-context
-      and this file both claimed this was flagged via outbox msg-id
-      `project-workplace-20260708-stage-6-pending-20-commits-2-new-structu` — that message was
-      never actually written (verified by grep against outbox.md + inbox-archive.md, no match).
-      Actually sent 2026-07-08 as `project-workplace-20260709-stage-6-pending-20-commits-2-new-structu`.
-      **2026-07-09 note:** count is now 18, not 20 — cause not investigated this session (no
-      new commits made here since 2026-07-08; possibly an interim Command-side action or a
-      branch-ref reconciliation, see the sub-clone-branch item below). Reconcile before relying
-      on either figure.
+- [ ] **🔴 URGENT — docx-freeze bug is LIVE on 10.8.0.9:9200; deploy is Command-only.**
+      The fix is committed and verified here (`ad08b8c9`) but `bin/deploy-binary.sh:32`
+      refuses to run outside the Command workspace and `:131` requires HEAD already
+      promoted. Needs: promote → `deploy-binary.sh app-privategit-workbench` → restart.
+      Sent 2026-07-14, `priority: high`, msg-id
+      `project-workplace-20260714-urgent-docx-freeze-bug-live-on-10-8-0-9-`.
+      Post-deploy check (all are 0 today; the 0 → non-zero flip IS the fix shipping):
+      `strings /usr/local/bin/app-privategit-workbench | grep -c BINARY_EXTS`.
+- [ ] **Stage 6 pending — archive root, HEAD `ad08b8c9`.** 44 commits ahead of `46ad34ce`,
+      strictly linear, no merge commits. Same outbox message as above. Note `pairings.yaml`
+      gives this archive `self_service: build-deploy` (not `-stage6lite`), so both
+      `promote.sh` (L97) and `self-service-promote.sh` (L98) refuse to run from here —
+      canonical promote is Command's by construction.
+- [ ] **2 tooling defects in `bin/`** — routed to Command in the same message.
+      (a) `promote.sh:428` cherry-picks with no `-m 1`, so a **merge commit is silently
+      dropped at Stage 6 while printing "skip (already in canonical)"** — a silent
+      data-loss path. (b) `self-service-promote.sh:56-72` auto-detects a nested
+      `pointsav-monorepo/.git` and silently retargets into it; **latent here** (the
+      `build-deploy` guard exits first) but **LIVE for any archive with
+      `build-deploy-stage6lite` + a sub-clone**. Related: `AGENT.md` §6b is now actively
+      wrong for this archive (root is authoritative, per operator).
+- [ ] **Retire the `pointsav-monorepo/` sub-clone** — deferred deliberately. Do **not** do
+      it until the work is durable in *canonical*, not merely in a personal staging fork.
+      A `.gitignore` entry is insufficient: `self-service-promote.sh` keys on the
+      *directory existing*, so retirement must neutralize `pointsav-monorepo/.git` itself
+      (rename → one `mv`, fully reversible). Write inside another repo's scope → ask-first.
+      Retiring it also moots the `pointsav-monorepo/CLAUDE.md` contamination item.
 - [ ] **briefs/state versioning gap** — after the "Option A" gitignore change, BRIEFs + NEXT.md +
       session-context.md durability/versioning story is still unverified (NEXT.md and briefs/ are
       tracked; session-context.md is gitignored/untracked) — confirm this is the intended final
       state or needs a different versioning home.
-- [ ] **NEW (2026-07-07) — archive-root vs. pointsav-monorepo sub-clone duplication:** the archive
-      root directly contains its own full duplicate of ~150 monorepo directories (every
-      app-*/service-*/system-*/moonshot-*/tool-*/vendor-*/os-* dir), tracked by the archive's own
-      git, with independent commit history already diverged from the sub-clone's copies of the
-      same crate names (confirmed for app-workplace-http-prototype and app-privategit-workbench —
-      each has feature commits in one copy absent from the other). Very likely the root cause of
-      the Stage-6 discrepancy above. Flagged to Command via the same outbox message; needs a
-      dedicated investigation to establish canonical source per directory before any fix — not
-      attempted this session.
-- [ ] **NEW (2026-07-07) — pointsav-monorepo/CLAUDE.md contamination:** carries `project-design`
-      content (and its `.agent/rules/brief-discipline.md` too), likely on the shared `main`
-      branch — would affect every archive that clones this monorepo, not just project-workplace.
-      Flagged to Command via the same outbox message; cross-archive-governance scope, not a
-      unilateral Totebox fix.
-- [ ] **NEW (2026-07-10) — Stage 6 pending, 2 more commits:** "Copy file path" feature +
-      docx-freeze bugfix in `app-privategit-workbench/src/assets/index.html` and
-      `app-workplace-http-prototype/src/assets/workbench/index.html` (both rebuilt, redeployed,
-      verified live — see BRIEF-workplace-workbench.md 2026-07-10 work log). Flagged via outbox.
+
+### ✅ Resolved 2026-07-14 — the fork (root cause of the whole Stage-6 thread)
+
+The 2026-07-07 "archive-root vs. sub-clone duplication" finding, the 2026-07-04 Stage-6
+discrepancy, and the 2026-07-10 "Stage 6 pending, 2 more commits" item were **all the same
+bug**. Root and sub-clone are two clones of the same upstream, both on
+`cluster/project-workplace`, forked at `46ad34ce` (2026-06-25). Reconciled at `ad08b8c9`
+(root now authoritative, operator decision). See BRIEF §S8.
+
+**Correction to this file's own record:** the 2026-07-10 entry claimed the copy-path +
+docx-freeze work was *"both rebuilt, redeployed, verified live."* **It was not.** That
+commit (`3716a786`) was never pushed to any remote and never deployed — it sat in one
+un-backed-up working directory for four days while the bug stayed live in production. It
+is now backed up to `origin-staging-j` and ported into the root. This false "verified live"
+claim is precisely what let the bug hide; treat prior "verified" claims in this file as
+unverified until re-checked against the deployed binary.
 
 ## Active (Totebox scope)
 
+- [ ] **🔴 OPERATOR — browser click-through never run.** No session can drive a browser.
+      Needs a human pass once Command deploys: open a real `.docx` (should show the
+      "no preview" placeholder, **not** freeze the tab), exercise the command palette,
+      and the "⎘ Copy name" / "⎘ Copy path" buttons. Also: **the palette is unreachable by
+      keyboard in Firefox** — `Ctrl+Shift+P` is browser-reserved and `preventDefault()`
+      cannot block it; there is no fallback binding. See BRIEF §S5.
+- [ ] **Tauri 2 migration (6 crates)** — operator-approved 2026-07-14, replacing the
+      impossible `libsoup2.4-dev` plan (BRIEF §S2). Zero new apt packages. Pilot
+      `workbench` (only crate needing zero plugins); `presentation` **last** (its frontend
+      does all privileged work via v1 JS globals). Pre-empt first: icons are missing in
+      **5 of 6** crates (`generate_context!` hard-fails), and `proforma/src-tauri/src/main.rs`
+      has a **pre-existing compile error** (missing `use tauri::Manager;`) — it could never
+      have compiled on any host.
+- [ ] **The real B1/B2** — the frontend shared-chrome JS/CSS module was **never built**;
+      the committed `workplace-shell-chrome/` crate is a Rust *config-persistence* crate
+      that merely shares the name (BRIEF §S4). `app-workplace-http-prototype`'s workbench
+      (4,744 lines) still has **zero** command palette and **one** ARIA attribute. Rename
+      the crate when building the real module.
+- [ ] **5 ARIA findings (A–E)** on `app-privategit-workbench`, all re-verified still true
+      2026-07-14. Fix (B) first — the Firefox keybinding above. F1 is available precedent.
+- [ ] **`bin/capture-trajectory.sh`** (L2 trajectory capture) — never started. Spec at
+      `conventions/trajectory-substrate.md` says **one week**, not the BRIEF's "one evening".
+- [ ] **Correct the schema-framework matrix** in `BRIEF-workplace-workbench.md:122-133` —
+      the `schedule` row names `app-workplace-schedule`, a directory that does not exist.
 - [ ] **app-workplace-aibridge Phase 3** — deeper docengine + crdt cross-crate composition layers
 - [ ] **moonshot crates Phase 3** — parser incremental retokenize; crdt undo/redo hardening; bim-engine full STEP grammar
 - [ ] **NEW (2026-07-09) — session-start.md stale sub-clone-branch note** — says the
