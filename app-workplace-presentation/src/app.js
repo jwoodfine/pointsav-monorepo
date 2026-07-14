@@ -91,6 +91,7 @@ const state = {
   selectedSlideId: null,
   selectedBlockId: null,
   drag: null, // { blockId, startX, startY, origX, origY, pointerStartX, pointerStartY }
+  dirty: false, // unsaved changes since last open/save/new?
 };
 state.selectedSlideId = state.presentation.slides[0].id;
 
@@ -105,6 +106,18 @@ function selectedBlock() {
 }
 
 // ---------------------------------------------------------------------------
+// Dirty-state tracking (unsaved-changes guard)
+// ---------------------------------------------------------------------------
+
+function markDirty() {
+  state.dirty = true;
+}
+
+function markClean() {
+  state.dirty = false;
+}
+
+// ---------------------------------------------------------------------------
 // Slide operations (c)
 // ---------------------------------------------------------------------------
 
@@ -115,6 +128,7 @@ function addSlide() {
   state.presentation.slides.splice(insertAt, 0, slide);
   state.selectedSlideId = slide.id;
   state.selectedBlockId = null;
+  markDirty();
   render();
 }
 
@@ -131,6 +145,7 @@ function deleteSlide(slideId) {
     state.selectedSlideId = next.id;
     state.selectedBlockId = null;
   }
+  markDirty();
   render();
 }
 
@@ -141,6 +156,7 @@ function moveSlide(slideId, direction) {
   if (idx === -1 || target < 0 || target >= slides.length) return;
   const [slide] = slides.splice(idx, 1);
   slides.splice(target, 0, slide);
+  markDirty();
   render();
 }
 
@@ -168,6 +184,7 @@ function addTextBlock() {
   };
   slide.blocks.push(block);
   state.selectedBlockId = block.id;
+  markDirty();
   render();
 }
 
@@ -205,6 +222,7 @@ async function addImageBlock() {
   };
   slide.blocks.push(block);
   state.selectedBlockId = block.id;
+  markDirty();
   render();
 }
 
@@ -215,6 +233,7 @@ function deleteBlock(blockId) {
   if (idx === -1) return;
   slide.blocks.splice(idx, 1);
   if (state.selectedBlockId === blockId) state.selectedBlockId = null;
+  markDirty();
   render();
 }
 
@@ -229,6 +248,7 @@ function updateBlock(blockId, patch) {
   const block = slide.blocks.find((b) => b.id === blockId);
   if (!block) return;
   Object.assign(block, patch);
+  markDirty();
   render();
 }
 
@@ -269,6 +289,7 @@ function onDragEnd() {
   state.drag = null;
   window.removeEventListener("mousemove", onDragMove);
   window.removeEventListener("mouseup", onDragEnd);
+  markDirty();
   render();
 }
 
@@ -288,11 +309,12 @@ function isValidPresentation(obj) {
 }
 
 async function newPresentation() {
-  if (!window.confirm("Start a new presentation? Unsaved changes will be lost.")) return;
+  if (state.dirty && !window.confirm("Start a new presentation? Unsaved changes will be lost.")) return;
   state.presentation = blankPresentation();
   state.filePath = null;
   state.selectedSlideId = state.presentation.slides[0].id;
   state.selectedBlockId = null;
+  markClean();
   render();
 }
 
@@ -332,6 +354,7 @@ async function openPresentation() {
   state.filePath = path;
   state.selectedSlideId = parsed.slides[0].id;
   state.selectedBlockId = null;
+  markClean();
   render();
   showToast(`Opened ${path.split(/[\\/]/).pop()}`);
 }
@@ -371,6 +394,7 @@ async function writePresentationTo(path) {
     return;
   }
   state.filePath = path;
+  markClean();
   render();
   showToast(`Saved ${path.split(/[\\/]/).pop()}`);
 }
@@ -746,7 +770,8 @@ function renderProperties() {
 
 function renderToolbarState() {
   const filenameEl = document.getElementById("filename");
-  filenameEl.textContent = state.filePath ? state.filePath.split(/[\\/]/).pop() : "Untitled presentation";
+  const baseName = state.filePath ? state.filePath.split(/[\\/]/).pop() : "Untitled presentation";
+  filenameEl.textContent = state.dirty ? `${baseName} • Unsaved changes` : baseName;
   document.getElementById("deleteSlideBtn").disabled = state.presentation.slides.length <= 1;
 }
 
@@ -755,6 +780,42 @@ function render() {
   renderCanvasOnly();
   renderProperties();
   renderToolbarState();
+}
+
+// ---------------------------------------------------------------------------
+// Keyboard slide navigation
+// ---------------------------------------------------------------------------
+
+function navigateSlide(direction) {
+  const slides = state.presentation.slides;
+  const idx = slides.findIndex((s) => s.id === state.selectedSlideId);
+  const target = idx + direction;
+  if (idx === -1 || target < 0 || target >= slides.length) return;
+  selectSlide(slides[target].id);
+}
+
+/** True if the event target is a form control already consuming arrow/Escape
+ * keys for its own editing (text field, number field, properties textarea). */
+function isEditableTarget(el) {
+  if (!el) return false;
+  const tag = el.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || !!el.isContentEditable;
+}
+
+function handleKeydown(e) {
+  if (isEditableTarget(e.target)) return;
+
+  if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+    e.preventDefault();
+    navigateSlide(1);
+  } else if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+    e.preventDefault();
+    navigateSlide(-1);
+  } else if (e.key === "Escape" && state.selectedBlockId !== null) {
+    e.preventDefault();
+    state.selectedBlockId = null;
+    render();
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -774,6 +835,14 @@ function init() {
   document.getElementById("slideCanvas").addEventListener("click", () => {
     state.selectedBlockId = null;
     render();
+  });
+
+  document.addEventListener("keydown", handleKeydown);
+  window.addEventListener("beforeunload", (e) => {
+    if (state.dirty) {
+      e.preventDefault();
+      e.returnValue = "";
+    }
   });
 
   if (!tauri()) {
