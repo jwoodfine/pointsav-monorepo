@@ -924,6 +924,40 @@ pub fn notice_banner(
     html! {}
 }
 
+/// `/research/{slug}` landing page (SPEC §0 render model): masthead +
+/// abstract + a link to the full-text rendition — **not** the full body
+/// (that's `research_fulltext`). `notice_banner()` composes in once its data
+/// source exists (Phase 3); until then it renders nothing, same as here.
+pub fn research_landing(title: &str, authors: &[Author], abstract_html: &str, slug: &str) -> Markup {
+    html! {
+        article."k-research k-research--landing" {
+            (masthead(title, authors))
+            @if !abstract_html.is_empty() {
+                section."k-research__abstract" {
+                    h2 { "Abstract" }
+                    div."k-prose" { (PreEscaped(abstract_html)) }
+                }
+            }
+            p."k-research__fulltext-link" {
+                a."k-button" href={ "/research/" (slug) "/full" } { "Read the full text \u{2192}" }
+            }
+        }
+    }
+}
+
+/// `/research/{slug}/full` — the full-text rendition (SPEC §0): the ~22-
+/// section body plus the generated References section (already appended to
+/// `body_html` by `content::render_journal_doc`), reachable in one click
+/// from the landing page.
+pub fn research_fulltext(title: &str, authors: &[Author], body_html: &str) -> Markup {
+    html! {
+        article."k-research k-research--fulltext" {
+            (masthead(title, authors))
+            div."k-prose" { (PreEscaped(body_html)) }
+        }
+    }
+}
+
 /// Shift every `<h1...>`/`</h1>` in comrak-rendered HTML down to `<h2>` — used
 /// for embedded content (the Important Information band) that must never
 /// introduce a second `<h1>` alongside the page's own article title. Comrak's
