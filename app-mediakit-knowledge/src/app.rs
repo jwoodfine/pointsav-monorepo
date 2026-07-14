@@ -155,6 +155,9 @@ pub fn router(state: AppState) -> Router {
         .route("/wiki/{*slug}", get(wiki_raw))
         .route("/es/wiki/{*slug}", get(wiki_es))
         .route("/category/{name}", get(category_page))
+        .route("/research", get(research_index))
+        .route("/research/{slug}", get(research_landing))
+        .route("/research/{slug}/full", get(research_fulltext))
         .route("/search", get(search_page))
         .route("/history/{*slug}", get(history_page))
         .route("/special/all-pages", get(special_all_pages))
@@ -421,6 +424,152 @@ async fn category_page(State(state): State<AppState>, Path(name): Path<String>) 
     let head = ui::doc_head(&label, &description, tenant, &path, false);
     let head = html! { (head) (ui::breadcrumb_jsonld(&jsonld_trail)) };
     Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref(), &state.legal).into_string()).into_response()
+}
+
+/// `/research` — index of every JOURNAL paper (SPEC-journal-wiki-render-
+/// contract.md §0's landing namespace; reuses the `/category/{name}` index UI
+/// since a JOURNAL paper is just a doc with `category: research` — SPEC §2.2).
+async fn research_index(State(state): State<AppState>) -> Response {
+    let tenant = state.tenant;
+    let docs: Vec<(String, String, String)> = state
+        .index
+        .in_category("research")
+        .into_iter()
+        .map(|d| {
+            (
+                d.slug.clone(),
+                d.title.clone(),
+                d.short_description.clone().unwrap_or_default(),
+            )
+        })
+        .collect();
+    let label = "Research".to_string();
+    let description = "Research papers published by this registry.".to_string();
+    let trail = vec![("/".to_string(), tenant.home_label().to_string())];
+    let body = html! { (ui::breadcrumb(&trail, &label)) (ui::category_index(&label, &docs)) };
+    let path = "/research";
+    let home = tenant.home_url();
+    let home = home.trim_end_matches('/');
+    let jsonld_trail = [
+        (format!("{home}/"), tenant.home_label().to_string()),
+        (format!("{home}{path}"), label.clone()),
+    ];
+    let head = ui::doc_head(&label, &description, tenant, path, false);
+    let head = html! { (head) (ui::breadcrumb_jsonld(&jsonld_trail)) };
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            "",
+            state.important_info.as_deref(),
+            &state.legal,
+        )
+        .into_string(),
+    )
+    .into_response()
+}
+
+/// Resolve a `/research/{slug}` request to its `DocRef` — 404s if absent OR
+/// if the slug resolves to a doc that isn't actually `category: research`
+/// (reachable through the ordinary `/wiki/{slug}` route instead; serving it
+/// here too would be a confusing duplicate URL for the same content).
+fn resolve_research_doc<'a>(state: &'a AppState, slug: &str) -> Option<&'a content::DocRef> {
+    state
+        .index
+        .resolve(slug, Lang::En)
+        .filter(|d| d.category.as_deref() == Some("research"))
+}
+
+/// `/research/{slug}` — JOURNAL landing page (SPEC §0): masthead + abstract +
+/// a link to the full-text rendition. The abstract is plain frontmatter text
+/// (SPEC §2.3) — citations are not resolved here, only in the full-text body.
+async fn research_landing(State(state): State<AppState>, Path(slug): Path<String>) -> Response {
+    let tenant = state.tenant;
+    let Some(doc) = resolve_research_doc(&state, &slug) else {
+        return not_found(
+            &state,
+            &format!("No such research paper: \u{201c}{slug}\u{201d}."),
+        );
+    };
+    let Ok(parsed) = content::load(doc) else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "read error").into_response();
+    };
+    let title = parsed
+        .frontmatter
+        .title
+        .clone()
+        .unwrap_or_else(|| doc.title.clone());
+    let abstract_html = parsed
+        .frontmatter
+        .abstract_text
+        .as_deref()
+        .map(|a| content::render(a).html)
+        .unwrap_or_default();
+    let description = parsed.frontmatter.short_description.clone().unwrap_or_default();
+    let body = ui::research_landing(&title, &parsed.frontmatter.authors, &abstract_html, &doc.slug);
+    let path = format!("/research/{}", doc.slug);
+    let head = ui::doc_head(&title, &description, tenant, &path, false);
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            "",
+            state.important_info.as_deref(),
+            &state.legal,
+        )
+        .into_string(),
+    )
+    .into_response()
+}
+
+/// `/research/{slug}/full` — the full-text rendition (SPEC §0): the ~22-
+/// section body, citations resolved against the citation registry (Phase 2)
+/// with a generated References section, TOC built from h2/h3 the same as any
+/// ordinary article.
+async fn research_fulltext(State(state): State<AppState>, Path(slug): Path<String>) -> Response {
+    let tenant = state.tenant;
+    let Some(doc) = resolve_research_doc(&state, &slug) else {
+        return not_found(
+            &state,
+            &format!("No such research paper: \u{201c}{slug}\u{201d}."),
+        );
+    };
+    let Ok(parsed) = content::load(doc) else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "read error").into_response();
+    };
+    let title = parsed
+        .frontmatter
+        .title
+        .clone()
+        .unwrap_or_else(|| doc.title.clone());
+    let description = parsed.frontmatter.short_description.clone().unwrap_or_default();
+    let rendered = content::render_journal_doc(&parsed, &state.citations);
+    let body = ui::research_fulltext(&title, &parsed.frontmatter.authors, &rendered.html);
+    let path = format!("/research/{}/full", doc.slug);
+    let head = ui::doc_head(&title, &description, tenant, &path, false);
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &rendered.headings,
+            "",
+            state.important_info.as_deref(),
+            &state.legal,
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 #[derive(serde::Deserialize)]
