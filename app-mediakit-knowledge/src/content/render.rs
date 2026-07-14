@@ -7,6 +7,7 @@
 //! and `[[slug|label]]` wikilinks resolve to internal `/wiki/{slug}` anchors.
 //! Section headings (h2/h3) are extracted for the table of contents.
 
+use std::collections::HashMap;
 use std::sync::OnceLock;
 
 use comrak::options::Plugins;
@@ -14,6 +15,8 @@ use comrak::plugins::syntect::{SyntectAdapter, SyntectAdapterBuilder};
 use comrak::{markdown_to_html_with_plugins, Options};
 use syntect::highlighting::ThemeSet;
 use syntect::html::{css_for_theme_with_class_style, ClassStyle};
+
+use crate::citations::CitationRegistry;
 
 /// Syntax highlighter, built once. Class-based output (no inline colours) so the
 /// palette can switch with the page theme via `syntax_css()`.
@@ -148,6 +151,161 @@ pub fn render_doc(doc: &super::frontmatter::ParsedDoc) -> Rendered {
         body.push('\n');
     }
     render(&body)
+}
+
+/// Render a JOURNAL document (SPEC-journal-wiki-render-contract.md §1):
+/// resolve bracket-ID citations against `registry`, then append a generated
+/// `## References` section in first-appearance order — the author never
+/// writes one (§1.2 item 3). Citations resolve before comrak sees the body,
+/// same as `resolve_wikilinks` in `render()`. Unresolved citation ids are
+/// still numbered and linked (a publish-gate finding, not a render failure —
+/// see `CitationRegistry::check_citation_gate`) so a broken paper still
+/// renders with the problem visible, not a blank page.
+pub fn render_journal_doc(
+    doc: &super::frontmatter::ParsedDoc,
+    registry: &CitationRegistry,
+) -> Rendered {
+    let (resolved_body, order, unresolved) = resolve_citations(&doc.body_md, registry);
+    for id in &unresolved {
+        tracing::warn!(
+            "JOURNAL citation [{id}] does not resolve in citations.yaml — publish-gate finding, SPEC §7"
+        );
+    }
+    let mut body = resolved_body;
+    if !order.is_empty() {
+        body.push_str("\n\n## References\n\n");
+        for (i, id) in order.iter().enumerate() {
+            let n = i + 1;
+            let line = match registry.get(id) {
+                Some(entry) => entry.bibliography_line(),
+                None => format!("*Unresolved citation: `{id}`.*"),
+            };
+            body.push_str(&format!("{n}. <a id=\"ref-{n}\"></a>{line}\n"));
+        }
+    }
+    render(&body)
+}
+
+/// Replace bracket-ID citation tokens per SPEC-journal-wiki-render-contract.md
+/// §1.1: `[id]` (single), `[id1][id2]` (adjacent — each independently
+/// numbered; falls out of processing brackets one at a time, no special
+/// casing needed), and `[id locator]` (pinpoint — the locator stays visible
+/// after the linked number, not itself linked). Code-fence- and inline-code-
+/// span-aware: a bracket inside ``` fences or a `code span` is left
+/// untouched (`[u8; 32]` in a code sample is not a citation), matching the
+/// bracket-hygiene rule in SPEC §1.2 item 8. Numbering is by first
+/// appearance (IEEE-style), stable across renditions. Returns
+/// (rewritten_body, first-appearance id order, ids that look like a citation
+/// but don't resolve in `registry`).
+fn resolve_citations(md: &str, registry: &CitationRegistry) -> (String, Vec<String>, Vec<String>) {
+    let mut order: Vec<String> = Vec::new();
+    let mut numbers: HashMap<String, usize> = HashMap::new();
+    let mut unresolved: Vec<String> = Vec::new();
+    let mut out = String::with_capacity(md.len());
+    let mut in_fence = false;
+    for line in md.split_inclusive('\n') {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("```") || trimmed.starts_with("~~~") {
+            in_fence = !in_fence;
+            out.push_str(line);
+            continue;
+        }
+        if in_fence {
+            out.push_str(line);
+            continue;
+        }
+        resolve_citations_in_line(line, registry, &mut order, &mut numbers, &mut unresolved, &mut out);
+    }
+    (out, order, unresolved)
+}
+
+/// Single-line pass for `resolve_citations` — tracks inline code spans
+/// (`` ` ``) so a citation-shaped bracket inside one is left untouched, same
+/// rationale as the fence check one level up.
+#[allow(clippy::too_many_arguments)]
+fn resolve_citations_in_line(
+    line: &str,
+    registry: &CitationRegistry,
+    order: &mut Vec<String>,
+    numbers: &mut HashMap<String, usize>,
+    unresolved: &mut Vec<String>,
+    out: &mut String,
+) {
+    let bytes = line.as_bytes();
+    let mut i = 0;
+    let mut in_code_span = false;
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b == b'`' {
+            in_code_span = !in_code_span;
+            out.push('`');
+            i += 1;
+            continue;
+        }
+        if !in_code_span && b == b'[' {
+            let escaped = i > 0 && bytes[i - 1] == b'\\';
+            // A `[[...` (wikilink) or `[^...` (footnote marker) is never a
+            // citation bracket — leave both for their own resolvers.
+            let other_bracket_form =
+                i + 1 < bytes.len() && matches!(bytes[i + 1], b'[' | b'^');
+            if !escaped && !other_bracket_form {
+                if let Some(close_rel) = line[i + 1..].find(']') {
+                    let close_abs = i + 1 + close_rel;
+                    let inner = &line[i + 1..close_abs];
+                    let (token, locator) = match inner.split_once(char::is_whitespace) {
+                        Some((t, l)) => (t, Some(l.trim())),
+                        None => (inner, None),
+                    };
+                    // A real markdown link whose text happens to look like an
+                    // id (e.g. someone hand-linking `[rfc-9162](url)`) must
+                    // still be left alone. NOT checked against a following
+                    // `[` — that's the adjacent-citation form `[id1][id2]`
+                    // (SPEC §1.1), which must resolve both brackets.
+                    let followed_by_link_syntax = line[close_abs + 1..].starts_with('(');
+                    if !followed_by_link_syntax && is_citation_id_shape(token) {
+                        let n = *numbers.entry(token.to_string()).or_insert_with(|| {
+                            order.push(token.to_string());
+                            order.len()
+                        });
+                        if registry.get(token).is_none() && !unresolved.iter().any(|u| u == token) {
+                            unresolved.push(token.to_string());
+                        }
+                        out.push_str(&citation_link_markdown(n, locator));
+                        i = close_abs + 1;
+                        continue;
+                    }
+                }
+            }
+        }
+        let ch_len = utf8_len(bytes[i]);
+        out.push_str(&line[i..i + ch_len]);
+        i += ch_len;
+    }
+}
+
+/// `citation-id` per SPEC §1.1: `^[a-z0-9][a-z0-9-]*$`. Anything else (an
+/// ordinary bracketed word, a footnote-style label, etc.) is left as plain
+/// text — this is the guard that keeps the resolver from touching prose
+/// brackets that were never meant to be citations.
+fn is_citation_id_shape(s: &str) -> bool {
+    let mut chars = s.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_lowercase() || c.is_ascii_digit() => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+}
+
+/// Markdown for one resolved citation occurrence: a linked, numbered
+/// `[n]` — literal brackets are backslash-escaped so they survive as literal
+/// characters around the link rather than being parsed as another link's
+/// delimiters. A pinpoint locator (SPEC §1.1) stays visible, plain text,
+/// inside the brackets but outside the link.
+fn citation_link_markdown(number: usize, locator: Option<&str>) -> String {
+    match locator {
+        Some(loc) if !loc.is_empty() => format!("\\[[{number}](#ref-{number}), {loc}\\]"),
+        _ => format!("\\[[{number}](#ref-{number})\\]"),
+    }
 }
 
 /// Replace `[[slug]]` / `[[slug|label]]` with Markdown links to `/wiki/slug`.
@@ -424,5 +582,136 @@ mod tests {
     fn anchor_wikilink_stays_same_page() {
         let r = render("Jump to [[#Cold start|cold start]].\n");
         assert!(r.html.contains(r##"href="#cold-start""##));
+    }
+
+    /// Build a `CitationRegistry` from inline YAML for a test — matches the
+    /// tempfile-load pattern `citations.rs`'s own tests use, since
+    /// `CitationRegistry` has no in-memory constructor.
+    fn test_registry(yaml: &str) -> CitationRegistry {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("citations.yaml");
+        std::fs::write(&path, yaml).unwrap();
+        CitationRegistry::load(&path)
+    }
+
+    #[test]
+    fn resolves_single_citation_with_linked_number() {
+        let registry = test_registry(
+            "citations:\n  rfc-9162:\n    type: technical-specification\n    title: RFC 9162\n    url: https://x\n",
+        );
+        let (body, order, unresolved) = resolve_citations("Certificate Transparency [rfc-9162] is a log.\n", &registry);
+        assert_eq!(order, vec!["rfc-9162".to_string()]);
+        assert!(unresolved.is_empty());
+        assert!(body.contains(r"\[[1](#ref-1)\]"));
+    }
+
+    #[test]
+    fn adjacent_multiple_citations_each_get_own_number() {
+        let registry = test_registry(
+            "citations:\n  a:\n    type: vendor-doc\n    title: A\n    url: https://x/a\n  b:\n    type: vendor-doc\n    title: B\n    url: https://x/b\n",
+        );
+        let (body, order, _) = resolve_citations("Supported by the literature [a][b].\n", &registry);
+        assert_eq!(order, vec!["a".to_string(), "b".to_string()]);
+        assert!(body.contains(r"\[[1](#ref-1)\]\[[2](#ref-2)\]"));
+    }
+
+    #[test]
+    fn pinpoint_locator_stays_visible_outside_the_link() {
+        let registry = test_registry(
+            "citations:\n  ni-51-102:\n    type: regulatory-instrument\n    title: NI 51-102\n    url: https://x\n",
+        );
+        let (body, order, _) = resolve_citations("Per [ni-51-102 \u{a7}4A.2].\n", &registry);
+        assert_eq!(order, vec!["ni-51-102".to_string()]);
+        assert!(body.contains("[1](#ref-1), \u{a7}4A.2"));
+    }
+
+    #[test]
+    fn same_id_cited_twice_reuses_its_first_appearance_number() {
+        let registry = test_registry(
+            "citations:\n  a:\n    type: vendor-doc\n    title: A\n    url: https://x/a\n  b:\n    type: vendor-doc\n    title: B\n    url: https://x/b\n",
+        );
+        let (body, order, _) = resolve_citations("First [b], then [a], then [b] again.\n", &registry);
+        assert_eq!(order, vec!["b".to_string(), "a".to_string()]);
+        assert!(body.contains(r"\[[1](#ref-1)\]"), "first [b] is ref 1");
+        assert!(body.contains(r"\[[2](#ref-2)\]"), "[a] is ref 2");
+        assert_eq!(
+            body.matches(r"\[[1](#ref-1)\]").count(),
+            2,
+            "second [b] must reuse number 1, not mint a new one"
+        );
+    }
+
+    #[test]
+    fn citation_inside_code_fence_is_left_untouched() {
+        let registry = test_registry("citations: {}\n");
+        let (body, order, _) = resolve_citations("```\nlet x: [u8; 32] = [rfc-9162];\n```\n", &registry);
+        assert!(order.is_empty());
+        assert!(body.contains("[rfc-9162]"), "literal bracket text must survive: {body}");
+        assert!(!body.contains("#ref-1"));
+    }
+
+    #[test]
+    fn citation_inside_inline_code_span_is_left_untouched() {
+        let registry = test_registry("citations: {}\n");
+        let (body, order, _) = resolve_citations("The type is `[u8; 32]`, not a citation.\n", &registry);
+        assert!(order.is_empty());
+        assert!(body.contains("`[u8; 32]`"));
+    }
+
+    #[test]
+    fn ordinary_bracket_text_that_is_not_id_shaped_is_untouched() {
+        let registry = test_registry("citations: {}\n");
+        let (body, order, _) = resolve_citations("See [Note] below, and [Some Text] here.\n", &registry);
+        assert!(order.is_empty());
+        assert!(body.contains("[Note]"));
+        assert!(body.contains("[Some Text]"));
+    }
+
+    #[test]
+    fn real_markdown_link_with_id_shaped_text_is_untouched() {
+        let registry = test_registry(
+            "citations:\n  rfc-9162:\n    type: technical-specification\n    title: RFC 9162\n    url: https://x\n",
+        );
+        let (body, order, _) = resolve_citations("See [rfc-9162](https://example.com) directly.\n", &registry);
+        assert!(order.is_empty(), "a real markdown link must not be treated as a citation");
+        assert!(body.contains("[rfc-9162](https://example.com)"));
+    }
+
+    #[test]
+    fn unresolved_citation_is_still_numbered_and_flagged() {
+        let registry = test_registry("citations: {}\n");
+        let (body, order, unresolved) = resolve_citations("Per [nonexistent-id].\n", &registry);
+        assert_eq!(order, vec!["nonexistent-id".to_string()]);
+        assert_eq!(unresolved, vec!["nonexistent-id".to_string()]);
+        assert!(body.contains(r"\[[1](#ref-1)\]"));
+    }
+
+    #[test]
+    fn render_journal_doc_appends_generated_references_section() {
+        use super::super::frontmatter::{Frontmatter, ParsedDoc};
+        let registry = test_registry(
+            "citations:\n  rfc-9162:\n    type: technical-specification\n    title: RFC 9162\n    url: https://x\n    authors: [\"IETF\"]\n    year: 2021\n",
+        );
+        let doc = ParsedDoc {
+            frontmatter: Frontmatter::default(),
+            body_md: "## 1. Introduction\n\nSee [rfc-9162] for details.\n".to_string(),
+        };
+        let r = render_journal_doc(&doc, &registry);
+        assert!(r.html.contains("References"));
+        assert!(r.html.contains(r#"id="ref-1""#));
+        assert!(r.html.contains("IETF"));
+        assert!(r.html.contains("RFC 9162"));
+    }
+
+    #[test]
+    fn render_journal_doc_omits_references_section_when_no_citations() {
+        use super::super::frontmatter::{Frontmatter, ParsedDoc};
+        let registry = test_registry("citations: {}\n");
+        let doc = ParsedDoc {
+            frontmatter: Frontmatter::default(),
+            body_md: "## 1. Introduction\n\nNo citations here.\n".to_string(),
+        };
+        let r = render_journal_doc(&doc, &registry);
+        assert!(!r.html.contains("References"));
     }
 }
