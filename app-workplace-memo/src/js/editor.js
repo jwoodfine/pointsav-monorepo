@@ -266,12 +266,16 @@ function handleAction(action) {
     case 'save-as':       saveDocumentAs(); break;
     case 'export-html':   window.WorkplaceExport?.exportHTML(); break;
     case 'print':         window.WorkplaceExport?.print(); break;
-    case 'insert-hr':     document.execCommand('insertHorizontalRule'); break;
+    case 'insert-hr':
+      document.execCommand('insertHorizontalRule');
+      markDirty();
+      break;
     case 'insert-pagebreak':
       // Insert a Paged.js-compatible page break
       document.execCommand('insertHTML',
         false,
         '<div style="break-before:page;page-break-before:always;" contenteditable="false">&nbsp;</div>');
+      markDirty();
       break;
     case 'page-size-a4':     setPageSize('A4'); break;
     case 'page-size-letter': setPageSize('Letter'); break;
@@ -295,6 +299,9 @@ function setPageSize(size) {
     canvas.style.minHeight = '1056px';
   }
   if (window.WorkplacePagination) WorkplacePagination.refresh();
+  // Page size is embedded in the exported document's @page CSS (see export.js
+  // buildPageCSS) — an un-saved change here must not be silently discardable.
+  markDirty();
 }
 
 function setMargins(mm) {
@@ -302,6 +309,9 @@ function setMargins(mm) {
   const px = Math.round(mm * 3.7795); // 1mm ≈ 3.7795px at 96dpi
   canvas.style.padding = `${px}px`;
   if (window.WorkplacePagination) WorkplacePagination.refresh();
+  // Margins are embedded in the exported document's @page CSS (see export.js
+  // buildPageCSS) — an un-saved change here must not be silently discardable.
+  markDirty();
 }
 
 /* ─── Fonts panel ────────────────────────────────────────────────────────── */

@@ -82,6 +82,10 @@ document.getElementById('template-select').addEventListener('change', function (
       this.options[this.selectedIndex].text
     );
     window.WorkplaceEditor?.State && (window.WorkplaceEditor.State.templateKey = this.value);
+    // The template key is embedded in the exported document (see export.js
+    // assembleHTML) — switching templates is a real document change and must
+    // not be silently discardable via an un-set dirty flag.
+    window.WorkplaceEditor?.markDirty();
   }
 });
 
