@@ -6,6 +6,10 @@
 
 fn main() {
     tauri::Builder::default()
+        // v2: the frontend calls these plugins' JS APIs directly (t.dialog.*, t.fs.*),
+        // so both must be registered here and permitted in capabilities/default.json.
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .run(tauri::generate_context!())
         .expect("error while running workplace-presentation");
 }

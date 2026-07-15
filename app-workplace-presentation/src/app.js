@@ -207,7 +207,7 @@ async function addImageBlock() {
 
   let bytes;
   try {
-    bytes = await t.fs.readBinaryFile(path);
+    bytes = await t.fs.readFile(path); // v2: fs.readBinaryFile was renamed to fs.readFile (returns Uint8Array)
   } catch (e) {
     showToast(`Could not read image: ${e}`);
     return;
