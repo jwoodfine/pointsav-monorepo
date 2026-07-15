@@ -1,2 +1,9 @@
 # Multi-agent session locks (ephemeral — not committed)
 .agent/engines/*/session.lock
+
+# Nested .agent state store — policy violation per conventions/mailbox-scope-discipline.md.
+# This sub-clone must not carry its own .agent/ at all; the archive-level .agent/ at
+# /srv/foundry/clones/project-orchestration/.agent/ is the only correct state store. Removed
+# 2026-07-14 (Phase 5a nested-.agent reconciliation, self-consistent identity, no unique
+# content, confirmed before untracking).
+.agent/
