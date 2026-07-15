@@ -495,6 +495,289 @@ fn ceil_char_boundary(s: &str, mut i: usize) -> usize {
     i
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Ranked search engine — trigram correctness floor UNIFIED with BM25 ranking
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Hybrid search per the research: the [`TrigramIndex`] substring floor (recall
+/// guarantee) unified with a BM25 token ranker (relevance). Multi-word queries are
+/// ranked by BM25; every substring/trigram hit for the whole query is ALSO returned
+/// and never dropped for the sake of ranking. Filename-term matches are boosted.
+/// Pure `std`, zero dependencies — the vendored Tantivy layer is a later phase.
+pub struct SearchEngine {
+    trigram: TrigramIndex,
+    docs: Vec<EngineDoc>,
+    id_to_idx: HashMap<String, u32>,
+    postings: HashMap<String, Vec<(u32, u32)>>, // term -> [(doc_idx, term_freq)]
+    df: HashMap<String, u32>,                    // document frequency per term
+    total_len: u64,
+    k1: f64,
+    b: f64,
+    name_boost: f64,
+}
+
+struct EngineDoc {
+    id: String,
+    name: String,
+    len: u32, // token count (name + content), for BM25 length normalisation
+    name_terms: HashSet<String>,
+}
+
+impl SearchEngine {
+    pub fn new() -> Self {
+        SearchEngine {
+            trigram: TrigramIndex::new(),
+            docs: Vec::new(),
+            id_to_idx: HashMap::new(),
+            postings: HashMap::new(),
+            df: HashMap::new(),
+            total_len: 0,
+            k1: 1.2,
+            b: 0.75,
+            name_boost: 1.0,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.docs.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.docs.is_empty()
+    }
+
+    /// Index one document into both the substring floor and the BM25 ranker.
+    pub fn add_document(&mut self, id: impl Into<String>, name: impl Into<String>, content: &str) {
+        let id = id.into();
+        let name = name.into();
+        let idx = self.docs.len() as u32;
+
+        // Substring floor (owns its own guarantee).
+        self.trigram.add_document(id.clone(), name.clone(), content);
+
+        // BM25 token stats.
+        let name_tokens = tokenize(&name);
+        let content_tokens = tokenize(content);
+        let name_terms: HashSet<String> = name_tokens.iter().cloned().collect();
+        let mut tf: HashMap<String, u32> = HashMap::new();
+        for t in name_tokens.iter().chain(content_tokens.iter()) {
+            *tf.entry(t.clone()).or_default() += 1;
+        }
+        let len = (name_tokens.len() + content_tokens.len()) as u32;
+        for (term, f) in tf {
+            self.postings.entry(term.clone()).or_default().push((idx, f));
+            *self.df.entry(term).or_default() += 1;
+        }
+        self.total_len += len as u64;
+        self.id_to_idx.insert(id.clone(), idx);
+        self.docs.push(EngineDoc {
+            id,
+            name,
+            len,
+            name_terms,
+        });
+    }
+
+    /// Recursively index a directory (delegates to the trigram floor for reading, then
+    /// mirrors each file into the BM25 ranker). See [`TrigramIndex::index_dir`].
+    pub fn index_dir(&mut self, root: impl AsRef<std::path::Path>) -> std::io::Result<IndexStats> {
+        // Re-walk here so both indexes see identical docs with identical ids.
+        let root = root.as_ref();
+        let mut stats = IndexStats::default();
+        let mut stack = vec![root.to_path_buf()];
+        while let Some(dir) = stack.pop() {
+            let entries = match std::fs::read_dir(&dir) {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                let ft = match entry.file_type() {
+                    Ok(ft) => ft,
+                    Err(_) => continue,
+                };
+                if ft.is_symlink() {
+                    continue;
+                }
+                if ft.is_dir() {
+                    if path.file_name().and_then(|n| n.to_str()) == Some(".git") {
+                        continue;
+                    }
+                    stack.push(path);
+                } else if ft.is_file() {
+                    let rel = path
+                        .strip_prefix(root)
+                        .unwrap_or(&path)
+                        .to_string_lossy()
+                        .into_owned();
+                    let over_cap = entry.metadata().map(|m| m.len() > 5 * 1024 * 1024).unwrap_or(true);
+                    let (content, skipped) = if over_cap {
+                        (String::new(), true)
+                    } else {
+                        match std::fs::read(&path) {
+                            Ok(bytes) => (String::from_utf8_lossy(&bytes).into_owned(), false),
+                            Err(_) => (String::new(), true),
+                        }
+                    };
+                    self.add_document(rel.clone(), rel, &content);
+                    stats.files += 1;
+                    if skipped {
+                        stats.content_skipped += 1;
+                    }
+                }
+            }
+        }
+        Ok(stats)
+    }
+
+    /// Ranked search. Multi-word queries rank by BM25 + filename boost; every substring
+    /// hit for the whole query is included regardless of BM25 (the no-silent-miss
+    /// guarantee survives ranking).
+    pub fn query(&self, q: &str) -> Vec<SearchHit> {
+        if q.trim().is_empty() {
+            return Vec::new();
+        }
+        let n = self.docs.len().max(1) as f64;
+        let avgdl = (self.total_len as f64 / n).max(1.0);
+
+        // BM25 accumulation over query terms.
+        let mut scores: HashMap<u32, f64> = HashMap::new();
+        for term in tokenize(q) {
+            let Some(plist) = self.postings.get(&term) else {
+                continue;
+            };
+            let df = *self.df.get(&term).unwrap_or(&1) as f64;
+            let idf = (((n - df + 0.5) / (df + 0.5)) + 1.0).ln();
+            for (doc, tf) in plist {
+                let tf = *tf as f64;
+                let dl = self.docs[*doc as usize].len as f64;
+                let denom = tf + self.k1 * (1.0 - self.b + self.b * dl / avgdl);
+                let mut s = idf * (tf * (self.k1 + 1.0)) / denom;
+                if self.docs[*doc as usize].name_terms.contains(&term) {
+                    s += self.name_boost * idf; // filename hits matter more
+                }
+                *scores.entry(*doc).or_default() += s;
+            }
+        }
+
+        // Substring floor for the whole query — these MUST all appear.
+        let sub_hits = self.trigram.search(q);
+        let mut sub_by_idx: HashMap<u32, SearchHit> = HashMap::new();
+        for h in sub_hits {
+            if let Some(&idx) = self.id_to_idx.get(&h.id) {
+                sub_by_idx.insert(idx, h);
+            }
+        }
+
+        // Merge: union of BM25-scored and substring-hit docs.
+        let mut idxs: HashSet<u32> = scores.keys().copied().collect();
+        idxs.extend(sub_by_idx.keys().copied());
+
+        // A small floor so a substring-only hit (BM25 = 0, e.g. a mid-word match) still
+        // outranks nothing and is never dropped.
+        const SUBSTRING_FLOOR: f64 = 0.01;
+
+        let mut ranked: Vec<(f64, SearchHit)> = Vec::with_capacity(idxs.len());
+        for idx in idxs {
+            let bm25 = scores.get(&idx).copied().unwrap_or(0.0);
+            let (hit, score) = if let Some(sh) = sub_by_idx.get(&idx) {
+                // Real substring hit — keep its precise kind/snippet.
+                let score = bm25 + SUBSTRING_FLOOR + kind_score_bonus(sh.kind);
+                (sh.clone(), score)
+            } else {
+                // BM25 token match only (terms present but not as one contiguous substring).
+                let doc = &self.docs[idx as usize];
+                let kind = if tokenize(q).iter().any(|t| doc.name_terms.contains(t)) {
+                    MatchKind::Filename
+                } else {
+                    MatchKind::Content
+                };
+                let hit = SearchHit {
+                    id: doc.id.clone(),
+                    name: doc.name.clone(),
+                    kind,
+                    snippet: String::new(),
+                    occurrences: 0,
+                };
+                (hit, bm25 + kind_score_bonus(kind))
+            };
+            ranked.push((score, hit));
+        }
+
+        ranked.sort_by(|a, b| {
+            b.0.partial_cmp(&a.0)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then(a.1.name.cmp(&b.1.name))
+        });
+        ranked.into_iter().map(|(_, h)| h).collect()
+    }
+}
+
+impl Default for SearchEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// A small ranking nudge so filename/both matches edge out content-only at equal relevance.
+fn kind_score_bonus(k: MatchKind) -> f64 {
+    match k {
+        MatchKind::Both => 0.5,
+        MatchKind::Filename => 0.4,
+        MatchKind::Content => 0.0,
+    }
+}
+
+#[cfg(test)]
+mod engine_tests {
+    use super::*;
+
+    fn ids(hits: &[SearchHit]) -> Vec<&str> {
+        hits.iter().map(|h| h.id.as_str()).collect()
+    }
+
+    #[test]
+    fn multi_term_ranks_more_relevant_higher() {
+        let mut e = SearchEngine::new();
+        e.add_document("a", "a.md", "revenue revenue revenue quarterly revenue");
+        e.add_document("b", "b.md", "revenue mentioned once, mostly about weather");
+        e.add_document("c", "c.md", "nothing relevant here at all");
+        let hits = e.query("quarterly revenue");
+        // 'a' (both terms, high tf) must outrank 'b' (one term, low tf); 'c' absent.
+        assert_eq!(hits[0].id, "a");
+        assert!(ids(&hits).contains(&"b"));
+        assert!(!ids(&hits).contains(&"c"));
+    }
+
+    #[test]
+    fn substring_only_hit_survives_ranking() {
+        // 'arfoob' is a mid-word substring BM25's tokenizer can't see — the trigram floor
+        // must still surface it through the engine (the guarantee survives ranking).
+        let mut e = SearchEngine::new();
+        e.add_document("x", "x.md", "barfoobaz");
+        e.add_document("y", "y.md", "unrelated content about revenue");
+        let hits = e.query("arfoob");
+        assert!(ids(&hits).contains(&"x"), "mid-word substring must survive the ranker");
+    }
+
+    #[test]
+    fn filename_term_is_boosted_over_content_only() {
+        let mut e = SearchEngine::new();
+        e.add_document("in-name", "invoice.md", "some body text");
+        e.add_document("in-body", "notes.md", "this mentions invoice in the body once");
+        let hits = e.query("invoice");
+        assert_eq!(hits[0].id, "in-name", "filename match should rank first");
+    }
+
+    #[test]
+    fn empty_query_returns_nothing() {
+        let mut e = SearchEngine::new();
+        e.add_document("a", "a.md", "hello");
+        assert!(e.query("").is_empty());
+        assert!(e.query("   ").is_empty());
+    }
+}
+
 #[cfg(test)]
 mod trigram_tests {
     use super::*;
