@@ -13,7 +13,7 @@ operator: woodfine (Mathew)
 working_pattern: production-first-mvp
 input_shape: totebox-orchestration-transition-phases-1-3
 
-slm_endpoint: http://localhost:8011
+slm_endpoint: http://localhost:9080
 module_id: orchestration
 
 software_footprint:
@@ -21,7 +21,7 @@ software_footprint:
   monorepo: pointsav-monorepo
   branch: cluster/project-orchestration
   owns:
-    - app-orchestration-command/  # user-facing aggregator (scaffolding pending Task session)
+    - app-orchestration-command/  # v0.0.1 shipped 2026-06-29; confirmed in canonical origin/main (29d0b4a1); v0.0.2 (pairing.rs WORM ledger) pending Stage 6 canonical merge
 
 # Cluster mission:
 # Implement the Totebox Orchestration transition — Phases 1, 2, and 3.
@@ -40,21 +40,21 @@ tetrad:
   vendor:
     - source_repo: pointsav-monorepo
       project_path: app-orchestration-command/
-      status: sub-clone provisioned 2026-05-08 on cluster/project-orchestration branch; awaiting Task session to author app-orchestration-command/ scaffolding
+      status: v0.0.1 shipped 2026-06-29 (3-crate workspace, 7 tests passing, Axum 0.8 server); confirmed in canonical origin/main (commit 29d0b4a1). v0.0.2 (pairing.rs WORM ledger schema_version + write-through) pushed to promote-queue 2026-07-09, awaiting Command Session canonical merge.
   customer:
     - fleet_deployment_repo: woodfine-fleet-deployment
       catalog_subfolder: gateway-orchestration-command/
-      status: leg-pending — guides to be authored after v0.0.1 ships
+      status: leg-pending — v0.0.1 has shipped; catalog_subfolder not yet created, guides not yet authored
   deployment:
     - instance_name: orchestration-command-1
-      instance_path: ~/Foundry/deployments/orchestration-command-1/
-      status: leg-pending — provision after app-orchestration-command v0.0.1 compiles
+      instance_path: ~/Foundry/deployments/gateway-orchestration-command-1/
+      status: live — provisioned 2026-06-29; systemd unit local-orchestration-command active on port 8020; binary ledger confirms smoke_test pass (data/binary-ledger/orchestration-command-server.jsonl)
   wiki:
-    - target_repo: content-wiki-documentation
+    - target_repo: media-knowledge-documentation   # renamed from content-wiki-documentation (DOCTRINE.md §IV.e, ratified 2026-05-21)
       articles:
         - architecture/totebox-orchestration-development.md
         - architecture/pairing-as-permission.md
         - systems/os-orchestration.md
         - architecture/totebox-session.md
         - architecture/personnel-permissions.md
-      status: leg-pending — drafts routed to project-editorial 2026-05-08
+      status: leg-pending — 2 of 5 drafts staged at ~/Foundry/.agent/drafts-outbound/ (topic-totebox-orchestration-development.draft.md, topic-os-orchestration.draft.md, last updated 2026-06-29); remaining 3 articles not yet drafted; none yet landed in media-knowledge-documentation
