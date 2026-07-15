@@ -32,12 +32,17 @@ key format).
 ## Tetrad
 
 See `.agent/manifest.md` `tetrad:` block for the canonical declaration
-across vendor / customer / deployment / wiki legs. As of this writing
-all four legs are declared `leg-pending` in the manifest, though
-`pairings.yaml` already lists two live deployment routes owned by
-this cluster (`vault-privategit-software-1`, `media-distribution-software-1`)
-— reconcile the manifest's tetrad block against `pairings.yaml` before
-relying on the leg-pending status.
+across vendor / customer / deployment / wiki legs. **Reconciled
+2026-07-15:** the deployment leg is now declared `active` in the
+manifest — `vault-privategit-software-1` is a confirmed live,
+provisioned instance (`~/Foundry/deployments/vault-privategit-software-1/`,
+`state: active`, public at `software.pointsav.com` since 2026-05-17).
+The second route `pairings.yaml` lists for this cluster,
+`media-distribution-software-1`, has no corresponding
+`~/Foundry/deployments/` instance directory — it reads as a
+planned/routing declaration, not a provisioned instance; unresolved,
+left as an open note in the manifest. Vendor, customer, and wiki legs
+remain `leg-pending`.
 
 ## At session start
 
