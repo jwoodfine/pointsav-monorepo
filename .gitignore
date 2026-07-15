@@ -61,3 +61,12 @@ archive-2026-06-01/
 .agent/drafts-outbound/
 NEXT.md
 # [/Option-A-mailbox-fix]
+
+# Nested .agent state store — policy violation per conventions/mailbox-scope-discipline.md.
+# This sub-clone must not carry its own .agent/ at all; the archive-level .agent/ at
+# /srv/foundry/clones/project-console/.agent/ is the only correct state store. Partial
+# cleanup 2026-07-14 (Phase 5b): 82 confirmed-stale-duplicate files untracked (legacy
+# operational store frozen ~2026-06-24, every foreign brief already superseded/current at
+# its real home elsewhere); 19 business-admin-flagged files (Bencal/orgchart content)
+# remain explicitly tracked, held for separate operator sign-off.
+.agent/
