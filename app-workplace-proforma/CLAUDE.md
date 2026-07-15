@@ -38,19 +38,27 @@ that has not yet proved it runs.
 
 | Layer | Choice | Non-negotiable because |
 |---|---|---|
-| Desktop shell | Tauri v1 (macOS 10.13 dev) / v2 (Linux prod) | Sovereignty — Commons Conservancy, EU jurisdiction |
+| Desktop shell | Tauri v2 (macOS 10.15+ dev / Linux prod) | Sovereignty — Commons Conservancy, EU jurisdiction |
 | Language | Rust (backend), vanilla JS (frontend) | No framework dependency, forkable end-to-end |
 | Formula engine | Phase 1 JS (`src/js/engine.js`), Phase 2 IronCalc via IPC | EU-funded sovereign path |
 | File format | Canonical `.json` with SHA-256 audit chain | Fifty-year archival horizon |
 | Licence | EUPL v1.2 | EU copyleft, DINUM/ZenDiS alignment |
-| CSP | `default-src 'self'; connect-src 'none'` | Zero outbound connections |
+| CSP | `default-src 'self'; connect-src ipc: http://ipc.localhost` | Zero *outbound* connections — `ipc.localhost` is Tauri v2's local IPC bridge (invoke rides a custom-protocol fetch), not a network origin; was `'none'` under v1 |
 | IPC surface | Exactly 3 Rust commands: `open_file`, `save_file`, `get_app_data_dir` | Every command is attack surface |
+
+> **Tauri v1 → v2, 2026-07-14 (operator-approved).** Tauri 1.x is unbuildable on this host
+> (Ubuntu 24.04 dropped webkit2gtk-4.0). Only `tauri-plugin-dialog` was added: the frontend
+> calls our own commands exclusively (`__TAURI__.core.invoke`) and prints via DOM
+> `window.print()`; file I/O + pickers are Rust-side (`open_file`/`save_file` via `DialogExt`).
+> The v1 `fs-*`/`path-all`/`window-print` features had no frontend consumer and were dropped.
+> macOS floor 10.13 → 10.15.
 
 Hard rules when editing:
 - **Never add `unsafe-eval`** to `script-src`. The formula parser is
   written to avoid `eval()` entirely.
-- **Never add a network call.** `connect-src 'none'` is load-bearing
-  to the sovereignty thesis.
+- **Never add a network call.** The CSP is now `connect-src ipc: http://ipc.localhost`
+  (v2 IPC requirement) — this permits only Tauri's local bridge, no external origin. The
+  no-outbound-network invariant is unchanged; never add an `https:`/wildcard origin.
 - **Never expand the IPC surface beyond six commands** (Phase 2 adds
   `evaluate_workbook` and `parse_formula`; nothing else).
 - **Never introduce a runtime npm dependency.** Dev-only tooling is
