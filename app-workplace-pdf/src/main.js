@@ -9,8 +9,9 @@
 
 "use strict";
 
-const invoke = window.__TAURI__.invoke;
-const appWindow = window.__TAURI__.window.appWindow;
+// Tauri v2: invoke moved to __TAURI__.core. The v1 window `appWindow.print()`
+// was removed (v2 Window has no print method) — printing now uses DOM window.print().
+const invoke = window.__TAURI__.core.invoke;
 
 // Screen rendering width at 100% zoom; print rendering width (~150 DPI letter).
 const BASE_WIDTH = 1100;
@@ -160,14 +161,11 @@ async function printDocument() {
       el.printArea.appendChild(img);
     }
     setStatus("");
-    // Tauri's window print shows the native OS print dialogue on macOS
-    // (plain DOM window.print() is a no-op in WKWebView). Fall back to the
-    // DOM API on platforms where the Tauri call is unavailable.
-    try {
-      await appWindow.print();
-    } catch (_) {
-      window.print();
-    }
+    // v2: Tauri's Window API no longer exposes print() (v1's window-print
+    // allowlist feature was removed), so use the DOM print API.
+    // UNVERIFIED on macOS: window.print() was historically a no-op in WKWebView;
+    // if that regresses, the fix is the Tauri print plugin (not yet in deps).
+    window.print();
   } catch (err) {
     showError(err);
   } finally {

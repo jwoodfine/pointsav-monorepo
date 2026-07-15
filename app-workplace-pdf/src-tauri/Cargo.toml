@@ -14,14 +14,16 @@ edition = "2021"
 rust-version = "1.70"
 
 [build-dependencies]
-tauri-build = { version = "1.5", features = [] }
+tauri-build = { version = "2", features = [] }
 
 [dependencies]
-# Tauri v1 — required for macOS 10.13 High Sierra compatibility.
-# Tauri v2 requires macOS 10.15+.
-# "dialog"       — Rust-side file picker (tauri::api::dialog); no JS allowlist needed.
-# "window-print" — appWindow.print() from the frontend (OS print dialogue on macOS).
-tauri = { version = "1.7", features = ["dialog", "window-print"] }
+# Tauri v2 (migrated 2026-07-14). v1.x is unbuildable on this host — Ubuntu 24.04
+# dropped webkit2gtk-4.0; v2 uses the 4.1/soup3 stack. macOS floor: 10.15+.
+# Dialog is a Rust-side file picker via tauri-plugin-dialog (no JS capability).
+# window-print is GONE in v2 — the frontend now uses DOM window.print() (see
+# src/main.js printDocument + CLAUDE.md print note; needs macOS verification).
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
