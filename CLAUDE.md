@@ -2,7 +2,7 @@
 
 # project-workplace — Archive Guide
 
-> **State:** active | **Last updated:** 2026-07-06
+> **State:** active | **Last updated:** 2026-07-15
 > **Cluster manifest:** `.agent/manifest.md`
 > **Workspace AGENT.md takes precedence on conflict.**
 
@@ -54,9 +54,17 @@ to outbox at shutdown. Command Session processes canonical merge.
 
 ## Deploy model
 
-This archive runs `app-workplace-http-prototype` on localhost only (port 9110, via
-`local-workplace-http-prototype.service`) for office staff to iterate with. There is no
-`foundry-prod` push today — no live public deployment exists yet for this archive's surfaces.
+Three systemd services run today (verified 2026-07-15), all localhost/PPN-scoped — no
+public-internet deployment exists yet for this archive's surfaces (Tetrad deployment leg
+stays leg-pending):
+- `local-workplace-http-prototype.service` — `app-workplace-http-prototype`, localhost:9110,
+  for office staff to iterate with.
+- `app-privategit-workbench.service` — port 9210, proxied via nginx to `10.8.0.9:9200` (PPN).
+  This is Jennifer's actual live working instance (confirmed via Command 2026-07-15) — treat
+  it as production-sensitive, not a throwaway dev copy.
+- `local-workbench-dev.service` — `app-privategit-workbench` DEV instance, port 9215.
+
+There is no `foundry-prod` push and no public-internet deployment yet.
 
 ## Conflicts
 
