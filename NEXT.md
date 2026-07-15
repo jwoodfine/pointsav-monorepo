@@ -7,6 +7,28 @@ Last updated: 2026-07-14
 
 ---
 
+## 2026-07-14 session — in-scope resume items (Totebox)
+
+> Full session state + crash recovery: `BRIEF-workplace-institutional-quality-roadmap.md` §S10.
+> Out-of-scope items (Stage 6, Phase 5, infra audit) routed to Command outbox this shutdown.
+
+- [ ] **Restart the :9119 chat canary after any reboot** (else `http://10.8.0.9/` → 502) —
+      exact command in §S10 §C. [2026-07-14 totebox@claude-code]
+- [ ] **Search v1 next:** incremental reindex (`notify` + stat/hash); wire `moonshot-index`
+      `SearchEngine` into a workbench UI (coverage-line/two-band/scope-chip/index-health);
+      then Tantivy ranked layer + `gix` git-history (v2). [2026-07-14 totebox@claude-code]
+- [ ] **CAD Phase 0 next:** more entities + DXF/SVG I/O (`dxf-rs`) + snapping, THEN the
+      `wgpu` 2D renderer (first GPU/WASM step; needs a browser harness). [2026-07-14 totebox@claude-code]
+- [ ] **Workbench-core #3 (§S9):** file access, back button, tabs, toolbar-stays-put,
+      don't-trap-in-surface, document→schema routing — captured, none built; prerequisite for
+      the `app-privategit-workbench` rebuild (MUST follow STABLE/DEV canary rule). [2026-07-14 totebox@claude-code]
+- [ ] **AI chat follow-ups:** make the :9119 canary a persistent systemd unit; streaming
+      responses; move chat into the real workbench once rebuilt. [2026-07-14 totebox@claude-code]
+- [ ] **Operator runtime passes owed:** browser click-through of the 6 migrated Tauri apps +
+      B1/B2 palette + AI chat; macOS `window.print()` (pdf/proforma/memo); presentation fs-scope. [2026-07-14 totebox@claude-code]
+
+---
+
 ## Blocked — Command Session (route via outbox)
 
 - [ ] **🔴 URGENT — docx-freeze bug is LIVE on 10.8.0.9:9200; deploy is Command-only.**
