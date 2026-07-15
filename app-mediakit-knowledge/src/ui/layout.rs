@@ -928,7 +928,13 @@ pub fn notice_banner(
 /// abstract + a link to the full-text rendition — **not** the full body
 /// (that's `research_fulltext`). `notice_banner()` composes in once its data
 /// source exists (Phase 3); until then it renders nothing, same as here.
-pub fn research_landing(title: &str, authors: &[Author], abstract_html: &str, slug: &str) -> Markup {
+pub fn research_landing(
+    title: &str,
+    authors: &[Author],
+    abstract_html: &str,
+    slug: &str,
+    cite_as: Option<&str>,
+) -> Markup {
     html! {
         article."k-research k-research--landing" {
             (masthead(title, authors))
@@ -941,6 +947,28 @@ pub fn research_landing(title: &str, authors: &[Author], abstract_html: &str, sl
             p."k-research__fulltext-link" {
                 a."k-button" href={ "/research/" (slug) "/full" } { "Read the full text \u{2192}" }
             }
+            (print_citation_stamp(slug, cite_as))
+        }
+    }
+}
+
+/// Print-only citation stamp for JOURNAL pages — same purpose and CSS
+/// mechanism as `article()`'s own (Phase 9 print mode, `.k-print-citation`
+/// is `display:none` on screen, shown only in `@media print`). Prefers the
+/// author-specified `cite_as` frontmatter string (SPEC §2 table) when
+/// present; falls back to the landing page's own URL. The landing page,
+/// not `/full`, is the citable record per academic-page convention (a DOI
+/// landing page cites the abstract page, not the full-text rendition).
+fn print_citation_stamp(slug: &str, cite_as: Option<&str>) -> Markup {
+    html! {
+        p."k-print-citation" {
+            "Cite this record: "
+            @if let Some(c) = cite_as.filter(|s| !s.is_empty()) {
+                (c)
+            } @else {
+                "/research/" (slug)
+            }
+            "."
         }
     }
 }
@@ -957,10 +985,18 @@ pub fn research_landing(title: &str, authors: &[Author], abstract_html: &str, sl
 /// build on — confirmed against comrak 0.52's `Extension` options — so it
 /// needs a hand-rolled parser, not yet justified with zero real geospatial
 /// papers locally to validate one against).
-pub fn research_fulltext(title: &str, authors: &[Author], body_html: &str, geospatial: bool) -> Markup {
+pub fn research_fulltext(
+    title: &str,
+    authors: &[Author],
+    body_html: &str,
+    geospatial: bool,
+    slug: &str,
+    cite_as: Option<&str>,
+) -> Markup {
     html! {
         article."k-research k-research--fulltext"."k-research--geospatial"[geospatial] {
             (masthead(title, authors))
+            (print_citation_stamp(slug, cite_as))
             div."k-prose" { (PreEscaped(body_html)) }
         }
     }
@@ -1180,10 +1216,18 @@ mod tests {
 
     #[test]
     fn research_fulltext_carries_geospatial_class_only_when_requested() {
-        let with_class = research_fulltext("T", &[], "<p>body</p>", true).into_string();
+        let with_class = research_fulltext("T", &[], "<p>body</p>", true, "slug", None).into_string();
         assert!(with_class.contains("k-research--geospatial"));
-        let without_class = research_fulltext("T", &[], "<p>body</p>", false).into_string();
+        let without_class = research_fulltext("T", &[], "<p>body</p>", false, "slug", None).into_string();
         assert!(!without_class.contains("k-research--geospatial"));
+    }
+
+    #[test]
+    fn print_citation_stamp_prefers_cite_as_over_url_fallback() {
+        let with_cite_as = research_fulltext("T", &[], "<p>b</p>", false, "my-slug", Some("Woodfine (2026)")).into_string();
+        assert!(with_cite_as.contains("Cite this record: Woodfine (2026)."));
+        let without_cite_as = research_fulltext("T", &[], "<p>b</p>", false, "my-slug", None).into_string();
+        assert!(without_cite_as.contains("Cite this record: /research/my-slug."));
     }
 
     #[test]
