@@ -15,6 +15,11 @@
 
 /* --- Breadcrumb (Home › Category › Article) -------------------------------- */
 .k-breadcrumb {
+  /* Sits directly below the sticky header with no other spacing above it
+     (`.k-page__body`/`.k-shell` carry no top padding) — without its own
+     top margin the breadcrumb text runs flush against the header's bottom
+     border, reading as "bleeding into" the nav line above it. */
+  margin-top: var(--k-space-4);
   margin-bottom: var(--k-space-3);
 }
 .k-breadcrumb__list {
