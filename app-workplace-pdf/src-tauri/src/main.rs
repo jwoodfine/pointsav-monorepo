@@ -10,6 +10,7 @@ use std::sync::Mutex;
 
 use base64::Engine as _;
 use pdfium_render::prelude::*;
+use tauri_plugin_dialog::DialogExt;
 
 /// Rendered-page width bounds (pixels). The frontend requests widths inside
 /// this range for zoom and print rendering.
@@ -234,23 +235,27 @@ fn worker_loop(rx: Receiver<PdfRequest>) {
 /// Returns `None` (not an error) if the user cancels the dialog.
 #[tauri::command]
 async fn open_pdf(
+    app: tauri::AppHandle,
     state: tauri::State<'_, PdfWorkerHandle>,
 ) -> Result<Option<DocumentInfo>, String> {
-    // Blocking dialog must not run on the main thread; spawn_blocking gives us
-    // a safe thread and tauri's dialog internally re-dispatches UI work to the
-    // main thread as required per platform.
-    let picked = tauri::async_runtime::spawn_blocking(|| {
-        tauri::api::dialog::blocking::FileDialogBuilder::new()
+    // v2: the dialog API moved to tauri-plugin-dialog (DialogExt on AppHandle).
+    // blocking_pick_file() must not run on the main thread; spawn_blocking gives
+    // it a safe thread and the plugin re-dispatches UI work to the main thread.
+    let picked = tauri::async_runtime::spawn_blocking(move || {
+        app.dialog()
+            .file()
             .set_title("Open PDF")
             .add_filter("PDF documents", &["pdf"])
-            .pick_file()
+            .blocking_pick_file()
     })
     .await
     .map_err(|e| format!("File dialog task failed: {}", e))?;
 
-    let Some(path) = picked else {
+    let Some(file_path) = picked else {
         return Ok(None);
     };
+    // v2 returns a FilePath enum (native path or content URI); resolve to a PathBuf.
+    let path = file_path.into_path().map_err(|e| e.to_string())?;
 
     let tx = state.sender()?;
     tauri::async_runtime::spawn_blocking(move || {
@@ -300,6 +305,7 @@ fn main() {
         .expect("failed to spawn PDF worker thread");
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .manage(PdfWorkerHandle { tx: Mutex::new(tx) })
         .invoke_handler(tauri::generate_handler![
             open_pdf,
