@@ -36,11 +36,33 @@ pub fn router() -> Router<AppState> {
         .route("/pdf", get(get_pdf))
         .route("/events", get(get_workbench_events))
         .route("/download", get(download_folder))
+        // B2 (Track B) — serve the shared frontend shell-chrome module as embedded assets.
+        .route("/shell-chrome.js", get(serve_shell_chrome_js))
+        .route("/shell-chrome.css", get(serve_shell_chrome_css))
 }
 
 // ---------------------------------------------------------------------------
 // Asset serving
 // ---------------------------------------------------------------------------
+
+fn serve_embedded(key: &str, content_type: &'static str) -> Response {
+    match Assets::get(key) {
+        Some(content) => (
+            [(header::CONTENT_TYPE, content_type)],
+            content.data.into_owned(),
+        )
+            .into_response(),
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
+async fn serve_shell_chrome_js() -> Response {
+    serve_embedded("workbench/shell-chrome.js", "text/javascript; charset=utf-8")
+}
+
+async fn serve_shell_chrome_css() -> Response {
+    serve_embedded("workbench/shell-chrome.css", "text/css; charset=utf-8")
+}
 
 async fn serve_index() -> Response {
     match Assets::get("workbench/index.html") {

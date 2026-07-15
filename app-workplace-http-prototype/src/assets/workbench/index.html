@@ -768,6 +768,7 @@ html.light .recent-show-more { color: #0066cc; }
 html.light .recent-show-more:hover { color: #004fa0; }
 </style>
 <script>(function(){if(localStorage.getItem('wb-theme')==='light')document.documentElement.classList.add('light');})()</script>
+<link rel="stylesheet" href="shell-chrome.css"><!-- B2 (Track B): shared shell chrome -->
 </head>
 <body>
 
@@ -4739,6 +4740,38 @@ setSurface(activeSurface);
 
 <div id="ctx-menu"></div>
 <div id="wb-toast"></div>
+
+<!-- B2 (Track B): shared frontend shell chrome. Additive + behaviour-preserving —
+     the existing window keydown handler still fires every shortcut; these entries
+     only make them discoverable via the Ctrl/Cmd+Shift+P command palette. No
+     keybindings are registered here for the existing shortcuts, so nothing double-fires. -->
+<script src="shell-chrome.js"></script>
+<script>
+(function () {
+  if (!window.ShellChrome) return;               // fail safe: never break the page
+  var SC = window.ShellChrome;
+  function has(fn) { return typeof window[fn] === 'function'; }
+  var cmds = [];
+  if (has('printCurrent'))  cmds.push({ id: 'wb.print',    title: 'Print Current',       category: 'File', shortcut: 'Ctrl/Cmd+P', run: function () { printCurrent(); } });
+  if (has('saveFile'))      cmds.push({ id: 'wb.save',     title: 'Save',                category: 'File', shortcut: 'Ctrl/Cmd+S', run: function () { saveFile(); } });
+  if (has('showFindBar'))   cmds.push({ id: 'wb.find',     title: 'Find in Editor',      category: 'Edit', shortcut: 'Ctrl/Cmd+F', run: function () { showFindBar(); } });
+  if (has('undoLastMove'))  cmds.push({ id: 'wb.undomove', title: 'Undo Last File Move', category: 'File', shortcut: 'Ctrl/Cmd+Z', run: function () { undoLastMove(); } });
+  try {
+    document.querySelectorAll('#surface-bar .surface-btn').forEach(function (btn, i) {
+      var label = (btn.textContent || ('Surface ' + (i + 1))).trim();
+      cmds.push({
+        id: 'wb.surface.' + i,
+        title: 'Switch to ' + label,
+        category: 'Surface',
+        shortcut: i < 9 ? ('Ctrl/Cmd+' + (i + 1)) : '',
+        run: function () { btn.click(); },
+      });
+    });
+  } catch (e) { /* surface bar optional */ }
+  SC.registerCommands(cmds);
+  SC.install();  // adds the palette overlay + its Ctrl/Cmd+Shift+P binding
+})();
+</script>
 
 </body>
 </html>
