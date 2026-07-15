@@ -3,7 +3,29 @@
 > Hot open items. ≤200 lines. Backlog at `.agent/next-backlog.md` (not yet created).
 > **Scope: this archive only.** Cross-repo and workspace-level items live at `~/Foundry/NEXT.md`.
 
-Last updated: 2026-07-14
+Last updated: 2026-07-15
+
+---
+
+## 2026-07-15 session — PROD/DEV locked pair
+
+- [ ] **🟡 OPERATOR — click through DEV at `http://10.8.0.9:9500/`.** Everything below is
+      verified by curl/probe only; the browser pass is yours. Confirm: the tree shows your
+      real project folders; open a file; Copy name / Copy path / Duplicate / Rename;
+      open a real `.docx` (**expect the "no preview" placeholder, NOT a frozen tab** — this
+      is the docx fix PROD still lacks); palette on **F1**. [2026-07-15 totebox@claude-code]
+- [x] **DEV rebuilt from HEAD + nginx parity fix + moved to :9500.** Root cause was **nginx,
+      not the binary** — PROD/DEV binaries were byte-identical (`0d474655…`). The DEV vhost's
+      `/_api/` catch-all rewrote `/_api/edit/file` → `/edit/file` (**every action 404'd**) and
+      never routed `/_api/{command,clones,staged}/` to the `:9211` lister (**empty tree**).
+      Rewrote DEV vhost to full parity + `:9207`→`:9500`; rebuilt DEV binary (sha
+      `6e74d2d3…`). DEV now matches PROD on all 7 probe paths and is strictly ahead
+      (docx fix + palette + ARIA + copy-path). PROD provably untouched: sha `0d474655…`
+      unchanged, MainPID `4187400` unchanged. nginx backup:
+      `/etc/nginx/backups/nginx-intranet.conf.bak-20260715`.
+- [ ] **Retire the mislabeled `:9207` ufw rule** — annotated `bim-lab: app-privategit-bim
+      preview` but nothing bim-related uses it; the workbench was squatting on it and has now
+      moved to :9500. Deleting it is Command's audit call — routed. [2026-07-15 totebox@claude-code]
 
 ---
 
@@ -31,27 +53,42 @@ Last updated: 2026-07-14
 
 ## Blocked — Command Session (route via outbox)
 
-- [ ] **🔴 URGENT — docx-freeze bug is LIVE on 10.8.0.9:9200; deploy is Command-only.**
-      The fix is committed and verified here (`ad08b8c9`) but `bin/deploy-binary.sh:32`
-      refuses to run outside the Command workspace and `:131` requires HEAD already
-      promoted. Needs: promote → `deploy-binary.sh app-privategit-workbench` → restart.
-      Sent 2026-07-14, `priority: high`, msg-id
-      `project-workplace-20260714-urgent-docx-freeze-bug-live-on-10-8-0-9-`.
-      Post-deploy check (all are 0 today; the 0 → non-zero flip IS the fix shipping):
-      `strings /usr/local/bin/app-privategit-workbench | grep -c BINARY_EXTS`.
-- [ ] **Stage 6 pending — archive root, HEAD `ad08b8c9`.** 44 commits ahead of `46ad34ce`,
-      strictly linear, no merge commits. Same outbox message as above. Note `pairings.yaml`
-      gives this archive `self_service: build-deploy` (not `-stage6lite`), so both
-      `promote.sh` (L97) and `self-service-promote.sh` (L98) refuse to run from here —
-      canonical promote is Command's by construction.
-- [ ] **2 tooling defects in `bin/`** — routed to Command in the same message.
-      (a) `promote.sh:428` cherry-picks with no `-m 1`, so a **merge commit is silently
-      dropped at Stage 6 while printing "skip (already in canonical)"** — a silent
-      data-loss path. (b) `self-service-promote.sh:56-72` auto-detects a nested
-      `pointsav-monorepo/.git` and silently retargets into it; **latent here** (the
-      `build-deploy` guard exits first) but **LIVE for any archive with
-      `build-deploy-stage6lite` + a sub-clone**. Related: `AGENT.md` §6b is now actively
-      wrong for this archive (root is authoritative, per operator).
+- [ ] **🔴 HIGH — gate PROD against the automated nightly clobber (Command scope).**
+      `conventions/software-units.yaml:195` registers `app-privategit-workbench` (PROD,
+      :9210) with `services: [app-privategit-workbench]`; `bin/deploy-binary.sh` does
+      `systemctl stop` → `install` → `start` against it; **`foundry-nightly-build.timer`
+      is active** (01:00 daily). **No `-dev` entry exists.** `queue.jsonl` is empty so
+      PROD is safe tonight, but AGENT.md step 5b tells Command sessions to
+      `nightly-build-plan.sh --add <binary>` on build-requests → would clobber PROD
+      unattended. **This is almost certainly what burned Jennifer.** Needs: `operator_gated:
+      true` on the PROD entry, enforcement in `bin/deploy-binary.sh` +
+      `bin/nightly-build*.sh` (they read no gate field today — a YAML comment alone is
+      decorative), and an `app-privategit-workbench-dev` entry so the default target is DEV.
+      Routed 2026-07-15. [2026-07-15 totebox@claude-code]
+- [ ] **🔴 docx-freeze bug STILL LIVE on 10.8.0.9:9200 — deploy HELD BY OPERATOR, not stalled.**
+      Command replied 2026-07-15: fix + analysis confirmed correct; `:9200` verified to be
+      Jennifer's **actual live working instance**, so the operator chose to hold the
+      promote+deploy rather than interrupt her session. Timing decision, not a defect —
+      **do not re-escalate; it needs an operator go-ahead, not another message.**
+      Re-verified live 2026-07-15: deployed binary dated Jul 13, `strings
+      /usr/local/bin/app-privategit-workbench | grep -c BINARY_EXTS` = **0**.
+      **The fix IS now testable on DEV** — `http://10.8.0.9:9500/` serves it (BINARY_EXTS=2).
+      Promotion is a byte-copy from the DEV binary, gated on her go-ahead (see CLAUDE.md).
+- [ ] **Stage 6 pending — archive root, HEAD `330f83d9`.** 44 promotable code commits,
+      strictly linear, **0 merge commits** (re-measured 2026-07-15). The root is 93 commits
+      ahead of `origin/main` in total; 49 are `.agent/`-only and filtered by `promote.sh`,
+      leaving the 44 — the previously-recorded figure was correct. The 31 commits since
+      `ad08b8c9` are all docs-only. Note `pairings.yaml` gives this archive
+      `self_service: build-deploy` (not `-stage6lite`), so both `promote.sh` (L97) and
+      `self-service-promote.sh` (L98) refuse to run from here — canonical promote is
+      Command's by construction.
+- [x] ~~**2 tooling defects in `bin/`**~~ — **FIXED by Command 2026-07-14 (commit `a7e444a`),
+      verified here 2026-07-15.** (a) `promote.sh` now counts parents (`:429`) and
+      cherry-picks merge commits with `-m 1` — the silent data-loss path is closed.
+      (b) `self-service-promote.sh` now takes `--repo-root` (`:51`) and prints both repos'
+      state before retargeting. **Still open:** `AGENT.md` §6b's text remains stale (says
+      treat the nested sub-clone as the code repo unconditionally); Command logged it in
+      workspace NEXT.md.
 - [ ] **Retire the `pointsav-monorepo/` sub-clone** — deferred deliberately. Do **not** do
       it until the work is durable in *canonical*, not merely in a personal staging fork.
       A `.gitignore` entry is insufficient: `self-service-promote.sh` keys on the
@@ -105,8 +142,12 @@ unverified until re-checked against the deployed binary.
       Verified 13/13 by driving real headless Chromium over CDP with real keypresses. Also
       fixed a pre-existing latent null-deref crash and a role-gated Enter/Space handler the
       role change would have silently killed. **Screen-reader pass still recommended.**
-- [ ] **`bin/capture-trajectory.sh`** (L2 trajectory capture) — never started. Spec at
-      `conventions/trajectory-substrate.md` says **one week**, not the BRIEF's "one evening".
+- [x] ~~**`bin/capture-trajectory.sh`** (L2 trajectory capture)~~ — **BUILT by Command
+      2026-07-15 (commit `890f287`)**; `conventions/trajectory-substrate.md` L2 row now reads
+      `DONE 2026-07-15`. Verified here. Uses L1's real Doorman `/v1/shadow` POST transport
+      (task_type `trajectory-capture`), not a direct corpus file write. Usage:
+      `capture-trajectory.sh "<summary>"`, stdin, or `--file`; `FOUNDRY_NO_CAPTURE=1` opts out.
+      **Not wired into any session-end hook** — that wiring is a separate, unmade decision.
 - [ ] **Correct the schema-framework matrix** in `BRIEF-workplace-workbench.md:122-133` —
       the `schedule` row names `app-workplace-schedule`, a directory that does not exist.
 - [ ] **app-workplace-aibridge Phase 3** — deeper docengine + crdt cross-crate composition layers
