@@ -510,9 +510,28 @@ async fn research_landing(State(state): State<AppState>, Path(slug): Path<String
         .map(|a| content::render(a).html)
         .unwrap_or_default();
     let description = parsed.frontmatter.short_description.clone().unwrap_or_default();
-    let body = ui::research_landing(&title, &parsed.frontmatter.authors, &abstract_html, &doc.slug);
+    let cite_as = parsed.frontmatter.cite_as.as_deref();
+    let body = ui::research_landing(&title, &parsed.frontmatter.authors, &abstract_html, &doc.slug, cite_as);
+    let trail = vec![
+        ("/".to_string(), tenant.home_label().to_string()),
+        ("/research".to_string(), "Research".to_string()),
+    ];
+    let body = html! { (ui::breadcrumb(&trail, &title)) (body) };
     let path = format!("/research/{}", doc.slug);
+    let home = tenant.home_url();
+    let home = home.trim_end_matches('/');
+    let current_url = format!("{home}{path}");
+    let mut jsonld_trail: Vec<(String, String)> = trail
+        .iter()
+        .map(|(href, label)| (format!("{home}{href}"), label.clone()))
+        .collect();
+    jsonld_trail.push((current_url.clone(), title.clone()));
     let head = ui::doc_head(&title, &description, tenant, &path, false);
+    let head = html! {
+        (head)
+        (ui::article_jsonld(tenant, &title, &description, &current_url, None))
+        (ui::breadcrumb_jsonld(&jsonld_trail))
+    };
     Html(
         ui::page(
             tenant,
@@ -551,15 +570,37 @@ async fn research_fulltext(State(state): State<AppState>, Path(slug): Path<Strin
         .clone()
         .unwrap_or_else(|| doc.title.clone());
     let description = parsed.frontmatter.short_description.clone().unwrap_or_default();
+    let cite_as = parsed.frontmatter.cite_as.as_deref();
     let rendered = content::render_journal_doc(&parsed, &state.citations);
     let body = ui::research_fulltext(
         &title,
         &parsed.frontmatter.authors,
         &rendered.html,
         parsed.frontmatter.is_geospatial(),
+        &doc.slug,
+        cite_as,
     );
+    let trail = vec![
+        ("/".to_string(), tenant.home_label().to_string()),
+        ("/research".to_string(), "Research".to_string()),
+        (format!("/research/{}", doc.slug), title.clone()),
+    ];
+    let body = html! { (ui::breadcrumb(&trail, "Full text")) (body) };
     let path = format!("/research/{}/full", doc.slug);
+    let home = tenant.home_url();
+    let home = home.trim_end_matches('/');
+    let current_url = format!("{home}{path}");
+    let mut jsonld_trail: Vec<(String, String)> = trail
+        .iter()
+        .map(|(href, label)| (format!("{home}{href}"), label.clone()))
+        .collect();
+    jsonld_trail.push((current_url.clone(), "Full text".to_string()));
     let head = ui::doc_head(&title, &description, tenant, &path, false);
+    let head = html! {
+        (head)
+        (ui::article_jsonld(tenant, &title, &description, &current_url, parsed.frontmatter.last_edited.as_deref()))
+        (ui::breadcrumb_jsonld(&jsonld_trail))
+    };
     Html(
         ui::page(
             tenant,
