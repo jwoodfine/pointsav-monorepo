@@ -173,7 +173,7 @@ async function exportHTML() {
   const name  = title.replace(/[^a-zA-Z0-9\-_\s]/g, '').trim() + '.html';
 
   if (typeof window.__TAURI__ !== 'undefined') {
-    const saved = await window.__TAURI__.invoke('save_file', {
+    const saved = await window.__TAURI__.core.invoke('save_file', {
       content: html,
       suggestedName: name,
     });
