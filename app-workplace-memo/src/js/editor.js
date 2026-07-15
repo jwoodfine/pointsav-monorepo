@@ -49,7 +49,7 @@ async function tauriInvoke(cmd, args = {}) {
     console.warn(`[bridge] Tauri not available — skipping command: ${cmd}`);
     return null;
   }
-  return window.__TAURI__.invoke(cmd, args);
+  return window.__TAURI__.core.invoke(cmd, args); // v2: invoke moved to __TAURI__.core
 }
 
 /* ─── File operations ────────────────────────────────────────────────────── */

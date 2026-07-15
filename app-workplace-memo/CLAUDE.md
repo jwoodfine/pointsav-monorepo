@@ -16,8 +16,17 @@ dialogue. Zero network calls, zero accounts, zero kill switch.
 Stack: Tauri (Rust backend + OS WebView frontend) + vanilla JS. No bundler,
 no React, no npm runtime dependencies. EUPL v1.2.
 
-Dev platform: macOS 10.13 High Sierra (Tauri v1). Production target: Linux
-(Tauri v2 — WebKitGTK).
+Dev platform: macOS 10.15+ (Tauri v2). Production target: Linux (Tauri v2 — WebKitGTK).
+
+> **Tauri v1 → v2, 2026-07-14 (operator-approved).** Tauri 1.x is unbuildable on this host
+> (Ubuntu 24.04 dropped webkit2gtk-4.0). Only `tauri-plugin-dialog` was added: the frontend
+> calls our own commands exclusively (`__TAURI__.core.invoke`), and all file I/O + pickers are
+> Rust-side (`open_file`/`save_file` via `DialogExt`). The v1 `fs-*`/`path-all`/`shell-open`
+> features and the fs allowlist scope had **no frontend consumer** and were dropped.
+> **Two things to restore/verify:** (1) the `bundle.resources` globs (`../fonts/**`,
+> `../templates/**`) were **removed** — v2's tauri-build hard-fails on globs that match no
+> files, and both dirs are empty until `npm run embed-fonts` runs; **re-add `resources` once
+> those dirs are populated.** (2) macOS floor 10.13 → 10.15.
 
 ## Current state
 
@@ -57,7 +66,10 @@ app-workplace-memo/
 
 ## Hard constraints
 
-- **No network calls.** `connect-src 'none'` is load-bearing.
+- **No network calls.** In v2 the CSP is `connect-src ipc: http://ipc.localhost` (was
+  `'none'` in v1). This is **not** a network relaxation — `ipc.localhost` is Tauri's local
+  IPC bridge, which v2's `invoke()` requires (v1 IPC bypassed CSP; v2 rides a custom-protocol
+  fetch). No external/`https:` origin is permitted; the no-outbound-network invariant holds.
 - **No runtime npm dependencies.** Dev tooling only; runtime must be
   vendored and EUPL/Apache/MIT compatible.
 - **No `unsafe-eval` in CSP.** The JS engine is written to avoid `eval()`.
