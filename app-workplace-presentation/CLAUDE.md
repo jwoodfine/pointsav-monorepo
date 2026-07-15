@@ -11,7 +11,17 @@
 tool. PowerPoint/Keynote muscle memory on the outside; canonical output format
 TBD (PPTX-compatible JSON or self-contained HTML) on the inside.
 
-Platform: macOS 10.13 High Sierra (Tauri v1). EUPL-1.2 licence.
+Platform: macOS 10.15 Catalina or later (Tauri v2). EUPL-1.2 licence.
+
+> **Tauri v1 → v2, 2026-07-14 (operator-approved).** Tauri 1.x is unbuildable on this host
+> (Ubuntu 24.04 dropped webkit2gtk-4.0). This crate is the highest-risk of the six: its
+> `main.rs` is 11 lines with **no** IPC commands — ALL privileged work is in `src/app.js`
+> via the plugin JS globals (`t.dialog.open/save`, `t.fs.readFile/readTextFile/writeTextFile`).
+> So both `tauri-plugin-dialog` and `tauri-plugin-fs` are registered AND frontend-gated in
+> `capabilities/default.json`. `fs.readBinaryFile` was renamed to `fs.readFile` in v2.
+> **Runtime-UNVERIFIED (cargo check cannot cover this):** whether the fs scope
+> (`$HOME/**`, `$APPDATA/**`) actually permits the dialog-picked paths at runtime — a file
+> picked outside those roots will be denied. Needs an operator build+run pass. Floor 10.13 → 10.15.
 
 ## Current state
 
@@ -35,6 +45,13 @@ First milestone: editor UI that creates a slide, adds text, and exports.
 
 ## Hard rules
 
-- `minimumSystemVersion: "10.13"` must stay in tauri.conf.json
-- `connect-src 'none'` — zero outbound network connections
+- ~~`minimumSystemVersion: "10.13"`~~ — **retired 2026-07-14**; floor is now **10.15** (Tauri v2).
+- CSP is `connect-src ipc: http://ipc.localhost` (was `'none'` in v1) — required so the
+  frontend's plugin calls (dialog/fs ride v2's custom-protocol IPC) work. Still zero
+  *outbound network*: `ipc.localhost` is Tauri's local bridge, not a network origin. Never
+  add an `https:`/wildcard origin.
+- Both `tauri-plugin-dialog` and `tauri-plugin-fs` must stay registered in `main.rs`, and
+  their capabilities (`dialog:allow-open/save`, `fs:allow-read-file`/`-read-text-file`/
+  `-write-text-file` with the `$HOME`/`$APPDATA` scope) must stay in `capabilities/default.json`
+  — the frontend calls these plugin JS APIs directly, so removing either breaks it at runtime.
 - EUPL-1.2 licence: all contributions must be compatible
