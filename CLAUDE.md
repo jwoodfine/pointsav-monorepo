@@ -54,17 +54,43 @@ to outbox at shutdown. Command Session processes canonical merge.
 
 ## Deploy model
 
-Three systemd services run today (verified 2026-07-15), all localhost/PPN-scoped — no
-public-internet deployment exists yet for this archive's surfaces (Tetrad deployment leg
-stays leg-pending):
-- `local-workplace-http-prototype.service` — `app-workplace-http-prototype`, localhost:9110,
-  for office staff to iterate with.
-- `app-privategit-workbench.service` — port 9210, proxied via nginx to `10.8.0.9:9200` (PPN).
-  This is Jennifer's actual live working instance (confirmed via Command 2026-07-15) — treat
-  it as production-sensitive, not a throwaway dev copy.
-- `local-workbench-dev.service` — `app-privategit-workbench` DEV instance, port 9215.
+### 🔒 LOCKED PAIR — PROD :9200 / DEV :9500 (operator directive, 2026-07-15)
 
-There is no `foundry-prod` push and no public-internet deployment yet.
+| Slot | URL | nginx → | Service | Rule |
+|---|---|---|---|---|
+| **PROD** | `http://10.8.0.9:9200/` | `127.0.0.1:9210` | `app-privategit-workbench.service` | **NEVER rebuild/restart/redeploy without Jennifer's explicit go-ahead** |
+| **DEV** | `http://10.8.0.9:9500/` | `127.0.0.1:9215` | `local-workbench-dev.service` | **ALL rebuilds land here** |
+
+PROD is Jennifer's daily work tool. A rebuild once clobbered it mid-work and cost her a
+session. Features are only ever added to DEV; **DEV ⊇ PROD, always**. Both build from the
+same crate (`app-privategit-workbench`) on the same branch, so the invariant holds by
+construction as long as only DEV is rebuilt.
+
+**Promotion DEV → PROD is a byte-copy, never a build, and needs her go-ahead every time:**
+```
+sudo cp --remove-destination /usr/local/bin/app-privategit-workbench-dev \
+                             /usr/local/bin/app-privategit-workbench
+sudo systemctl restart app-privategit-workbench
+```
+`--remove-destination` is mandatory — `cp` onto a running binary fails `ETXTBSY` and the
+restart then silently serves the OLD binary. Verify with `sha256sum` on both paths after.
+
+DEV and PROD serve the **same 21 real writable project-clone roots** (DEV adds
+`_sandbox-jennifer`). DEV is NOT a throwaway — writes there hit real files.
+
+⚠️ **`conventions/software-units.yaml` registers `app-privategit-workbench` (PROD, :9210) for
+automated rebuild+restart via `bin/deploy-binary.sh`, and `foundry-nightly-build.timer` is
+active.** There is no `-dev` entry. Never run `bin/deploy-binary.sh app-privategit-workbench`
+or `nightly-build-plan.sh --add app-privategit-workbench` — that is the PROD-clobber path.
+Gating this in `software-units.yaml` + `bin/` is Command scope; routed 2026-07-15.
+
+### Other services
+
+- `local-workplace-http-prototype.service` — `app-workplace-http-prototype`, localhost:9110.
+- `:9119` chat/palette canary — bare background process (not a unit); dies on reboot.
+
+No `foundry-prod` push and no public-internet deployment yet (Tetrad deployment leg
+stays leg-pending).
 
 ## Conflicts
 
