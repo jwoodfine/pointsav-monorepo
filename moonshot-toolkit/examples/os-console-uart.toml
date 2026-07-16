@@ -1,0 +1,28 @@
+# os-console seL4 Phase H3 — PL011 UART MMIO direct write.
+#
+# Proves the seL4 device-untyped → SmallPage → page_table_map → page_map capability
+# chain works on QEMU virt (AArch64, Cortex-A53). Writes "UART gate: PASSED" directly
+# to the PL011 UART data register at 0x09000000 without using seL4_DebugPutChar.
+#
+# Build from monorepo root:
+#   CARGO_TARGET_DIR=/tmp/moonshot-h3-build cargo run \
+#     --manifest-path moonshot-toolkit/Cargo.toml \
+#     -- build moonshot-toolkit/examples/os-console-uart.toml
+#
+# Boot with:
+#   qemu-system-aarch64 -machine virt -cpu cortex-a53 -m 1G \
+#     -nographic -kernel build/system-image.bin \
+#     -serial file:/tmp/sel4-h3-out.txt
+#
+# Then check: grep "UART gate: PASSED" /tmp/sel4-h3-out.txt
+#
+# Gate: "UART gate: PASSED" in /tmp/sel4-h3-out.txt (direct MMIO path).
+# Gate confirmed by: presence of "[uart] page table mapped" and "[uart] frame mapped"
+#   in debug serial output (via seL4_DebugPutChar) before the direct UART write.
+
+[[protection_domains]]
+name        = "os-console-uart"
+binary      = "moonshot-sel4-vmm"
+rust_bin    = "uart_main"
+priority    = 100
+stack_bytes = 65536
