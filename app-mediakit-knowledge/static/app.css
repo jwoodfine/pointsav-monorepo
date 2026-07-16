@@ -659,9 +659,11 @@ button:disabled { cursor: default; }
 .k-compliance__body p { margin: 0 0 var(--k-space-2); }
 
 @media print {
-  /* The record copy carries the full disclaimer, expanded. */
-  .k-compliance__body { display: block !important; }
-  .k-compliance__summary::before { display: none; }
+  /* Wikipedia print model: replace the site footer/legal chrome with one
+     minimal citation line (.k-print-citation, below), not carry it forward.
+     Supersedes the earlier "expanded disclaimer" decision — see
+     BRIEF-print-mode.md's 2026-07-15 revision. */
+  .k-compliance { display: none !important; }
 }
 .k-footer__cities {
   display: flex;
@@ -828,26 +830,27 @@ button:disabled { cursor: default; }
   }
 
   /* The citation/permalink block (see ui::layout::print_citation) — always
-     hidden on screen, always shown in print, so a printed page is a
-     self-contained, attributable record independent of its on-screen chrome. */
+     hidden on screen, always shown in print. Wikipedia print model: this
+     replaces the site footer as the page's only closing record (a minimal
+     "Retrieved from ..." line), not a supplement alongside the full footer —
+     see the .k-footer rule directly below, which now hides the footer
+     entirely rather than restyling it for print. */
   .k-print-citation {
     display: block;
-    margin: 0 0 1.5em;
-    padding-bottom: 0.75em;
-    border-bottom: 1px solid #000;
+    margin: 1.5em 0 0;
+    padding-top: 0.75em;
+    border-top: 1px solid #000;
     font-size: 9pt;
     color: #333;
   }
 
-  .k-footer {
-    background: transparent;
-    border-top: 1px solid #000;
-    color: #000;
-    font-size: 10pt;
-  }
-  .k-footer__link { color: #000; text-decoration: underline; }
-  .k-footer__grid { grid-template-columns: repeat(3, 1fr); }
-  .k-footer__brand-tagline { color: #333; }
+  /* Full site footer (badges, network links, trademark/copyright legal
+     text, multi-column nav) is website chrome, not part of the article
+     record — .k-print-citation above is the article's own self-contained
+     citation line, same role Wikipedia's minimal "Retrieved from" footer
+     plays. Supersedes the earlier "B&W condensed footer" decision — see
+     BRIEF-print-mode.md's 2026-07-15 revision. */
+  .k-footer { display: none !important; }
 }
 
 /* ========================================================================== */
