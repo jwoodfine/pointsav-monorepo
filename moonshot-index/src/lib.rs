@@ -415,6 +415,141 @@ impl TrigramIndex {
         }
         acc
     }
+
+    /// The trigram candidate set for `query`, as [`CandidateHit`]s. A **superset** of
+    /// true substring matches: the trigram filter guarantees no false negatives, but the
+    /// caller must verify content matches against the real body (filename matches are
+    /// already verified here — `name_lc` is always retained, even in the lite mode).
+    ///
+    /// This is the query entry point for the Forge/Strike split: the trigram index is
+    /// persisted and loaded WITHOUT the content copy (see [`save_lite`](Self::save_lite)),
+    /// so content verification is delegated to whoever holds the body — e.g.
+    /// `service-search`, which reads it back from a Tantivy stored field, never from RAM
+    /// or a second disk pass. Queries under 3 bytes fail OPEN to the whole corpus.
+    pub fn candidate_ids(&self, query: &str) -> Vec<CandidateHit> {
+        let q = query.to_lowercase();
+        if q.is_empty() {
+            return Vec::new();
+        }
+        let cands: Vec<u32> = if q.len() < 3 {
+            (0..self.docs.len() as u32).collect()
+        } else {
+            self.candidates_for(&q)
+        };
+        cands
+            .into_iter()
+            .map(|i| {
+                let d = &self.docs[i as usize];
+                CandidateHit {
+                    id: d.id.clone(),
+                    name: d.name.clone(),
+                    name_matches: d.name_lc.contains(&q),
+                }
+            })
+            .collect()
+    }
+
+    /// Serialize a **lite** index: the trigram postings and each doc's `(id, name)` —
+    /// but NOT the content copy. Small on disk, and small in RAM when loaded back with
+    /// [`load_lite`](Self::load_lite): the substring guarantee is preserved through
+    /// [`candidate_ids`](Self::candidate_ids), with content verification delegated to the
+    /// caller. Pure-`std` binary format (little-endian), no serde. This is the sovereign,
+    /// low-memory persistence path for a long-running query server (the Strike).
+    pub fn save_lite(&self, w: &mut impl std::io::Write) -> std::io::Result<()> {
+        w.write_all(b"MSIX1\n")?; // magic + format version
+        write_u64(w, self.max_content_bytes as u64)?;
+        write_u64(w, self.docs.len() as u64)?;
+        for d in &self.docs {
+            write_str(w, &d.id)?;
+            write_str(w, &d.name)?;
+        }
+        write_u64(w, self.postings.len() as u64)?;
+        for (tri, list) in &self.postings {
+            w.write_all(tri)?;
+            write_u64(w, list.len() as u64)?;
+            for v in list {
+                w.write_all(&v.to_le_bytes())?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Load an index written by [`save_lite`](Self::save_lite). Each doc's `content_lc`
+    /// is empty (content is not persisted in lite mode); use
+    /// [`candidate_ids`](Self::candidate_ids) — not [`search`](Self::search) — to query a
+    /// lite-loaded index, and verify content matches against the body held elsewhere.
+    pub fn load_lite(r: &mut impl std::io::Read) -> std::io::Result<Self> {
+        use std::io::{Error, ErrorKind};
+        let mut magic = [0u8; 6];
+        r.read_exact(&mut magic)?;
+        if &magic != b"MSIX1\n" {
+            return Err(Error::new(ErrorKind::InvalidData, "bad service-index magic"));
+        }
+        let max_content_bytes = read_u64(r)? as usize;
+        let ndocs = read_u64(r)? as usize;
+        let mut docs = Vec::with_capacity(ndocs);
+        for _ in 0..ndocs {
+            let id = read_str(r)?;
+            let name = read_str(r)?;
+            let name_lc = name.to_lowercase();
+            docs.push(TriDoc {
+                id,
+                name,
+                name_lc,
+                content_lc: String::new(),
+            });
+        }
+        let nposts = read_u64(r)? as usize;
+        let mut postings: HashMap<[u8; 3], Vec<u32>> = HashMap::with_capacity(nposts);
+        for _ in 0..nposts {
+            let mut tri = [0u8; 3];
+            r.read_exact(&mut tri)?;
+            let len = read_u64(r)? as usize;
+            let mut list = Vec::with_capacity(len);
+            let mut buf = [0u8; 4];
+            for _ in 0..len {
+                r.read_exact(&mut buf)?;
+                list.push(u32::from_le_bytes(buf));
+            }
+            postings.insert(tri, list);
+        }
+        Ok(TrigramIndex {
+            docs,
+            postings,
+            max_content_bytes,
+        })
+    }
+}
+
+/// A trigram candidate from [`TrigramIndex::candidate_ids`]. `name_matches` is verified
+/// (the filename really contains the query); a content match is only *possible* and must
+/// be confirmed by the caller against the real body.
+#[derive(Debug, Clone)]
+pub struct CandidateHit {
+    pub id: String,
+    pub name: String,
+    pub name_matches: bool,
+}
+
+// Pure-std little-endian helpers for the lite index format.
+fn write_u64(w: &mut impl std::io::Write, v: u64) -> std::io::Result<()> {
+    w.write_all(&v.to_le_bytes())
+}
+fn read_u64(r: &mut impl std::io::Read) -> std::io::Result<u64> {
+    let mut b = [0u8; 8];
+    r.read_exact(&mut b)?;
+    Ok(u64::from_le_bytes(b))
+}
+fn write_str(w: &mut impl std::io::Write, s: &str) -> std::io::Result<()> {
+    write_u64(w, s.len() as u64)?;
+    w.write_all(s.as_bytes())
+}
+fn read_str(r: &mut impl std::io::Read) -> std::io::Result<String> {
+    let len = read_u64(r)? as usize;
+    let mut buf = vec![0u8; len];
+    r.read_exact(&mut buf)?;
+    String::from_utf8(buf)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
 }
 
 impl Default for TrigramIndex {
@@ -632,6 +767,31 @@ mod trigram_tests {
         assert!(by_content.iter().any(|h| h.name.contains("lib.rs")));
         // Filename search: "lib.rs" is itself findable (the anti-Spotlight case).
         assert!(t.search("lib.rs").iter().any(|h| h.name.contains("lib.rs")));
+    }
+
+    #[test]
+    fn lite_roundtrip_preserves_the_candidate_guarantee() {
+        // Build a full index, lite-serialize it, load it back, and confirm the trigram
+        // candidate set still contains every true substring match — the guarantee that
+        // survives dropping the content copy.
+        let full = idx(&[
+            ("1", "letter-of-intent.md", "the parties hereby agree"),
+            ("2", "proforma.json", "cap rate and rent roll"),
+            ("3", "notes.txt", "nothing relevant here"),
+        ]);
+        let mut buf: Vec<u8> = Vec::new();
+        full.save_lite(&mut buf).unwrap();
+        let lite = TrigramIndex::load_lite(&mut &buf[..]).unwrap();
+
+        // Content substring "hereby" → doc 1 must be a candidate (content not in RAM,
+        // so name_matches is false, but the candidate is present for the caller to verify).
+        let c = lite.candidate_ids("hereby");
+        assert!(c.iter().any(|h| h.id == "1"), "content candidate must survive lite roundtrip");
+        // Filename substring "proforma" → verified here (name_lc is retained).
+        let f = lite.candidate_ids("proforma");
+        assert!(f.iter().any(|h| h.id == "2" && h.name_matches), "filename match verified in lite");
+        // A truly absent string → no candidates.
+        assert!(lite.candidate_ids("zzzznotpresent").is_empty());
     }
 
     #[test]
