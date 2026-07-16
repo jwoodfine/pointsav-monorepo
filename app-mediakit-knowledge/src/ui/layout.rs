@@ -273,10 +273,21 @@ pub fn mobile_nav(tenant: Tenant, query: &str) -> Markup {
 /// link columns. Disclaimer and Contact live here only. Copyright holder and
 /// trademark notice come from `legal` (loaded from the canonical
 /// `legal-tokens-{brand}.yaml`, falling back to `LegalTokens::default()`).
-pub fn footer(tenant: Tenant, legal: &LegalTokens) -> Markup {
+pub fn footer(tenant: Tenant, legal: &LegalTokens, site_description: Option<&str>) -> Markup {
     html! {
         footer."k-footer" role="contentinfo" {
             div."k-footer__inner" {
+                // Brand re-anchor — repeats the site identity once the masthead
+                // has scrolled off-screen on a long article. Tagline reuses the
+                // site's own canonical description (site-footer recipe,
+                // pointsav-design-system: "deliberately not a second hand-
+                // authored copy, to avoid a second copy drifting out of sync") —
+                // falls back to Tenant::tagline() only when no index.md
+                // short_description exists.
+                div."k-footer__brand" {
+                    p."k-footer__brand-name" { (tenant.home_label()) }
+                    p."k-footer__brand-tagline" { (site_description.unwrap_or_else(|| tenant.tagline())) }
+                }
                 div."k-footer__grid" {
                     div."k-footer__col" {
                         h2."k-footer__col-title" { "Browse" }
@@ -308,60 +319,77 @@ pub fn footer(tenant: Tenant, legal: &LegalTokens) -> Markup {
                         }
                     }
                 }
-                // Base row — copyright + cities on the left, badges on the right.
-                div."k-footer__base" {
-                    div."k-footer__meta" {
+                // Identity bar — 4 distinct stacked rows (site-footer recipe,
+                // pointsav-design-system), not one crowded row: locations+badge,
+                // then copyright, then disclaimer, then trademark each get their
+                // own row. Restructured 2026-07-15 — the prior single-row
+                // "locations+copyright left, badges right" layout is the
+                // recipe's own documented mobile-legibility bug (badges buried
+                // under legal text); this is a real fix, not restyling for its
+                // own sake.
+                div."k-footer__identity" {
+                    div."k-footer__identity-row k-footer__identity-row--locations" {
                         div."k-footer__cities" {
+                            // Middot separator, not pipe — site-footer recipe's
+                            // content_conventions.separator: "the live sites'
+                            // current 'Vancouver | New York' is the one
+                            // inconsistency this component corrects."
                             @for (i, city) in tenant.cities().iter().enumerate() {
-                                @if i > 0 { span."k-footer__cities-sep" aria-hidden="true" { "|" } }
+                                @if i > 0 { span."k-footer__cities-sep" aria-hidden="true" { "\u{00b7}" } }
                                 span { (city) }
                             }
                         }
+                        div."k-footer__badges" {
+                            // Powered by MediaKit (the engine).
+                            a."k-badge" href="/wiki/about" {
+                                span."k-badge__glyph" aria-hidden="true" {
+                                    svg viewBox="0 0 24 24" width="15" height="15" {
+                                        path fill="currentColor" d="M3 5.5A1.5 1.5 0 0 1 4.5 4h15A1.5 1.5 0 0 1 21 5.5v13A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5v-13zM6 8v8l3.2-2.4L6 8zm7 6.5h5V13h-5v1.5zm0-3h5V10h-5v1.5z" {}
+                                    }
+                                }
+                                span."k-badge__text" {
+                                    span."k-badge__lead" { "Powered by" }
+                                    span."k-badge__name" { "MediaKit" }
+                                }
+                            }
+                            // Content licence — per tenant (CC BY for the open docs
+                            // library; CC BY-ND for the verbatim disclosure records).
+                            a."k-badge k-badge--license" href=(tenant.license_url())
+                              target="_blank" rel="noopener license"
+                              aria-label={ "Content licensed " (tenant.license_name()) } {
+                                span."k-badge__cc" aria-hidden="true" {
+                                    img."k-cc-icon" src="/static/cc.svg" alt="" width="20" height="20";
+                                    img."k-cc-icon" src="/static/cc-by.svg" alt="" width="20" height="20";
+                                    @if tenant.license_nd() {
+                                        img."k-cc-icon" src="/static/cc-nd.svg" alt="" width="20" height="20";
+                                    }
+                                }
+                                span."k-badge__text" {
+                                    span."k-badge__lead" { "Licensed" }
+                                    span."k-badge__name" { (tenant.license_name()) }
+                                }
+                            }
+                        }
+                    }
+                    div."k-footer__identity-row" {
                         p."k-footer__copyright" {
                             "\u{00a9} 2026 " (legal.copyright.holder)
                         }
                     }
-                    div."k-footer__badges" {
-                        // Powered by MediaKit (the engine).
-                        a."k-badge" href="/wiki/about" {
-                            span."k-badge__glyph" aria-hidden="true" {
-                                svg viewBox="0 0 24 24" width="15" height="15" {
-                                    path fill="currentColor" d="M3 5.5A1.5 1.5 0 0 1 4.5 4h15A1.5 1.5 0 0 1 21 5.5v13A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5v-13zM6 8v8l3.2-2.4L6 8zm7 6.5h5V13h-5v1.5zm0-3h5V10h-5v1.5z" {}
-                                }
-                            }
-                            span."k-badge__text" {
-                                span."k-badge__lead" { "Powered by" }
-                                span."k-badge__name" { "MediaKit" }
-                            }
-                        }
-                        // Content licence — per tenant (CC BY for the open docs
-                        // library; CC BY-ND for the verbatim disclosure records).
-                        a."k-badge k-badge--license" href=(tenant.license_url())
-                          target="_blank" rel="noopener license"
-                          aria-label={ "Content licensed " (tenant.license_name()) } {
-                            span."k-badge__cc" aria-hidden="true" {
-                                img."k-cc-icon" src="/static/cc.svg" alt="" width="20" height="20";
-                                img."k-cc-icon" src="/static/cc-by.svg" alt="" width="20" height="20";
-                                @if tenant.license_nd() {
-                                    img."k-cc-icon" src="/static/cc-nd.svg" alt="" width="20" height="20";
-                                }
-                            }
-                            span."k-badge__text" {
-                                span."k-badge__lead" { "Licensed" }
-                                span."k-badge__name" { (tenant.license_name()) }
-                            }
+                    div."k-footer__identity-row k-footer__identity-row--muted" {
+                        // Persistent one-line disclaimer (always visible; the band expands it).
+                        p."k-footer__disclaimer" { (tenant.disclaimer_line()) }
+                    }
+                    div."k-footer__identity-row k-footer__identity-row--trademark" {
+                        // Trademark notice — sourced from the canonical
+                        // legal-tokens-{brand}.yaml (factory-release-engineering), not
+                        // hardcoded here. The marks are reserved independently of the
+                        // CC BY 4.0 content licence, so no blanket "all rights reserved"
+                        // (content is openly licensed).
+                        p."k-footer__trademark" {
+                            (legal.trademarks.statement)
                         }
                     }
-                }
-                // Persistent one-line disclaimer (always visible; the band expands it).
-                p."k-footer__disclaimer" { (tenant.disclaimer_line()) }
-                // Trademark notice — sourced from the canonical
-                // legal-tokens-{brand}.yaml (factory-release-engineering), not
-                // hardcoded here. The marks are reserved independently of the
-                // CC BY 4.0 content licence, so no blanket "all rights reserved"
-                // (content is openly licensed).
-                p."k-footer__trademark" {
-                    (legal.trademarks.statement)
                 }
             }
         }
@@ -962,13 +990,16 @@ pub fn research_landing(
 /// element (small wordmark + one-line tagline, then a rule) even though it
 /// hides all interactive header/search/nav chrome — a printed page identifies
 /// its source at both the top and the bottom, not only via the closing
-/// citation line. Reuses `home_label()`/`tagline()`, the same brand strings
-/// the on-screen header and footer already use — no new copy introduced.
-fn print_brand_mark(tenant: Tenant) -> Markup {
+/// citation line. `site_description` is the same canonical description
+/// `footer()`'s brand block uses (site-footer recipe, `pointsav-design-
+/// system`: the tagline must reuse the site's own description, never a
+/// second hand-authored copy) — falls back to `Tenant::tagline()` only when
+/// no description exists (e.g. `index.md` has no `short_description`).
+fn print_brand_mark(tenant: Tenant, site_description: Option<&str>) -> Markup {
     html! {
         div."k-print-brand" {
             p."k-print-brand__name" { (tenant.home_label()) }
-            p."k-print-brand__tagline" { (tenant.tagline()) }
+            p."k-print-brand__tagline" { (site_description.unwrap_or_else(|| tenant.tagline())) }
         }
     }
 }
@@ -1087,6 +1118,7 @@ pub fn page(
     query: &str,
     disclaimer: Option<&str>,
     legal: &LegalTokens,
+    site_description: Option<&str>,
 ) -> Markup {
     html! {
         (DOCTYPE)
@@ -1096,7 +1128,7 @@ pub fn page(
                 a."k-skip-link" href="#k-main" { "Skip to content" }
                 (mobile_nav(tenant, query))
                 div."k-page" {
-                    (print_brand_mark(tenant))
+                    (print_brand_mark(tenant, site_description))
                     (utility_bar(tenant))
                     (header(tenant, lang, query))
                     div."k-shell" {
@@ -1104,7 +1136,7 @@ pub fn page(
                         main."k-page__body" #"k-main" tabindex="-1" { (body) }
                     }
                     (compliance_band(tenant, disclaimer))
-                    (footer(tenant, legal))
+                    (footer(tenant, legal, site_description))
                 }
                 script src="/static/app.js" defer {}
             }
@@ -1253,11 +1285,18 @@ mod tests {
     }
 
     #[test]
-    fn print_brand_mark_uses_tenant_home_label_and_tagline() {
-        let html = print_brand_mark(Tenant::Documentation).into_string();
+    fn print_brand_mark_falls_back_to_tenant_tagline_when_no_site_description() {
+        let html = print_brand_mark(Tenant::Documentation, None).into_string();
         assert!(html.contains("PointSav Documentation"));
         assert!(html.contains("Technical records for the PointSav platform."));
         assert!(html.contains("k-print-brand"));
+    }
+
+    #[test]
+    fn print_brand_mark_prefers_site_description_over_tenant_tagline() {
+        let html = print_brand_mark(Tenant::Documentation, Some("A record repository.")).into_string();
+        assert!(html.contains("A record repository."));
+        assert!(!html.contains("Technical records for the PointSav platform."));
     }
 
     #[test]
