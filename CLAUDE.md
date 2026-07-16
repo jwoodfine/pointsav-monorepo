@@ -63,7 +63,7 @@ commit from this cluster using `bin/commit-as-next.sh`.
 
 ## 4. Key references
 
-- Plan: `.agent/plans/totebox-ppn-infrastructure-master-plan.md`
+- Plan: `/srv/foundry/.agent/briefs/BRIEF-sovereign-os-family-master-plan.md`
 - Cluster wiki draft pipeline: `~/Foundry/conventions/cluster-wiki-draft-pipeline.md`
 - TOPIC/GUIDE drafts already staged: `~/Foundry/.agent/drafts-outbound/topic-*.draft.md` + `guide-*.draft.md`
 

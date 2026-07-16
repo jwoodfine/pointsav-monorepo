@@ -1,7 +1,7 @@
 # NEXT — project-orchestration
 
 > Implementation scope: Totebox Orchestration transition Phases 1–3.
-> Full plan: `.agent/plans/totebox-ppn-infrastructure-master-plan.md`
+> Full plan: `/srv/foundry/.agent/briefs/BRIEF-sovereign-os-family-master-plan.md`
 > Opened: 2026-05-08
 
 ---
@@ -140,6 +140,6 @@ See plan file §"Two-VM transition" for full detail.
 
 ## Key references
 
-- Plan file: `.agent/plans/totebox-ppn-infrastructure-master-plan.md`
+- Plan file: `/srv/foundry/.agent/briefs/BRIEF-sovereign-os-family-master-plan.md`
 - Cluster manifest: `.agent/manifest.md`
 - app-orchestration-gis reference impl: `clones/project-gis/pointsav-monorepo/app-orchestration-gis/`
