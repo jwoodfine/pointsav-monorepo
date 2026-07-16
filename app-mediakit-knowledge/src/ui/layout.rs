@@ -955,6 +955,24 @@ pub fn research_landing(
     }
 }
 
+/// Print-only brand mark at the very top of the page — same `display:none`-
+/// then-`@media print`-override mechanism as `.k-print-citation` below.
+/// Added 2026-07-15 after comparing our print render directly against a real
+/// Wikipedia print render: Wikipedia keeps a minimal top-of-page brand
+/// element (small wordmark + one-line tagline, then a rule) even though it
+/// hides all interactive header/search/nav chrome — a printed page identifies
+/// its source at both the top and the bottom, not only via the closing
+/// citation line. Reuses `home_label()`/`tagline()`, the same brand strings
+/// the on-screen header and footer already use — no new copy introduced.
+fn print_brand_mark(tenant: Tenant) -> Markup {
+    html! {
+        div."k-print-brand" {
+            p."k-print-brand__name" { (tenant.home_label()) }
+            p."k-print-brand__tagline" { (tenant.tagline()) }
+        }
+    }
+}
+
 /// Print-only citation stamp for JOURNAL pages — same purpose and CSS
 /// mechanism as `article()`'s own (Phase 9 print mode, `.k-print-citation`
 /// is `display:none` on screen, shown only in `@media print`). Prefers the
@@ -1078,6 +1096,7 @@ pub fn page(
                 a."k-skip-link" href="#k-main" { "Skip to content" }
                 (mobile_nav(tenant, query))
                 div."k-page" {
+                    (print_brand_mark(tenant))
                     (utility_bar(tenant))
                     (header(tenant, lang, query))
                     div."k-shell" {
@@ -1231,6 +1250,14 @@ mod tests {
         assert!(with_cite_as.contains("Cite this record: Woodfine (2026)."));
         let without_cite_as = research_fulltext("T", &[], "<p>b</p>", false, "my-slug", None).into_string();
         assert!(without_cite_as.contains("Cite this record: /research/my-slug."));
+    }
+
+    #[test]
+    fn print_brand_mark_uses_tenant_home_label_and_tagline() {
+        let html = print_brand_mark(Tenant::Documentation).into_string();
+        assert!(html.contains("PointSav Documentation"));
+        assert!(html.contains("Technical records for the PointSav platform."));
+        assert!(html.contains("k-print-brand"));
     }
 
     #[test]
