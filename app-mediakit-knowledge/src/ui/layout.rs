@@ -273,7 +273,7 @@ pub fn mobile_nav(tenant: Tenant, query: &str) -> Markup {
 /// link columns. Disclaimer and Contact live here only. Copyright holder and
 /// trademark notice come from `legal` (loaded from the canonical
 /// `legal-tokens-{brand}.yaml`, falling back to `LegalTokens::default()`).
-pub fn footer(tenant: Tenant, legal: &LegalTokens, site_description: Option<&str>) -> Markup {
+pub fn footer(tenant: Tenant, legal: &LegalTokens, site_description: Option<&str>, article_count: usize) -> Markup {
     html! {
         footer."k-footer" role="contentinfo" {
             div."k-footer__inner" {
@@ -291,6 +291,14 @@ pub fn footer(tenant: Tenant, legal: &LegalTokens, site_description: Option<&str
                 div."k-footer__grid" {
                     div."k-footer__col" {
                         h2."k-footer__col-title" { "Browse" }
+                        // One editorial fact line under the heading — the
+                        // bim.woodfinegroup.com pattern (a real fact per
+                        // column instead of a bare link list) applied
+                        // minimally: one line, one column, real live data.
+                        p."k-footer__col-fact" {
+                            @if article_count == 1 { "1 article" }
+                            @else { (article_count) " articles" }
+                        }
                         ul."k-footer__list" {
                             li { a."k-footer__link" href="/" { "Home" } }
                             li { a."k-footer__link" href="/special/all-pages" { "All articles" } }
@@ -1119,6 +1127,7 @@ pub fn page(
     disclaimer: Option<&str>,
     legal: &LegalTokens,
     site_description: Option<&str>,
+    article_count: usize,
 ) -> Markup {
     html! {
         (DOCTYPE)
@@ -1136,7 +1145,7 @@ pub fn page(
                         main."k-page__body" #"k-main" tabindex="-1" { (body) }
                     }
                     (compliance_band(tenant, disclaimer))
-                    (footer(tenant, legal, site_description))
+                    (footer(tenant, legal, site_description, article_count))
                 }
                 script src="/static/app.js" defer {}
             }
