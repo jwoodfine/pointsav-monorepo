@@ -2479,6 +2479,7 @@ const COMMANDS = [
   { id: 'toggle-hidden',   title: 'Toggle Hidden Files',    category: 'View',     shortcut: '',                  when: () => true,                                                      run: toggleHiddenFiles },
   { id: 'toggle-editor',   title: 'Toggle Editor Panel',    category: 'View',     shortcut: '',                  when: () => editorPanelVisible(),                                      run: toggleEditorCollapse },
   { id: 'focus-search',    title: 'Focus File Search',      category: 'Navigate', shortcut: '',                  when: () => true,                                                      run: () => document.getElementById('search-input').focus() },
+  { id: 'ai-chat',         title: 'Toggle AI Chat',         category: 'AI',       shortcut: '⌘L / Ctrl+L',       when: () => true,                                                      run: () => { if (window.__toggleAiChat) window.__toggleAiChat(); } },
 ];
 
 let cmdpalFocusIdx  = -1;
@@ -2686,6 +2687,13 @@ window.addEventListener('keydown', e => {
 
   if ((e.metaKey || e.ctrlKey) && e.key === 'p') { e.preventDefault(); printCurrent(); }
   if ((e.metaKey || e.ctrlKey) && e.key === 's') { e.preventDefault(); saveFile(); }
+  // Ctrl/Cmd+L toggles AI chat (Cursor's shortcut). Registered here directly, not
+  // via ShellChrome — this app has no ShellChrome, so the prototype's window.ShellChrome
+  // guard would leave the panel unopenable.
+  if ((e.metaKey || e.ctrlKey) && !e.shiftKey && (e.key === 'l' || e.key === 'L')) {
+    e.preventDefault();
+    if (window.__toggleAiChat) window.__toggleAiChat();
+  }
   if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
     if (document.getElementById('editor-panel').classList.contains('visible')) {
       e.preventDefault(); showFindBar();
@@ -4434,5 +4442,103 @@ searchInput.addEventListener('keydown', e => {
 
 <div id="wb-toast" role="status" aria-live="polite" aria-atomic="true"></div>
 
+<!-- In-workbench AI chat (Cursor-style). Proxies to the SLM Doorman via /_api/edit/chat
+     (nginx strips the prefix → /chat backend); model routes to local OLMo (Tier A, free,
+     SYS-ADR-07-safe). Toggle: Ctrl/Cmd+L or the command palette. Ported from
+     app-workplace-http-prototype; ShellChrome registration replaced with window.__toggleAiChat
+     (this app has no ShellChrome) and the fetch path made absolute for the 120s nginx timeout. -->
+<style>
+  #ai-chat { position: fixed; top: 0; right: 0; width: 380px; max-width: 92vw; height: 100vh;
+    display: none; flex-direction: column; background: #ffffff; color: #333333;
+    border-left: 1px solid #d0d0d0; box-shadow: -8px 0 24px rgba(0,0,0,.15); z-index: 900;
+    font: 13px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #ai-chat.open { display: flex; }
+  #ai-chat-head { display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 12px; border-bottom: 1px solid #d0d0d0; font-weight: 600; }
+  #ai-chat-head .sub { font-weight: 400; opacity: .6; font-size: 11px; }
+  #ai-chat-close { cursor: pointer; background: none; border: 0; color: inherit; font-size: 18px; line-height: 1; }
+  #ai-chat-msgs { flex: 1 1 auto; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .ai-chat-msg { padding: 8px 10px; border-radius: 8px; white-space: pre-wrap; word-break: break-word; max-width: 92%; }
+  .ai-chat-msg--user { align-self: flex-end; background: #094771; color: #fff; }
+  .ai-chat-msg--assistant { align-self: flex-start; background: #f0f0f0; color: #1a1a1a; }
+  #ai-chat-status { padding: 2px 12px; font-size: 11px; opacity: .6; min-height: 16px; }
+  #ai-chat-form { display: flex; gap: 6px; padding: 10px 12px; border-top: 1px solid #d0d0d0; }
+  #ai-chat-input { flex: 1 1 auto; resize: none; height: 44px; padding: 8px; border-radius: 6px;
+    border: 1px solid #d0d0d0; background: #fff; color: inherit; font: inherit; }
+  #ai-chat-send { padding: 0 14px; border-radius: 6px; border: 0; background: #094771; color: #fff; cursor: pointer; }
+  #ai-chat-send:disabled { opacity: .5; cursor: default; }
+</style>
+<div id="ai-chat" aria-label="AI chat panel">
+  <div id="ai-chat-head"><span>AI Chat <span class="sub">local OLMo · $0</span></span>
+    <button id="ai-chat-close" title="Close (Ctrl/Cmd+L)" aria-label="Close AI chat">×</button></div>
+  <div id="ai-chat-msgs" role="log" aria-live="polite"></div>
+  <div id="ai-chat-status" role="status" aria-live="polite"></div>
+  <form id="ai-chat-form">
+    <textarea id="ai-chat-input" placeholder="Ask the local model…  (Enter to send, Shift+Enter for newline)" aria-label="Chat message"></textarea>
+    <button id="ai-chat-send" type="submit">Send</button>
+  </form>
+</div>
+<script>
+(function () {
+  var messages = [];
+  var panel = document.getElementById('ai-chat');
+  var msgsEl = document.getElementById('ai-chat-msgs');
+  var statusEl = document.getElementById('ai-chat-status');
+  var inputEl = document.getElementById('ai-chat-input');
+  var sendBtn = document.getElementById('ai-chat-send');
+
+  function render() {
+    msgsEl.innerHTML = '';
+    messages.forEach(function (m) {
+      var d = document.createElement('div');
+      d.className = 'ai-chat-msg ai-chat-msg--' + m.role;
+      d.textContent = m.content;
+      msgsEl.appendChild(d);
+    });
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  }
+  function setStatus(s) { statusEl.textContent = s || ''; }
+
+  async function send() {
+    var text = inputEl.value.trim();
+    if (!text) return;
+    inputEl.value = '';
+    messages.push({ role: 'user', content: text });
+    render();
+    setStatus('thinking… (local OLMo — can take a few seconds)');
+    sendBtn.disabled = true; inputEl.disabled = true;
+    try {
+      var r = await fetch('/_api/edit/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: messages }),
+      });
+      if (!r.ok) throw new Error((await r.text()) || ('HTTP ' + r.status));
+      var j = await r.json();
+      messages.push({ role: 'assistant', content: j.content || '(empty response)' });
+      render();
+      setStatus((j.tier_used || 'local') + ' · ' + (j.inference_ms || 0) + 'ms · $' + (j.cost_usd || 0));
+    } catch (e) {
+      messages.push({ role: 'assistant', content: '⚠ ' + (e && e.message ? e.message : e) });
+      render();
+      setStatus('error');
+    } finally {
+      sendBtn.disabled = false; inputEl.disabled = false; inputEl.focus();
+    }
+  }
+
+  function toggle() {
+    panel.classList.toggle('open');
+    if (panel.classList.contains('open')) inputEl.focus();
+  }
+  // Exposed for the global Ctrl/Cmd+L handler and the command-palette entry.
+  window.__toggleAiChat = toggle;
+
+  document.getElementById('ai-chat-form').addEventListener('submit', function (e) { e.preventDefault(); send(); });
+  document.getElementById('ai-chat-close').addEventListener('click', toggle);
+  inputEl.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+})();
+</script>
 </body>
 </html>

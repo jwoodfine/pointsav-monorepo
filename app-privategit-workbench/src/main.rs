@@ -1649,6 +1649,8 @@ async fn main() -> Result<()> {
         .route("/pdf", get(get_pdf))
         .route("/zip", get(get_zip))
         .route("/events", get(get_events))
+        // In-workbench AI chat (Cursor-style) — proxies to the SLM Doorman.
+        .route("/chat", post(chat))
         .with_state(state);
 
     let addr: SocketAddr = config.bind.parse().context("parsing bind address")?;
@@ -1657,4 +1659,92 @@ async fn main() -> Result<()> {
     let listener = TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// AI chat — proxy to the SLM Doorman (service-slm)
+// Ported from app-workplace-http-prototype/src/workbench.rs. The browser cannot
+// reach 127.0.0.1:9080 itself, so the workbench backend proxies. Reached from
+// the frontend as /_api/edit/chat (nginx strips the /_api/edit/ prefix → /chat);
+// that path carries the 120s proxy timeout the Doorman needs, unlike location /.
+// ---------------------------------------------------------------------------
+
+/// Local SLM Doorman inference endpoint. Model "olmo" routes to Tier A (local
+/// OLMo 7B, free, SYS-ADR-07-safe — no data leaves the VM).
+const DOORMAN_URL: &str = "http://127.0.0.1:9080/v1/chat/completions";
+
+#[derive(Deserialize, Serialize, Clone)]
+struct ChatMessage {
+    role: String,
+    content: String,
+}
+
+#[derive(Deserialize)]
+struct ChatRequest {
+    messages: Vec<ChatMessage>,
+}
+
+#[derive(Serialize)]
+struct DoormanRequest<'a> {
+    model: &'a str,
+    messages: &'a [ChatMessage],
+    max_tokens: u32,
+    stream: bool,
+}
+
+#[derive(Deserialize)]
+struct DoormanResponse {
+    content: Option<String>,
+    tier_used: Option<String>,
+    inference_ms: Option<u64>,
+    cost_usd: Option<f64>,
+}
+
+/// POST /chat — forward the conversation to the Doorman and return the reply.
+async fn chat(Json(req): Json<ChatRequest>) -> Response {
+    if req.messages.is_empty() {
+        return (StatusCode::BAD_REQUEST, "no messages").into_response();
+    }
+    let body = DoormanRequest {
+        model: "olmo",
+        messages: &req.messages,
+        max_tokens: 512,
+        stream: false,
+    };
+    let client = reqwest::Client::new();
+    let resp = match client
+        .post(DOORMAN_URL)
+        .json(&body)
+        .timeout(std::time::Duration::from_secs(120))
+        .send()
+        .await
+    {
+        Ok(r) => r,
+        Err(e) => {
+            return (
+                StatusCode::BAD_GATEWAY,
+                format!("SLM Doorman unreachable: {e}"),
+            )
+                .into_response()
+        }
+    };
+    if !resp.status().is_success() {
+        let code = resp.status();
+        let text = resp.text().await.unwrap_or_default();
+        return (StatusCode::BAD_GATEWAY, format!("Doorman {code}: {text}")).into_response();
+    }
+    match resp.json::<DoormanResponse>().await {
+        Ok(dr) => Json(serde_json::json!({
+            "content": dr.content.unwrap_or_default(),
+            "tier_used": dr.tier_used,
+            "inference_ms": dr.inference_ms,
+            "cost_usd": dr.cost_usd,
+        }))
+        .into_response(),
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            format!("bad Doorman response: {e}"),
+        )
+            .into_response(),
+    }
 }
