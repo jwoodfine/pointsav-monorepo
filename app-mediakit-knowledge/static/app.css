@@ -776,11 +776,14 @@ button:disabled { cursor: default; }
 /* server-side ?format=pdf route rendering this stylesheet via headless      */
 /* Chromium — Wikipedia's actual Proton pattern — not a client library.       */
 /* ========================================================================== */
-/* .k-print-citation is print-only chrome; hidden on screen by default here,
-   BEFORE the @media print block below overrides it — same-specificity rules
-   resolve by source order, so this must come first or the print override
-   (later in the cascade) would lose to this one even while printing. */
-.k-print-citation { display: none; }
+/* .k-print-citation and .k-print-brand are print-only chrome; hidden on
+   screen by default here, BEFORE the @media print block below overrides
+   them — same-specificity rules resolve by source order, so this must come
+   first or the print override (later in the cascade) would lose to this one
+   even while printing (this is the exact bug the citation stamp shipped
+   with originally — see the "Verified" section of BRIEF-print-mode.md). */
+.k-print-citation,
+.k-print-brand { display: none; }
 
 @media print {
   .k-skip-link,
@@ -792,6 +795,29 @@ button:disabled { cursor: default; }
   .k-nav-drawer,
   .k-sidenav,
   .k-tabs { display: none !important; }
+
+  /* Minimal top-of-page brand mark — Wikipedia keeps one even though it
+     hides all interactive header chrome (see BRIEF-print-mode.md's
+     2026-07-15 revision). Same visual weight as the article title's own
+     print rule for a consistent top/bottom bracket around the record. */
+  .k-print-brand {
+    display: block;
+    margin: 0 0 1em;
+    padding-bottom: 0.5em;
+    border-bottom: 2px solid #000;
+  }
+  .k-print-brand__name {
+    margin: 0;
+    font-family: var(--k-title-font);
+    font-weight: var(--k-weight-bold);
+    font-size: 14pt;
+    color: #000;
+  }
+  .k-print-brand__tagline {
+    margin: 0.15em 0 0;
+    font-size: 9pt;
+    color: #333;
+  }
 
   @page {
     margin: 2cm 1.5cm;
