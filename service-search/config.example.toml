@@ -1,0 +1,25 @@
+# service-search — example config for the DEV workbench corpus.
+#
+# The Forge reads this, indexes every root, writes to index_path, and exits.
+# The Strike reads the same file, loads index_path read-only, and serves :bind.
+#
+# NOTE: the workbench's `_command` root (→ /srv/foundry, 83 GB) is DELIBERATELY
+# omitted here — it is not a project corpus and would balloon the index. Add real
+# project roots only.
+
+index_path = "/srv/foundry/cargo-target/jennifer/service-search/index"
+bind = "127.0.0.1:9310"
+max_content_bytes = 5242880   # 5 MiB — larger files are indexed by name only
+
+# Prune build/vendor trees (measured: ~5% of files, but avoids indexing generated noise).
+exclude_dirs = ["target", "node_modules", "vendor", "dist", ".venv", ".git"]
+
+[[roots]]
+url_prefix = "_clones/project-workplace"
+fs_path = "/srv/foundry/clones/project-workplace"
+
+# Add further project-* roots as needed, mirroring the workbench's config.toml
+# [[root]] entries (minus _command and _sandbox-jennifer). Example:
+# [[roots]]
+# url_prefix = "_clones/project-editorial"
+# fs_path = "/srv/foundry/clones/project-editorial"
