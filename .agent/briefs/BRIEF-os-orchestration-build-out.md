@@ -443,27 +443,56 @@ a stub once the first os-orchestration PD is running. Stage the updated manuscri
 | 2026-06-19 | totebox@project-data | BRIEF created; research gathered from project-infrastructure, project-system, project-data-journals, project-orchestration, and project-data-code subagents; full architecture documented. |
 | 2026-07-08 | totebox@project-totebox | Identified as misscoped (merge artifact from 2026-06-20 project-data → project-totebox merge); archived with `moved_to: project-orchestration`; flagged to Command for physical redistribution. |
 | 2026-07-09 | command@claude-code | Physically redistributed to project-orchestration's own `.agent/briefs/`; status restored to `active`, owner corrected. |
+| 2026-07-15 | totebox@project-orchestration | Found the 2026-07-09 redistribution moved BRIEF ownership but not the underlying code: §15's "actionable in project-orchestration" items all target crates still under `clones/project-data/` (archived, merged into `project-totebox` 2026-06-20) — matches what project-totebox itself flagged on 2026-07-08, but the code-location half of that gap was never closed. Reconciled §15 against §10's "already implemented (session-11)" evidence (Phase 2 endpoints + membership tokens were stale-checkbox, not actually open) and reclassified the remaining Phase O1/O2/O3 items as project-totebox scope. Sent coordination message to project-totebox. No code changes made against this BRIEF's Phase O items — out of this session's reach. |
 
 ---
 
 ## §15 — Carry-Forward
 
-**Actionable in project-orchestration (Totebox scope):**
+> **Scope correction (2026-07-15, totebox@project-orchestration):** the "Actionable in
+> project-orchestration" list below was wrong. `app-orchestration-slm`, `os-interface`/
+> `os-orchestration`, and `app-orchestration-bim` physically live under
+> `clones/project-data/` — and `project-data` was **archived 2026-06-20, merged into
+> `project-totebox`** (confirmed via `PROJECT-CLONES.md`). None of those crates exist in
+> this archive's `pointsav-monorepo/` (only `app-orchestration-command/` and
+> `app-orchestration-graph/` do). This BRIEF was physically redistributed to
+> project-orchestration on 2026-07-09 for *architecture/roadmap ownership* — the actual
+> Phase O1–O3 code was never moved and isn't reachable from this session. Reclassified
+> below; a coordination message went to project-totebox the same day flagging this.
+>
+> Also reconciled against §10 "Current State," which already documents Phase 2 endpoints
+> and Ed25519 membership tokens as implemented (session-11) — the checklist below hadn't
+> been updated to match. Only `/v1/audit/rollup` (placeholder rollup) is confirmed still
+> open on the Phase O1 endpoint set.
 
-- [ ] Phase O1: implement Phase 2 endpoints in `app-orchestration-slm`
-  (`/v1/graph/federated`, `/v1/training/schedule`, `/v1/adapters`, `/v1/audit/rollup`).
-- [ ] Phase O1: replace `tier_b_subscribed` self-attestation with signed Ed25519 membership token.
-- [ ] Phase O1: integration test — two Doorman instances registering, routing, and metering.
+**Actionable in project-orchestration (Totebox scope) — this archive's own crates only:**
+
+- [x] Update `.agent/briefs/README.md` to include this BRIEF in the active-briefs table
+  — verified already done; both BRIEFs are listed.
+- [ ] J5 §4: update JOURNAL-totebox-orchestration Implementation section after Phase O1
+  lands (blocked on project-totebox landing Phase O1 remainder, not this archive's work).
+- [ ] J5 §5/§6/§8: draft Evaluation, Discussion, Conclusion stubs after benchmark harness
+  is available.
+
+**Reclassified — project-totebox scope (crates live in their archive, not here):**
+
+- [x] Phase O1: `/v1/graph/federated`, `/v1/training/schedule`, `/v1/adapters` — already
+  implemented per §10 (session-11); only checklist was stale.
+- [x] Phase O1: signed Ed25519 membership token (`membership.rs`) — already implemented
+  per §10 (session-11); only checklist was stale.
+- [ ] Phase O1: `/v1/audit/rollup` — still returns an empty placeholder per §10.
+- [ ] Phase O1: integration test — two Doorman instances registering, routing, metering.
 - [ ] Phase O2: scaffold `capability-broker-pd` as a `moonshot-sel4-vmm` PD entry point.
 - [ ] Phase O2: define CBOR capability manifest format; confirm with operator.
 - [ ] Phase O3: write `examples/os-orchestration.toml` for `moonshot-toolkit`.
-- [ ] J5 §4: update JOURNAL-totebox-orchestration Implementation section after Phase O1 lands.
-- [ ] J5 §5/§6/§8: draft Evaluation, Discussion, Conclusion stubs after benchmark harness is available.
-- [ ] Rename commit: `os-interface/` → `os-orchestration/` (or confirm Command Session handles this).
-- [ ] Update `.agent/briefs/README.md` to include this BRIEF in the active-briefs table.
+- [ ] Rename commit: `os-interface/` → `os-orchestration/` — note: both directories were
+  observed present under `clones/project-data/` as of 2026-07-15; rename status unclear,
+  project-totebox should confirm current state.
 
 **Route to Command Session (outbox):**
 
-- [ ] Stage 6 promotion for `app-orchestration-slm` commits (batch with pending project-data commits).
+- [ ] Stage 6 promotion for `app-orchestration-slm` commits — batch with project-totebox's
+  own pending commits now (not "project-data commits"; that archive no longer exists as
+  an active target).
 - [ ] Hardware decision: AArch64 GCP vs Firecracker x86_64 for Phase O3 (operator action required).
 - [ ] vm-intelligence launch (Part C Step C1) — gated on WireGuard Part A + app-orchestration-command v0.0.1.
