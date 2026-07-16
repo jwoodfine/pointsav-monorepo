@@ -52,6 +52,50 @@
   font-weight: var(--k-weight-medium);
 }
 
+/* --- JOURNAL masthead (SPEC-journal-wiki-render-contract.md §5 item 1) ---- */
+.k-masthead { padding-block: var(--k-space-4) var(--k-space-5); }
+.k-masthead__title {
+  font-family: var(--k-title-font);
+  font-size: var(--k-title-fs);
+  margin: 0 0 var(--k-space-2);
+}
+.k-masthead__authors {
+  margin: 0 0 var(--k-space-1);
+  font-family: var(--k-font-sans);
+  font-size: var(--k-text-sm);
+  color: var(--k-ink-secondary);
+}
+.k-masthead__author-sep { color: var(--k-ink-muted); }
+.k-masthead__affiliation {
+  /* Superscript with no left margin sits flush against the author name
+     (e.g. "Test AuthorTest Org") — found via print-mode screenshot review. */
+  margin-left: 0.2em;
+  font-size: 0.75em;
+  color: var(--k-ink-muted);
+}
+.k-masthead__correspondence {
+  margin: 0;
+  font-family: var(--k-font-sans);
+  font-size: var(--k-text-sm);
+  color: var(--k-ink-muted);
+}
+
+/* --- JOURNAL research pages (/research/{slug}, /research/{slug}/full) ---- */
+.k-research__abstract {
+  margin-top: var(--k-space-4);
+  padding-top: var(--k-space-4);
+  border-top: 1px solid var(--k-border-subtle);
+}
+.k-research__abstract h2 {
+  font-family: var(--k-font-sans);
+  font-size: var(--k-text-sm);
+  text-transform: uppercase;
+  letter-spacing: var(--k-tracking-caps);
+  color: var(--k-ink-muted);
+  margin: 0 0 var(--k-space-2);
+}
+.k-research__fulltext-link { margin-top: var(--k-space-5); }
+
 /* --- Article shell -------------------------------------------------------- */
 .k-article {
   padding-block: var(--k-space-4) var(--k-space-7);
