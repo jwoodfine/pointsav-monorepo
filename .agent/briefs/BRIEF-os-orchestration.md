@@ -189,6 +189,25 @@ user entries as archive topology rows. Infrastructure ACK confirmed this separat
   does not depend on either blocker: SHA-256 fingerprint upgrade, `PairingStore` startup
   load from `user-pairings.yaml`, and WORM ledger `pairing_revoked` event
   (`schema_version: "2"`, old `"1"` entries treated as not-revoked for backward compat).
+- 2026-07-15/16 — Operator asked whether os-orchestration was ready to test. Checked the
+  live deployment (`gateway-orchestration-command-1`, port 8020): running, but stale
+  (v0.0.1, `29d0b4a1`), observation mode (no license token), and **fleet loading silently
+  broken since first deploy 2026-06-29** — `fleet.rs`'s `PairingsYaml` struct expected a
+  top-level `archives:` key; the real `pairings.yaml` uses `pairings:`. `/v1/archives` has
+  returned an empty list in production for the entire deployment's life; only a WARN in
+  the log, never a startup failure. Fixed (`dc2899b1`), added a regression test against
+  the real `pairings.yaml` shape. Verified live end-to-end on a scratch instance (port
+  18021, dev-minted Ed25519 license token — the `[0u8;32]` "dev key" in `main.rs` is a
+  placeholder `VerifyingKey` with no matching `SigningKey`, generated a real keypair
+  instead): `/v1/archives` now returns real fleet data; full invite→pair flow produces a
+  `sha256:`-prefixed `key_fingerprint` in the WORM ledger; **restart test confirmed
+  `PairingStore::load()` genuinely restores prior pairings** — re-pairing the same key
+  post-restart returned `already_paired` with the original pre-restart `paired_on`
+  timestamp, not just a restored count. Production `/usr/local/bin` swap + systemd
+  restart is Command Session scope (`deploy-binary.sh` guards against running from a
+  Totebox clone and requires HEAD already on canonical `origin/main`) — not done here;
+  `dc2899b1` is staged via Stage 6 lite, awaiting Command's canonical merge same as the
+  earlier v0.1.0 commit.
 
 ---
 
