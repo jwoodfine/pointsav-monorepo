@@ -11,15 +11,17 @@
     "xs":   { "$type": "dimension", "$var": "text-xs",   "$value": "0.75rem",   "$description": "12px — sitenotice, footer meta" },
     "sm":   { "$type": "dimension", "$var": "text-sm",   "$value": "0.8125rem", "$description": "13px — controls, nav links" },
     "base": { "$type": "dimension", "$var": "text-base", "$value": "0.875rem",  "$description": "14px — chrome baseline (Vector register)" },
-    "md":   { "$type": "dimension", "$var": "text-md",   "$value": "1rem",      "$description": "16px — search input, footer col titles" },
+    "md":   { "$type": "dimension", "$var": "text-md",   "$value": "1rem",      "$description": "16px — search input" },
     "lg":   { "$type": "dimension", "$var": "text-lg",   "$value": "1.125rem",  "$description": "18px — logo wordmark" },
     "xl":   { "$type": "dimension", "$var": "text-xl",   "$value": "1.375rem",  "$description": "22px" },
-    "2xl":  { "$type": "dimension", "$var": "text-2xl",  "$value": "1.75rem",   "$description": "28px" }
+    "2xl":  { "$type": "dimension", "$var": "text-2xl",  "$value": "1.75rem",   "$description": "28px" },
+    "footer-heading": { "$type": "dimension", "$var": "text-footer-heading", "$value": "1.0625rem", "$description": "17px — footer column headings; a deliberate off-scale step (not md/16 or lg/18) matching bim.woodfinegroup.com's own legibility-audit value, adopted 2026-07-16 after that heading size was found to read as fine print at 2xs" }
   },
   "leading": {
-    "tight":  { "$type": "number", "$var": "leading-tight",  "$value": 1.25 },
-    "snug":   { "$type": "number", "$var": "leading-snug",   "$value": 1.4 },
-    "normal": { "$type": "number", "$var": "leading-normal", "$value": 1.55 }
+    "tight":   { "$type": "number", "$var": "leading-tight",   "$value": 1.25 },
+    "snug":    { "$type": "number", "$var": "leading-snug",    "$value": 1.4 },
+    "normal":  { "$type": "number", "$var": "leading-normal",  "$value": 1.55 },
+    "relaxed": { "$type": "number", "$var": "leading-relaxed", "$value": 1.6, "$description": "footer link-list rhythm — bim.woodfinegroup.com precedent, 2026-07-16" }
   },
   "weight": {
     "regular":  { "$type": "fontWeight", "$var": "weight-regular",  "$value": 400 },
@@ -111,7 +113,8 @@
     "none":   { "$type": "string", "$var": "shadow-none",   "$value": "none" },
     "sm":     { "$type": "shadow", "$var": "shadow-sm",     "$value": "0 1px 2px rgba(32, 33, 34, 0.08)" },
     "header": { "$type": "shadow", "$var": "shadow-header", "$value": "0 1px 0 var(--k-border)" },
-    "drawer": { "$type": "shadow", "$var": "shadow-drawer", "$value": "2px 0 12px rgba(32, 33, 34, 0.18)" }
+    "drawer": { "$type": "shadow", "$var": "shadow-drawer", "$value": "2px 0 12px rgba(32, 33, 34, 0.18)" },
+    "footer": { "$type": "shadow", "$var": "shadow-footer", "$value": "0 -10px 24px -20px rgba(11, 35, 64, 0.28)", "$description": "footer elevation — bim.woodfinegroup.com precedent, 2026-07-16. Paired with a top-edge gradient wash left as a literal in app.css (composited with --k-footer-bg per-theme; no gradient $type precedent in this file yet)" }
   },
   "motion": {
     "fast":     { "$type": "duration",    "$var": "motion-fast", "$value": "120ms" },
