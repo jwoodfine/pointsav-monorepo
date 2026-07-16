@@ -464,11 +464,15 @@ pub fn article(
                 }
             }
             h1."k-article__title" { (title) }
+            div."k-prose" { (PreEscaped(body_html)) }
             @if asof.is_none() {
                 // Print-only citation stamp (Phase 9 — .k-print-citation is
-                // display:none on screen, shown only in @media print). A
-                // historical (asof) view already carries its own "Revision as
-                // of" banner above, so this doesn't duplicate for that case.
+                // display:none on screen, shown only in @media print).
+                // Placed after the body, not before it — Wikipedia's own
+                // "Retrieved from ..." line is the article's closing record,
+                // not a header (2026-07-15 revision, see BRIEF-print-mode.md).
+                // A historical (asof) view already carries its own "Revision
+                // as of" banner above, so this doesn't duplicate for that case.
                 p."k-print-citation" {
                     "Cite this record: /wiki/" (slug)
                     @if let Some(s) = sha { " \u{2014} revision " code { (s) } }
@@ -478,7 +482,6 @@ pub fn article(
                     "."
                 }
             }
-            div."k-prose" { (PreEscaped(body_html)) }
         }
     }
 }
@@ -996,8 +999,8 @@ pub fn research_fulltext(
     html! {
         article."k-research k-research--fulltext"."k-research--geospatial"[geospatial] {
             (masthead(title, authors))
-            (print_citation_stamp(slug, cite_as))
             div."k-prose" { (PreEscaped(body_html)) }
+            (print_citation_stamp(slug, cite_as))
         }
     }
 }
