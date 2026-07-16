@@ -68,6 +68,7 @@
   --k-h3-fs: 1.2rem; /* 19px sub-section */
   --k-heading-rule: var(--k-border-light);
   --k-leading-normal: 1.55;
+  --k-leading-relaxed: 1.6; /* footer link-list rhythm — bim.woodfinegroup.com precedent, 2026-07-16 */
   --k-leading-snug: 1.4;
   --k-leading-tight: 1.25;
   --k-motion-base: 180ms;
@@ -89,6 +90,7 @@
   --k-radius-sm: 3px;
   --k-radius-xs: 2px;
   --k-shadow-drawer: 2px 0 12px rgba(32, 33, 34, 0.18);
+  --k-shadow-footer: 0 -10px 24px -20px rgba(11, 35, 64, 0.28); /* footer elevation — bim.woodfinegroup.com precedent, 2026-07-16. Paired with a top-edge gradient wash left as a literal in app.css (composited with --k-footer-bg per-theme; no gradient $type precedent in this file yet) */
   --k-shadow-header: 0 1px 0 var(--k-border);
   --k-shadow-none: none;
   --k-shadow-sm: 0 1px 2px rgba(32, 33, 34, 0.08);
@@ -110,8 +112,9 @@
   --k-text-2xl: 1.75rem; /* 28px */
   --k-text-2xs: 0.6875rem; /* 11px — badge, legal fine print */
   --k-text-base: 0.875rem; /* 14px — chrome baseline (Vector register) */
+  --k-text-footer-heading: 1.0625rem; /* 17px — footer column headings; a deliberate off-scale step (not md/16 or lg/18) matching bim.woodfinegroup.com's own legibility-audit value, adopted 2026-07-16 after that heading size was found to read as fine print at 2xs */
   --k-text-lg: 1.125rem; /* 18px — logo wordmark */
-  --k-text-md: 1rem; /* 16px — search input, footer col titles */
+  --k-text-md: 1rem; /* 16px — search input */
   --k-text-sm: 0.8125rem; /* 13px — controls, nav links */
   --k-text-xl: 1.375rem; /* 22px */
   --k-text-xs: 0.75rem; /* 12px — sitenotice, footer meta */
