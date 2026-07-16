@@ -180,6 +180,15 @@ user entries as archive topology rows. Infrastructure ACK confirmed this separat
   (commit `95f4ca2f`). Discovered the formal `bin/build-soft.sh` signed pipeline has
   never run for this binary; requested from Command via outbox. Re-pinged project-totebox
   on the stalled `/v1/pair` design ACK (11 days silent).
+- 2026-07-15 — Re-verified (not just re-read) the two blockers: `origin/main` still only
+  has v0.0.1 (`29d0b4a1`); v0.0.2 (`95f4ca2f`) remains queued in `promote-queue.jsonl`,
+  `verified: false` — Command has not merged it. `peer_type`/Totebox-side `/v1/pair` ACK
+  confirmed still unanswered (16 days since original ask, 6 since the 2026-07-09 ping) —
+  sent a second status-check re-ping to project-totebox
+  (`command-20260716-status-check-totebox-side-v1-pair-design`). Starting v0.1.0 work that
+  does not depend on either blocker: SHA-256 fingerprint upgrade, `PairingStore` startup
+  load from `user-pairings.yaml`, and WORM ledger `pairing_revoked` event
+  (`schema_version: "2"`, old `"1"` entries treated as not-revoked for backward compat).
 
 ---
 
