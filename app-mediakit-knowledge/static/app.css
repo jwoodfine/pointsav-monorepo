@@ -581,41 +581,45 @@ button:disabled { cursor: default; }
 .k-footer__link:visited { color: var(--k-link-visited); }
 .k-footer__link:focus-visible { outline: var(--k-focus-outline); outline-offset: 2px; border-radius: var(--k-radius-xs); }
 
-/* Base row — copyright + cities (left) · badges (right). */
-.k-footer__base {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--k-space-3) var(--k-space-5);
+/* Identity bar — 4 stacked rows, per pointsav-design-system's site-footer
+   recipe (dtcg-vault/components/site-footer/recipe.json): locations+badge,
+   copyright, disclaimer, trademark — each its own row rather than one
+   crowded flex row. Token names kept as this wiki's own `--k-*` palette,
+   not the recipe's literal `--ps-*` prefix (same reasoning as the brand
+   block commit: the shared accent scale doesn't apply here). */
+.k-footer__identity {
   margin-top: var(--k-gutter-lg);
   padding-top: var(--k-space-4);
   border-top: 1px solid var(--k-border-subtle);
-  color: var(--k-ink-muted);
-  font-size: var(--k-text-xs);
-}
-.k-footer__meta {
   display: flex;
-  flex-direction: column;               /* cities above the copyright line */
-  align-items: flex-start;
-  gap: var(--k-space-3);
+  flex-direction: column;
+  gap: var(--k-space-2);
+}
+.k-footer__identity-row {
+  display: flex;
+  align-items: center;
+  gap: var(--k-space-2);
+  font-size: var(--k-text-xs);
+  color: var(--k-ink-secondary);
+}
+.k-footer__identity-row--locations {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--k-space-3) var(--k-space-5);
+}
+.k-footer__identity-row--muted {
+  font-size: var(--k-text-2xs);
+  color: var(--k-ink-muted);
+}
+.k-footer__identity-row--trademark {
+  font-size: var(--k-text-2xs);
+  color: var(--k-ink-muted);
+  line-height: var(--k-leading-snug);
+  max-width: 60ch;
 }
 .k-footer__copyright { margin: 0; color: var(--k-ink-muted); }
-.k-footer__trademark {
-  margin: var(--k-space-4) 0 0;
-  padding-top: var(--k-space-3);
-  border-top: 1px solid var(--k-border-subtle);
-  color: var(--k-ink-muted);
-  font-size: var(--k-text-2xs);
-  line-height: var(--k-leading-snug);
-  max-width: 70ch;
-}
-.k-footer__disclaimer {
-  margin: var(--k-space-3) 0 0;
-  color: var(--k-ink-muted);
-  font-size: var(--k-text-xs);
-  max-width: 72ch;
-}
+.k-footer__disclaimer { margin: 0; }
+.k-footer__trademark { margin: 0; }
 
 /* --- Important Information band (above the footer) ------------------------- */
 .k-compliance {
