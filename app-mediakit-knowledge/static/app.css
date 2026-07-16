@@ -547,10 +547,27 @@ button:disabled { cursor: default; }
 /* ========================================================================== */
 .k-footer {
   flex: 0 0 auto;
-  background: var(--k-footer-bg);
+  /* Elevation — soft upward shadow + faint top-edge gradient wash, giving
+     the footer a distinct plane instead of a flat slab. Values proven on
+     bim.woodfinegroup.com's `.bim-footer` (Playwright-verified 2026-07-16);
+     staged as a candidate `elevation.footer` DTCG token in
+     DESIGN-TOKEN-footer-elevation-and-heading-scale — not yet a named
+     token, hence the literal values here. */
+  background:
+    linear-gradient(180deg, rgba(22, 70, 121, 0.035), transparent 46%),
+    var(--k-footer-bg);
+  box-shadow: 0 -10px 24px -20px rgba(11, 35, 64, 0.28);
   border-top: 1px solid var(--k-border);
   color: var(--k-ink-secondary);
   font-size: var(--k-text-sm);
+}
+:root[data-theme="dark"] .k-footer {
+  /* Navy wash reads muddy against a dark surface — swap for a light,
+     near-transparent tint (same treatment bim.woodfinegroup.com uses for
+     its own dark-mode footer). */
+  background:
+    linear-gradient(180deg, rgba(180, 197, 213, 0.05), transparent 46%),
+    var(--k-footer-bg);
 }
 .k-footer__inner {
   max-width: var(--k-content-max);
@@ -564,17 +581,33 @@ button:disabled { cursor: default; }
 }
 .k-footer__col { min-width: 0; }
 .k-footer__col-title {
-  margin-bottom: var(--k-space-3);
-  font-size: var(--k-text-2xs);
-  font-weight: var(--k-weight-semibold);
-  text-transform: uppercase;
-  letter-spacing: var(--k-tracking-caps);
+  /* Real heading weight, not a micro-label — the prior all-caps 2xs
+     treatment read as fine print and let the 3 columns run together.
+     Values proven on bim.woodfinegroup.com's `.bim-footer__heading`
+     (Playwright-verified 2026-07-16); staged as a candidate
+     `footer.heading` DTCG token, see DESIGN-TOKEN-footer-elevation-and-
+     heading-scale — literal values here pending formalization. */
+  margin: 0 0 0.875rem;
+  font-size: 1.0625rem;
+  font-weight: var(--k-weight-bold, 700);
+  color: var(--k-ink);
+}
+.k-footer__col-fact {
+  margin: 0 0 var(--k-space-3);
+  font-size: var(--k-text-xs);
   color: var(--k-ink-muted);
 }
-.k-footer__list { display: flex; flex-direction: column; gap: var(--k-space-2); }
+.k-footer__list {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+.k-footer__list li { margin-bottom: 0.375rem; }
+.k-footer__list li:last-child { margin-bottom: 0; }
 .k-footer__link {
   color: var(--k-link);
-  font-size: var(--k-text-sm);
+  font-size: inherit;
 }
 .k-footer__link:hover  { color: var(--k-link-hover); }
 .k-footer__link:active { color: var(--k-link-active); }
