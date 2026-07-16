@@ -74,6 +74,11 @@ pub struct AppState {
     /// `None` when `index.md` has no `short_description` — callers fall back
     /// to `Tenant::tagline()`.
     pub site_description: Arc<Option<String>>,
+    /// Live article count, from the same `index.article_count()` call
+    /// already used for the startup log line. Rendered as the footer's
+    /// "Browse" column fact line (bim.woodfinegroup.com pattern of one
+    /// editorial fact per column, applied minimally — one line, one column).
+    pub article_count: usize,
 }
 
 impl AppState {
@@ -82,7 +87,8 @@ impl AppState {
         let mounts = MountSet::from_config(&config);
         let index = ContentIndex::build(&mounts);
         let tenant = Tenant::from_instance(config.site.instance.as_deref());
-        tracing::info!("indexed {} article(s)", index.article_count());
+        let article_count = index.article_count();
+        tracing::info!("indexed {} article(s)", article_count);
         let search = SearchIndex::build(&index).expect("build search index");
         // Load the counsel-owned Important Information text from the content repo.
         // Uses the primary (editable, article-owning) mount specifically —
@@ -158,6 +164,7 @@ impl AppState {
             claims,
             citations: Arc::new(citations),
             site_description: Arc::new(site_description),
+            article_count,
         }
     }
 }
@@ -326,6 +333,7 @@ fn not_found(state: &AppState, message: &str) -> Response {
                 state.important_info.as_deref(),
                 &state.legal,
                 state.site_description.as_deref(),
+                state.article_count,
             )
             .into_string(),
         ),
@@ -411,6 +419,7 @@ async fn home(State(state): State<AppState>) -> Response {
             state.important_info.as_deref(),
             &state.legal,
             state.site_description.as_deref(),
+            state.article_count,
         )
         .into_string(),
     )
@@ -467,6 +476,7 @@ async fn category_page(State(state): State<AppState>, Path(name): Path<String>) 
             state.important_info.as_deref(),
             &state.legal,
             state.site_description.as_deref(),
+            state.article_count,
         )
         .into_string(),
     )
@@ -515,6 +525,7 @@ async fn research_index(State(state): State<AppState>) -> Response {
             state.important_info.as_deref(),
             &state.legal,
             state.site_description.as_deref(),
+            state.article_count,
         )
         .into_string(),
     )
@@ -592,6 +603,7 @@ async fn research_landing(State(state): State<AppState>, Path(slug): Path<String
             state.important_info.as_deref(),
             &state.legal,
             state.site_description.as_deref(),
+            state.article_count,
         )
         .into_string(),
     )
@@ -662,6 +674,7 @@ async fn research_fulltext(State(state): State<AppState>, Path(slug): Path<Strin
             state.important_info.as_deref(),
             &state.legal,
             state.site_description.as_deref(),
+            state.article_count,
         )
         .into_string(),
     )
@@ -717,6 +730,7 @@ async fn search_page(State(state): State<AppState>, Query(params): Query<SearchQ
             state.important_info.as_deref(),
             &state.legal,
             state.site_description.as_deref(),
+            state.article_count,
         )
         .into_string(),
     )
@@ -771,6 +785,7 @@ async fn history_page(
                 state.important_info.as_deref(),
                 &state.legal,
                 state.site_description.as_deref(),
+                state.article_count,
             )
             .into_string(),
         )
@@ -798,6 +813,7 @@ async fn history_page(
             state.important_info.as_deref(),
             &state.legal,
             state.site_description.as_deref(),
+            state.article_count,
         )
         .into_string(),
     )
@@ -839,6 +855,7 @@ async fn special_all_pages(State(state): State<AppState>) -> Response {
             state.important_info.as_deref(),
             &state.legal,
             state.site_description.as_deref(),
+            state.article_count,
         )
         .into_string(),
     )
@@ -875,6 +892,7 @@ async fn special_recent(State(state): State<AppState>) -> Response {
             state.important_info.as_deref(),
             &state.legal,
             state.site_description.as_deref(),
+            state.article_count,
         )
         .into_string(),
     )
@@ -1110,6 +1128,7 @@ async fn serve_article(
                 state.important_info.as_deref(),
                 &state.legal,
                 state.site_description.as_deref(),
+                state.article_count,
             )
             .into_string(),
         )
@@ -1252,6 +1271,7 @@ async fn serve_article(
             state.important_info.as_deref(),
             &state.legal,
             state.site_description.as_deref(),
+            state.article_count,
         )
         .into_string(),
     )
