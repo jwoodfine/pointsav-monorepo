@@ -66,6 +66,14 @@ pub struct AppState {
     /// against. Empty (not an error) if `[citations]` is unset in
     /// `knowledge.toml` or the file is missing.
     pub citations: Arc<CitationRegistry>,
+    /// The site's own one-line description, from `index.md`'s
+    /// `short_description` frontmatter — the same source `home()` uses for
+    /// its meta description. Threaded into the footer brand block and the
+    /// print brand mark so both reuse this one canonical copy rather than a
+    /// second hand-authored tagline that can drift out of sync with it.
+    /// `None` when `index.md` has no `short_description` — callers fall back
+    /// to `Tenant::tagline()`.
+    pub site_description: Arc<Option<String>>,
 }
 
 impl AppState {
@@ -129,6 +137,13 @@ impl AppState {
             tracing::warn!("failed to rebuild claim cited_by index: {e}");
         }
 
+        // Same source `home()` resolves for its own meta description —
+        // computed once here so the footer/print brand mark never carry a
+        // second, independently-drifting copy of it.
+        let site_description = index
+            .resolve("index", Lang::En)
+            .and_then(|doc| content::load(doc).ok())
+            .and_then(|p| p.frontmatter.short_description.clone());
         Self {
             config: Arc::new(config),
             mounts: Arc::new(mounts),
@@ -142,6 +157,7 @@ impl AppState {
             legal: Arc::new(legal),
             claims,
             citations: Arc::new(citations),
+            site_description: Arc::new(site_description),
         }
     }
 }
@@ -309,6 +325,7 @@ fn not_found(state: &AppState, message: &str) -> Response {
                 "",
                 state.important_info.as_deref(),
                 &state.legal,
+                state.site_description.as_deref(),
             )
             .into_string(),
         ),
@@ -382,7 +399,22 @@ async fn home(State(state): State<AppState>) -> Response {
         .collect();
     let body = ui::home_page(tenant, &lede, total, &cats, &guides);
     let head = ui::doc_head(tenant.home_label(), &description, tenant, "/", false);
-    Html(ui::page(tenant, "en", head, body, &nav, &[], "", state.important_info.as_deref(), &state.legal).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav,
+            &[],
+            "",
+            state.important_info.as_deref(),
+            &state.legal,
+            state.site_description.as_deref(),
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 /// Category listing page — every article in one category.
@@ -423,7 +455,22 @@ async fn category_page(State(state): State<AppState>, Path(name): Path<String>) 
     ];
     let head = ui::doc_head(&label, &description, tenant, &path, false);
     let head = html! { (head) (ui::breadcrumb_jsonld(&jsonld_trail)) };
-    Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref(), &state.legal).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            "",
+            state.important_info.as_deref(),
+            &state.legal,
+            state.site_description.as_deref(),
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 /// `/research` — index of every JOURNAL paper (SPEC-journal-wiki-render-
@@ -467,6 +514,7 @@ async fn research_index(State(state): State<AppState>) -> Response {
             "",
             state.important_info.as_deref(),
             &state.legal,
+            state.site_description.as_deref(),
         )
         .into_string(),
     )
@@ -543,6 +591,7 @@ async fn research_landing(State(state): State<AppState>, Path(slug): Path<String
             "",
             state.important_info.as_deref(),
             &state.legal,
+            state.site_description.as_deref(),
         )
         .into_string(),
     )
@@ -612,6 +661,7 @@ async fn research_fulltext(State(state): State<AppState>, Path(slug): Path<Strin
             "",
             state.important_info.as_deref(),
             &state.legal,
+            state.site_description.as_deref(),
         )
         .into_string(),
     )
@@ -655,7 +705,22 @@ async fn search_page(State(state): State<AppState>, Query(params): Query<SearchQ
     // useful for a crawler to discover the search feature exists) but
     // shouldn't be indexed page-by-page-per-query.
     let head = ui::doc_head(&title, &desc, tenant, "/search", true);
-    Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], &q, state.important_info.as_deref(), &state.legal).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            &q,
+            state.important_info.as_deref(),
+            &state.legal,
+            state.site_description.as_deref(),
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -694,8 +759,22 @@ async fn history_page(
             &format!("/history/{}", doc.slug),
             false,
         );
-        return Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref(), &state.legal).into_string())
-            .into_response();
+        return Html(
+            ui::page(
+                tenant,
+                "en",
+                head,
+                body,
+                &nav_cats(&state),
+                &[],
+                "",
+                state.important_info.as_deref(),
+                &state.legal,
+                state.site_description.as_deref(),
+            )
+            .into_string(),
+        )
+        .into_response();
     }
 
     let revs = crate::history::file_history(repo_root, rel, 50);
@@ -707,7 +786,22 @@ async fn history_page(
         &format!("/history/{}", doc.slug),
         false,
     );
-    Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref(), &state.legal).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            "",
+            state.important_info.as_deref(),
+            &state.legal,
+            state.site_description.as_deref(),
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 /// "Index of record" — every article A–Z (the auditor's completeness check).
@@ -733,7 +827,22 @@ async fn special_all_pages(State(state): State<AppState>) -> Response {
         "/special/all-pages",
         false,
     );
-    Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref(), &state.legal).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            "",
+            state.important_info.as_deref(),
+            &state.legal,
+            state.site_description.as_deref(),
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 /// "Recent changes" — records most recently updated (the site-wide delta view).
@@ -754,7 +863,22 @@ async fn special_recent(State(state): State<AppState>) -> Response {
         .collect();
     let body = ui::special_list("Recent changes", "Recent changes", &items);
     let head = ui::doc_head("Recent changes", "Records most recently updated.", tenant, "/special/recent-changes", false);
-    Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref(), &state.legal).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            "",
+            state.important_info.as_deref(),
+            &state.legal,
+            state.site_description.as_deref(),
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 // --- Discovery surfaces (robots / sitemap / feeds / llms.txt) ---------------
@@ -985,6 +1109,7 @@ async fn serve_article(
                 "",
                 state.important_info.as_deref(),
                 &state.legal,
+                state.site_description.as_deref(),
             )
             .into_string(),
         )
@@ -1115,8 +1240,22 @@ async fn serve_article(
         (ui::article_jsonld(tenant, &title, &description, &current_url, parsed.frontmatter.last_edited.as_deref()))
         (ui::breadcrumb_jsonld(&jsonld_trail))
     };
-    Html(ui::page(tenant, lang_code, head, body, &nav_cats(&state), &rendered.headings, "", state.important_info.as_deref(), &state.legal).into_string())
-        .into_response()
+    Html(
+        ui::page(
+            tenant,
+            lang_code,
+            head,
+            body,
+            &nav_cats(&state),
+            &rendered.headings,
+            "",
+            state.important_info.as_deref(),
+            &state.legal,
+            state.site_description.as_deref(),
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 /// Serve an embedded static asset by path.
