@@ -57,6 +57,10 @@
 .k-masthead__title {
   font-family: var(--k-title-font);
   font-size: var(--k-title-fs);
+  font-weight: var(--k-weight-bold);
+  line-height: var(--k-leading-tight);
+  letter-spacing: -0.015em;
+  color: var(--k-ink);
   margin: 0 0 var(--k-space-2);
 }
 .k-masthead__authors {
@@ -196,6 +200,14 @@
   padding-bottom: 0.25em;
   border-bottom: 1px solid var(--k-heading-rule);
   scroll-margin-top: calc(var(--k-header-height) + var(--k-space-4));
+}
+/* First heading right after the masthead (JOURNAL research pages) or right
+   at the top of .k-prose shouldn't carry its full top margin — stacked with
+   the masthead's own bottom padding, it read as an oversized blank gap
+   before the first section (found via Wikipedia print-mode comparison). */
+.k-prose > h2:first-child,
+.k-prose > h3:first-child {
+  margin-top: 0;
 }
 .k-prose h3 {
   font-family: var(--k-title-font);
@@ -663,4 +675,13 @@
   .k-prose pre { border: 1px solid #999; }
   .k-prose { max-width: none; }
   .k-prose .anchor::before { display: none; }
+
+  /* Stronger section-rule contrast than the on-screen hairline — matches
+     Wikipedia's bolder print hierarchy (found via direct comparison against
+     a real Wikipedia print render). --k-heading-rule is a light gray on
+     screen; on paper, a near-black rule reads as real structure instead of
+     a faint suggestion of one. */
+  .k-prose h2 { border-bottom: 1px solid #000; }
+  .k-masthead__title,
+  .k-article__title { border-bottom: 2px solid #000; }
 }
