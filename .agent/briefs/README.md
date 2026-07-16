@@ -9,6 +9,7 @@
 |------|----------|-------|--------|---------|
 | [BRIEF-os-orchestration.md](BRIEF-os-orchestration.md) | project-orchestration-os-orchestration | os-orchestration build-out — app-orchestration-command (v0.0.1/v0.0.2 in BETA) | active | 2026-07-09 |
 | [BRIEF-os-orchestration-build-out.md](BRIEF-os-orchestration-build-out.md) | project-orchestration-os-orchestration-build-out | os-orchestration: Stateless Aggregation Layer — Full Build-Out | active | 2026-07-09 |
+| [BRIEF-orchestration-totebox-integration.md](BRIEF-orchestration-totebox-integration.md) | project-orchestration-totebox-integration | os-orchestration ↔ os-totebox integration — shared cross-archive BRIEF (jointly owned with project-totebox) | active | 2026-07-16 |
 
 **Reconciled 2026-07-09:** the two BRIEFs are scoped to be non-overlapping.
 `BRIEF-os-orchestration.md` owns concrete shipping/deployment/licensing state for
