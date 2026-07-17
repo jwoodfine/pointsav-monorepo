@@ -1651,6 +1651,9 @@ async fn main() -> Result<()> {
         .route("/events", get(get_events))
         // In-workbench AI chat (Cursor-style) — proxies to the SLM Doorman.
         .route("/chat", post(chat))
+        // Comprehensive search — proxies to the service-search Strike (no-silent-miss
+        // trigram floor + Tantivy BM25). Reached from the frontend as /_api/edit/search.
+        .route("/search", get(search))
         .with_state(state);
 
     let addr: SocketAddr = config.bind.parse().context("parsing bind address")?;
@@ -1747,4 +1750,58 @@ async fn chat(Json(req): Json<ChatRequest>) -> Response {
         )
             .into_response(),
     }
+}
+
+// ---------------------------------------------------------------------------
+// Comprehensive search — proxy to the service-search Strike
+// ---------------------------------------------------------------------------
+
+/// The service-search Strike query endpoint. Override with SEARCH_STRIKE_URL.
+fn strike_url() -> String {
+    std::env::var("SEARCH_STRIKE_URL").unwrap_or_else(|_| "http://127.0.0.1:9310".to_string())
+}
+
+#[derive(Deserialize)]
+struct SearchQuery {
+    q: String,
+}
+
+/// GET /search?q= — forward to the Strike and return its JSON verbatim. The browser
+/// cannot reach the Strike's loopback port, so the workbench backend proxies. A Strike
+/// that is down yields a well-formed empty result (trustworthy zero), never a 500.
+async fn search(Query(sq): Query<SearchQuery>) -> Response {
+    if sq.q.trim().is_empty() {
+        return Json(serde_json::json!({
+            "query": "", "filenames": [], "contents": [],
+            "files_indexed": 0, "roots_indexed": 0
+        }))
+        .into_response();
+    }
+    let url = format!("{}/search", strike_url());
+    let client = reqwest::Client::new();
+    let resp = client
+        .get(&url)
+        .query(&[("q", &sq.q)])
+        .timeout(std::time::Duration::from_secs(30))
+        .send()
+        .await;
+    match resp {
+        Ok(r) if r.status().is_success() => match r.text().await {
+            Ok(body) => ([(axum::http::header::CONTENT_TYPE, "application/json")], body)
+                .into_response(),
+            Err(e) => search_unavailable(&sq.q, &format!("read error: {e}")),
+        },
+        Ok(r) => search_unavailable(&sq.q, &format!("strike {}", r.status())),
+        Err(e) => search_unavailable(&sq.q, &format!("strike unreachable: {e}")),
+    }
+}
+
+/// A well-formed empty response carrying a diagnostic in `error` — the UI shows a
+/// "search index unavailable" banner rather than a broken state.
+fn search_unavailable(q: &str, why: &str) -> Response {
+    Json(serde_json::json!({
+        "query": q, "filenames": [], "contents": [],
+        "files_indexed": 0, "roots_indexed": 0, "error": why
+    }))
+    .into_response()
 }
