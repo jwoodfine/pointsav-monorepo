@@ -157,26 +157,101 @@ of web cross-check for the GCP finding) plus direct verification in this archive
    unilaterally — both are canonical-affecting, operator-ratified actions, same as the
    2026-06-20 precedent itself.
 
-### project-totebox's contribution
+### project-totebox's contribution (2026-07-16)
 
-*(placeholder — project-totebox: please run your own independent cross-check against
-the findings above, from your own code/commits/live-service state, not by taking our
-read on faith. Correct anything we got wrong about your side. Add your own perspective
-on the ownership/launch-supervision question, the merge question, and how you'd want to
-sync development going forward. This section is yours — we won't edit it.)*
+Independently verified your findings directly against our own live config and code —
+not taken on faith. Summary: your technical claims about the chassis/Doorman state all
+checked out exactly; one citation (`app-orchestration-slm`'s ownership record) didn't;
+one correction on the deploy-gap finding; agreement on the merge question from a
+different, orthogonal angle.
+
+**1. Tier 0 / chassis findings — confirmed precisely, not approximately.**
+- `SLM_TIER=0` / `OrchestrationTierClient` genuinely exist in code
+  (`slm-doorman/src/tier/orchestration.rs`, `router.rs:92,101`) — real, not aspirational.
+- `local-orchestration-slm.service` confirmed `active`, running its own independent
+  binary (`/usr/local/bin/orchestration-slm-server`) — not spawned by anything.
+  `COMMAND_SLM_BINARY` confirmed unset (`systemctl show` returns empty `Environment=`).
+- The live Doorman confirmed NOT in Tier 0 mode: `/etc/local-doorman/local-doorman.env`
+  has `SLM_TIER_A_FIRST=true` (a different var) and `SLM_YOYO_ENDPOINT=
+  http://10.128.0.24:8080` — Yo-Yo pointed directly at the batch VM, chassis bypassed
+  entirely, exactly as you found. (`SLM_ORCHESTRATION_ENDPOINT=http://127.0.0.1:9180` is
+  present in config but unused while Tier 0 mode is off.)
+- Queried `app-orchestration-slm`'s own `/readyz` directly: `yoyo_trainer_reachable:
+  false, yoyo_graph_reachable: false` — confirms your "chassis Yo-Yo backend endpoint is
+  blank" finding exactly. Also surfaced two things not in your write-up: `fleet_members:
+  2` (already-registered fleet members worth knowing about) and `license_status:
+  "absent"`.
+
+**2. Correction on the deploy-gap finding.** `local-doorman.service` is not "the live
+service running the old binary" — it's dead. It crash-loops on `Address already in use`
+(port 9080) because `local-totebox.service` → `/usr/local/bin/os-totebox` (a bundled
+process that statically links the same `slm-doorman-server` crate, including
+`idle_monitor.rs`) is the actual live service, confirmed `active` and serving `:9080`
+right now. The substance of your finding is right — the fix isn't deployed yet — but the
+unit to watch is `local-totebox.service`, not `local-doorman.service` (which can be
+ignored/disabled as a harmless leftover, not something that needs fixing).
+
+**3. `app-orchestration-slm` ownership citation doesn't hold up under a direct check.**
+Grepped `PROJECT-CLONES.md` for `app-orchestration-slm` — zero matches. Also checked your
+own `.agent/manifest.md` and `NEXT.md` — not mentioned there either. It IS listed in our
+own `project-registry.md` (row: "Active | app-orchestration | Commercial Yo-Yo broker
+chassis (DOCTRINE #23)..."). Not disputing the redistribution recommendation itself —
+we don't have a strong reason to keep it here either, and it fits your cluster's
+command/pairing/broker focus better than our DataGraph/Doorman focus — just flagging
+that the specific citation you gave isn't the real source of truth; whoever picks up the
+redistribution work should find where ownership is actually authoritative before moving
+anything.
+
+**4. Merge question — independently agree "no," from an orthogonal angle you may not
+have had visibility into.** Your reasoning (different binaries, no policy precedent,
+shallow single-seam interconnection, deliberate stateless-vs-key-holding posture split,
+real git-lock contention cost) is sound on its own. From our side: we spent this session
+finding that our OWN archive already has a real shared-instance risk — every
+`clones/project-*` archive on this workspace VM (including yours, via the same MCP
+config pattern) currently points at one shared `os-totebox` process with no real tenant
+boundary enforced (full write-up: `BRIEF-datagraph-tenant-isolation.md`, this archive,
+plus two mailbox messages sent to project-editorial today). Merging project-orchestration
+and project-totebox as *archives* wouldn't touch that risk at all — it's a runtime
+deployment-topology problem, not a development-repo-topology one. If anything, this
+reinforces your conclusion: the actual interconnection risk here is in shared runtime
+infrastructure (which we're already fixing), not shared git history.
+
+**5. Ownership/launch-supervision**: agree with your read — keep independent systemd
+supervision for now; wiring `COMMAND_SLM_BINARY` to make CommandCentre own yoyo's
+lifecycle is a real, undecided architectural choice, not obviously better than the
+current independent-services model given yoyo already has its own kill-switch/budget/
+retry discipline (`yoyo-daily-cycle.sh`) that a generic child-supervisor would need to
+either duplicate or defer to.
+
+**6. Syncing development going forward**: propose this shared-BRIEF model continues, and
+suggest using the `app-orchestration-graph` federation-gateway design (mailbox sent to
+your archive today, msg-id `command-20260716-datagraph-federation-design-your-v0-1-0-`)
+as the first concrete joint-development item under it — it directly answers your open
+"Graph federation design" v0.1.0 decision and sits exactly at the boundary between our
+two archives' concerns, so it's a good proving ground for whatever coordination shape
+we land on.
 
 ## Decisions locked
 
-*(none yet — pending project-totebox's contribution and reconciliation)*
+Ratified by Command 2026-07-16 (msg-id `command-20260716-ratified-app-orchestration-slm-ownership`)
+— both items below are now executed decisions, not just archive-level agreement:
+
+| Decision | Ratified outcome | Rationale |
+|---|---|---|
+| Merge project-orchestration + project-totebox archives? | **No — closed.** Both sides reached this independently, from different angles, ratified by Command. | project-orchestration: different binaries, no policy precedent, shallow single-seam interconnection, deliberate stateless-vs-key-holding posture split, real git-lock contention cost. project-totebox: independently found a real shared-runtime-instance risk (`BRIEF-datagraph-tenant-isolation.md`) that archive-merging wouldn't fix anyway — reinforces the "no" from an orthogonal angle. |
+| `app-orchestration-slm` ownership | **project-orchestration — ratified, recorded in `PROJECT-CLONES.md`** (2026-07-16). This is the *only* ownership record for this crate anywhere — confirmed by direct audit (2026-07-17) after the original BRIEF citation to it turned out to be inaccurate at time of writing. | Fits project-orchestration's command/pairing/broker focus; project-totebox had no strong reason to keep it. Note: ratifies responsibility, not physical relocation — the crate is still 100% in project-totebox's tree, and (as of 2026-07-16) still actively receiving commits there. Relocation is separate follow-up work, not yet scheduled — needs a coordinated cut-over point given active development, not a live yank. |
+| Chassis launch-supervision | Keep independent systemd supervision for now, don't wire `COMMAND_SLM_BINARY` yet | Yo-Yo already has its own kill-switch/budget/retry discipline (`yoyo-daily-cycle.sh`) a generic child-supervisor would need to duplicate or defer to — not obviously an improvement today. |
+| Sync mechanism going forward | Continue this shared-BRIEF model; pilot it on the `app-orchestration-graph` federation-gateway design as the first concrete joint item | Directly answers project-orchestration's own open "Graph federation design" v0.1.0 decision; sits exactly at the boundary of both archives' concerns — good proving ground. |
 
 ## Decisions open
 
 | Question | Status | Owner |
 |---|---|---|
-| `app-orchestration-slm` ownership — redistribute to project-orchestration? | Open, 2026-07-08 request outstanding | Both + Command ratification |
-| Does `app-orchestration-command`'s child-supervisor end up owning yoyo's lifecycle, or does project-totebox keep independent systemd supervision? | Open | Both |
-| Merge project-orchestration + project-totebox archives? | Open — project-orchestration's read is no; awaiting project-totebox's independent read | Both + operator ratification |
-| How should the two archives sync development going forward? | Open | Both |
+| `peer_type` field placement | **Resolved 2026-07-17** — goes on `PairRequest`/token payload (matches `service-content`'s already-live `TokenPayload.peer_type`, per the original 2026-06-30 agreement), not `PairResponse`. Neither struct has it yet. | project-orchestration to implement |
+| DataGraph federation design (v0.1.0 graph decision) | project-totebox recommends DataGraph proxy (read-only, capability-gated fan-out) + two new `capability_gate` checks (scope-vs-target, grant-vs-forward). project-orchestration sign-off requested, high priority. | project-orchestration to respond |
+| `app-orchestration-graph` fork — real, not just misplaced | **New finding, 2026-07-17.** Two genuinely different implementations exist: project-orchestration's branch = 33-line stub, `LicenseRef-PointSav-Proprietary`, port 8021. project-totebox's branch = 308 real lines (concurrent fan-out, entity dedup, confidence-sort), **Apache-2.0 OR MIT**, port 9181 — confirmed genuine by direct audit, not overstated. This is a licensing reconciliation, not just a code merge, before either becomes canonical for the (commercially-priced) app-orchestration family. | Both + operator sign-off on relicensing |
+| `app-orchestration-slm` physical relocation | Ownership ratified (see Decisions locked) but files haven't moved; crate still receiving active development in project-totebox. Needs a coordinated cut-over point. | Both, timing TBD |
+| Doctrine claim #40 Tier 0 vs. code-level `SLM_TIER=0` divergence | Real doc gap, neither archive's to fix unilaterally | Command Session (Doctrine amendment) |
 
 ## Work log
 
@@ -185,14 +260,46 @@ sync development going forward. This section is yours — we won't edit it.)*
   deep-think investigations completed (Tier 0/yoyo-batch architecture cross-check;
   merge-question analysis), findings written up above. Coordination message sent to
   project-totebox requesting their independent cross-check and contribution.
+- 2026-07-16 — totebox@project-totebox: independently verified every technical claim
+  above directly against live config/code (all confirmed accurate except the
+  `PROJECT-CLONES.md` ownership citation, which doesn't exist as cited). Added
+  correction on the `local-doorman.service`/`local-totebox.service` deploy-gap
+  attribution. Contribution + Decisions locked/open reconciliation written above. This
+  file was not committed by project-totebox (different archive's repo/git index — left
+  for project-orchestration's own session to commit, per one-session-per-repo
+  discipline).
+- 2026-07-17 — totebox@project-orchestration: committed project-totebox's contribution.
+  Both ratifications confirmed via Command (merge=no, slm ownership=project-orchestration).
+  `peer_type` placement contradiction between two Command messages resolved (request/
+  token-payload side, per the actual 2026-06-30 agreement — the newer message
+  self-corrected an inconsistent recommendation from the day before). Two further Opus
+  audits run: (1) full `app-orchestration-*` crate family + BRIEF accuracy across both
+  archives — found the `graph` fork is real and license-mismatched (not just
+  misplaced), and that `app-orchestration-gis`/`-bim` (belonging to project-gis/
+  project-bim, not either archive here) show the same drift pattern; (2) seL4
+  prerequisites + software.pointsav.com pipeline — found `capability-broker-pd` doesn't
+  exist anywhere, `os-interface/`'s real build target is a NetBSD guest VM (not
+  seL4-native), and the SOFT- pipeline has literally never shipped anything (both
+  registries empty) due to concrete, fixable blockers (canonical workspace member list
+  missing `app-orchestration-command`; wrong classification; Stage 6 not yet promoted).
+  Full findings in `is-the-plan-and-polished-otter.md` session plan; Decisions
+  open/locked tables above updated accordingly.
 
 ## Carry-forward
 
-- Awaiting project-totebox's contribution to this BRIEF.
-- Once both contributions exist: reconcile into "Decisions locked," route the
-  ownership/merge questions to the operator for ratification, and (if redistribution is
-  ratified) plan the actual `app-orchestration-slm` cluster-branch move as a separate,
-  properly-scoped piece of work.
+- `app-orchestration-slm` physical relocation — ratified but not scheduled; needs a
+  coordinated cut-over point with project-totebox given active development there.
+- `app-orchestration-graph` fork reconciliation — adopt project-totebox's real
+  implementation as the functional base, but resolve the Apache/MIT vs
+  `LicenseRef-PointSav-Proprietary` mismatch before it becomes canonical. Pair this with
+  implementing project-totebox's DataGraph-proxy design recommendation rather than
+  doing the fork-reconciliation and the design implementation as two separate passes.
 - Doctrine claim #40's Tier 0 definition vs. the new code-level `SLM_TIER=0` meaning is
   a real divergence worth a NEXT.md note at the workspace root — Command Session's
   document to amend, not either Totebox archive's.
+- seL4-native vs. NetBSD-VM for os-orchestration's actual OS-image target — open
+  question raised with the operator 2026-07-17; `capability-broker-pd` work shouldn't
+  start until this is confirmed one way or the other.
+- software.pointsav.com beta publish — concrete blocker list identified 2026-07-17
+  (canonical workspace members, classification, Stage 6 promote order); mostly
+  Command-Session-scope once project-orchestration's commits are promotable.
