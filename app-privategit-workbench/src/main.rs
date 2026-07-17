@@ -31,6 +31,7 @@ const SPA_HTML: &str = include_str!("assets/index.html");
 const TOKENS_HTML: &str = include_str!("assets/tokens.html");
 const PROFORMA_HTML: &str = include_str!("assets/proforma.html");
 const BIM_HTML: &str = include_str!("assets/bim.html");
+const MEMO_HTML: &str = include_str!("assets/memo.html");
 
 // ---------------------------------------------------------------------------
 // Config
@@ -1664,6 +1665,7 @@ async fn main() -> Result<()> {
         .route("/tokens-data", get(get_tokens_data))
         .route("/proforma", get(get_proforma_page))
         .route("/bim", get(get_bim_page))
+        .route("/memo", get(get_memo_page))
         .with_state(state);
 
     let addr: SocketAddr = config.bind.parse().context("parsing bind address")?;
@@ -1842,6 +1844,12 @@ async fn get_proforma_page() -> impl IntoResponse {
 /// its `?path=` `.bim.json` file through the workbench roots file API.
 async fn get_bim_page() -> impl IntoResponse {
     Html(BIM_HTML)
+}
+
+/// GET /memo — the rich-text memo editor surface. Reads/writes its `?path=` `.html` file
+/// through the workbench roots file API.
+async fn get_memo_page() -> impl IntoResponse {
+    Html(MEMO_HTML)
 }
 
 /// GET /tokens-data — the DTCG bundle JSON the page renders (read-only).
