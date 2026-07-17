@@ -2023,6 +2023,20 @@ async function openFile(path, name) {
         }
       }
 
+      // §S9 doc→surface routing: an HTML file can open in the editable Memo surface
+      // (memo edits HTML fragments as rich text). Opt-in button, not an auto-hijack.
+      if (ext === 'html' || ext === 'htm') {
+        const bar = document.getElementById('viewer-bar');
+        if (bar && !bar.querySelector('.doc-memo-btn')) {
+          const mBtn = document.createElement('button');
+          mBtn.className = 'bar-btn doc-memo-btn';
+          mBtn.textContent = '✎ Open in Memo';
+          mBtn.title = 'Open this HTML file in the editable Memo surface';
+          mBtn.addEventListener('click', () => window.open('/memo?path=' + encodeURIComponent(apiPath), '_blank'));
+          bar.appendChild(mBtn);
+        }
+      }
+
       if (ext === 'md') { tc.className = 'md-view'; tc.innerHTML = mdToHtml(viewerText); }
       else { tc.className = 'code-view'; tc.textContent = viewerText; }
     } else {
@@ -2503,6 +2517,7 @@ const COMMANDS = [
   { id: 'ai-chat',         title: 'Toggle AI Chat',         category: 'AI',       shortcut: '⌘L / Ctrl+L',       when: () => true,                                                      run: () => { if (window.__toggleAiChat) window.__toggleAiChat(); } },
   { id: 'surface-tokens',  title: 'Open Design Tokens',     category: 'Surface',  shortcut: '',                  when: () => true,                                                      run: () => { window.open('/tokens', '_blank'); } },
   { id: 'surface-bim',     title: 'Open BIM Workspace',     category: 'Surface',  shortcut: '',                  when: () => true,                                                      run: () => { window.open('/bim', '_blank'); } },
+  { id: 'surface-memo',    title: 'Open Memo Editor',       category: 'Surface',  shortcut: '',                  when: () => true,                                                      run: () => { window.open('/memo', '_blank'); } },
 ];
 
 let cmdpalFocusIdx  = -1;

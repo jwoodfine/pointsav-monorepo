@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Memo — Workbench</title>
+<style>
+/* Self-contained LIGHT theme (matches the DEV workbench). Ported from
+   app-workplace-http-prototype/src/assets/memo.html; the /style.css dependency and the
+   html.light override layer were collapsed into one light stylesheet. Class/id names
+   unchanged. */
+:root {
+  --bg: #ffffff; --panel: #f3f3f3; --panel-2: #ebebeb; --border: #d4d4d4;
+  --border-strong: #bbbbbb; --text: #1a1a1a; --text-dim: #666666; --accent: #007acc;
+  --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, monospace;
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; height: 100vh; display: flex; flex-direction: column;
+  font-family: var(--font-ui); background: #f0f0f0; color: var(--text); font-size: 13px; }
+#app-header { display: flex; align-items: baseline; gap: 10px; padding: 10px 16px;
+  background: #e8e8e8; border-bottom: 1px solid #d0d0d0; flex-shrink: 0; }
+#app-header .logo { font-size: 13px; font-weight: 600; }
+#app-header .logo a { color: var(--text); }
+#app-header .version { font-size: 11px; color: #555; }
+#memo-layout { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* Toolbar */
+#memo-toolbar { display: flex; align-items: center; gap: 5px; padding: 6px 12px;
+  background: var(--panel); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+#memo-toolbar button { background: #e4e4e4; border: 1px solid var(--border-strong);
+  border-radius: 3px; color: #444; cursor: pointer; font-size: 12px; padding: 4px 8px; min-width: 26px; }
+#memo-toolbar button:hover { background: #d8d8d8; border-color: #999; }
+#memo-toolbar button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+#memo-toolbar .sep { width: 1px; height: 20px; background: var(--border); margin: 0 4px; }
+#btn-save { margin-left: auto; }
+.open-wrap { position: relative; }
+#open-menu { display: none; position: absolute; right: 0; top: 100%; margin-top: 4px; z-index: 800;
+  min-width: 220px; background: var(--panel); border: 1px solid var(--border); border-radius: 5px;
+  box-shadow: 0 3px 8px rgba(0,0,0,0.12); padding: 4px; }
+#open-menu.open { display: block; }
+#open-menu button { display: block; width: 100%; text-align: left; background: transparent;
+  border: none; color: #333; padding: 6px 10px; border-radius: 4px; cursor: pointer; }
+#open-menu button:hover { background: #e0e0e0; }
+#open-menu a { display: block; color: var(--text); text-decoration: none; padding: 6px 10px; border-radius: 4px; font-size: 12px; }
+#open-menu a:hover { background: #e0e0e0; }
+.menu-sep { height: 1px; background: var(--border); margin: 4px 0; }
+
+/* Body: editor + token panel */
+#memo-body { flex: 1; display: flex; overflow: hidden; background: #f0f0f0; }
+#memo-editor { flex: 1; overflow-y: auto; margin: 16px auto; max-width: 820px; width: 100%;
+  background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.1); border-radius: 3px;
+  padding: 40px 56px; outline: none; line-height: 1.6; }
+#memo-editor:empty::before { content: attr(data-placeholder); color: var(--text-dim);
+  pointer-events: none; font-style: italic; }
+#memo-editor ol { margin: 0 0 0.6em 1.5em; padding: 0; }
+#memo-status { flex-shrink: 0; padding: 4px 14px; font-size: 11px; background: var(--panel);
+  border-top: 1px solid var(--border); color: #555; }
+
+/* Token side panel */
+#tok-panel { display: none; width: 260px; flex-shrink: 0; flex-direction: column;
+  background: #f5f5f5; border-left: 1px solid var(--border); overflow: hidden; }
+#tok-panel.open { display: flex; }
+#tok-panel-hdr { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px;
+  background: var(--panel-2); border-bottom: 1px solid var(--border); color: #333; font-size: 12px; font-weight: 600; }
+#tok-panel-hdr button { background: #d8d8d8; border: 1px solid var(--border-strong); border-radius: 3px; color: #555; cursor: pointer; }
+#tok-panel-search { padding: 8px; }
+#tok-panel-search input { width: 100%; background: #fff; border: 1px solid #c8c8c8; border-radius: 3px;
+  color: var(--text); font-size: 12px; padding: 5px 8px; outline: none; }
+#tok-panel-body { flex: 1; overflow-y: auto; }
+.tok-section-hdr { background: var(--panel-2); color: #555; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .05em; padding: 5px 10px; }
+.tok-chip, .tok-type-chip { display: flex; align-items: center; gap: 8px; padding: 5px 10px;
+  border-bottom: 1px solid var(--border); cursor: pointer; }
+.tok-chip:hover, .tok-type-chip:hover { background: #e0e0e0; }
+.tok-chip-name { font-size: 12px; color: #333; }
+.tok-chip-val { font-size: 10px; color: #777; font-family: var(--font-mono); margin-left: auto; }
+
+/* Crash banner */
+#crash-banner { background: #1c5f9a; color: #eaf3fb; font-size: 12px; padding: 5px 12px;
+  display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+#crash-banner.hidden { display: none; }
+#crash-banner span { flex: 1; }
+#crash-restore { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4);
+  color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 3px; cursor: pointer; }
+#crash-dismiss { background: transparent; border: none; color: rgba(255,255,255,0.7); font-size: 16px; cursor: pointer; padding: 0 4px; }
+
+/* Save-As modal (unused in v1 edit-mode; kept for the follow-up create flow) */
+#save-as-modal { position: fixed; inset: 0; z-index: 900; background: rgba(0,0,0,0.35);
+  display: flex; align-items: center; justify-content: center; }
+#save-as-modal.hidden { display: none; }
+#save-as-box { background: #f5f5f5; border: 1px solid #ccc; border-radius: 6px; padding: 20px 24px;
+  min-width: 320px; max-width: 440px; width: 90%; box-shadow: 0 8px 32px rgba(0,0,0,0.25); }
+#save-as-title { font-size: 14px; font-weight: 600; margin-bottom: 14px; color: var(--text); }
+.save-as-row { margin-bottom: 10px; }
+.save-as-row label { display: block; font-size: 11px; color: var(--text-dim); margin-bottom: 3px; }
+.save-as-row select, .save-as-row input[type=text] { width: 100%; background: #fff;
+  border: 1px solid var(--border-strong); border-radius: 3px; color: var(--text); font-size: 13px; padding: 5px 8px; }
+.save-as-row select:focus, .save-as-row input[type=text]:focus { outline: 1px solid var(--accent); border-color: var(--accent); }
+#save-as-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+#save-as-btns button { font-size: 12px; padding: 5px 14px; border-radius: 3px; cursor: pointer; border: 1px solid var(--border-strong); }
+#save-modal-ok { background: var(--accent); border-color: var(--accent); color: #fff; }
+#save-modal-cancel { background: transparent; color: #555; }
+#save-modal-cancel:hover { background: #e0e0e0; }
+</style>
+</head>
+<body>
+<header id="app-header">
+  <span class="logo"><a href="/" style="color:inherit;text-decoration:none">Workplace</a></span>
+  <span class="version">Memo</span>
+</header>
+
+<div id="memo-layout">
+  <div id="memo-toolbar">
+    <!-- Inline formatting -->
+    <button id="btn-bold"      title="Bold (Ctrl+B)"               onclick="fmt('bold')"><b>B</b></button>
+    <button id="btn-italic"    title="Italic (Ctrl+I)"              onclick="fmt('italic')"><i>I</i></button>
+    <button id="btn-underline" title="Underline (Ctrl+U)"           onclick="fmt('underline')"><u>U</u></button>
+    <button id="btn-strike"    title="Strikethrough (Ctrl+Shift+X)" onclick="fmt('strikeThrough')"><s>S</s></button>
+    <span class="sep"></span>
+    <!-- Block formats -->
+    <button id="btn-h1"   title="Heading 1 (Ctrl+Alt+1)" onclick="fmtBlock('h1')">H1</button>
+    <button id="btn-h2"   title="Heading 2 (Ctrl+Alt+2)" onclick="fmtBlock('h2')">H2</button>
+    <button id="btn-h3"   title="Heading 3 (Ctrl+Alt+3)" onclick="fmtBlock('h3')">H3</button>
+    <button id="btn-para" title="Normal text (Ctrl+Alt+0)" onclick="fmtBlock('p')">P</button>
+    <span class="sep"></span>
+    <!-- Lists -->
+    <button id="btn-ul" title="Bullet list"                   onclick="fmt('insertUnorderedList')">•</button>
+    <button id="btn-ol" title="Numbered list (Ctrl+Shift+7)" onclick="fmt('insertOrderedList')">1.</button>
+    <span class="sep"></span>
+    <!-- Alignment -->
+    <button id="btn-align-left"   title="Align left (Ctrl+Shift+L)"  onclick="fmt('justifyLeft')">≡L</button>
+    <button id="btn-align-center" title="Align center (Ctrl+E)"       onclick="fmt('justifyCenter')">≡C</button>
+    <button id="btn-align-right"  title="Align right (Ctrl+Shift+R)"  onclick="fmt('justifyRight')">≡R</button>
+    <span class="sep"></span>
+    <!-- Clear formatting -->
+    <button id="btn-clear" title="Clear formatting (Ctrl+\)" onclick="fmt('removeFormat')">clr</button>
+    <!-- Right-aligned controls: Save button has margin-left:auto from style.css -->
+    <button id="btn-save" title="Save (Ctrl+S)" onclick="saveFile()">Save</button>
+    <div class="open-wrap">
+      <button id="btn-open-toggle" title="Open file" onclick="toggleOpenMenu()">Open ▾</button>
+      <div id="open-menu">
+        <button onclick="saveFileAs()">Save As…</button>
+        <button onclick="promptNewDocument()">+ New document</button>
+        <div class="menu-sep"></div>
+        <div id="open-menu-files"></div>
+      </div>
+    </div>
+    <span class="sep"></span>
+    <button id="btn-theme" title="Toggle light/dark mode">☀</button>
+    <button id="btn-tokens" title="Design Tokens" onclick="toggleTokenPanel()">Tokens</button>
+  </div>
+
+  <div id="save-as-modal" class="hidden">
+    <div id="save-as-box">
+      <div id="save-as-title">Save document</div>
+      <div class="save-as-row">
+        <label>Folder</label>
+        <select id="save-dir-select"><option value="memo">memo</option></select>
+      </div>
+      <div class="save-as-row">
+        <label>Document name</label>
+        <input id="save-name-input" type="text" placeholder="my-document" autocomplete="off">
+      </div>
+      <div id="save-as-btns">
+        <button id="save-modal-cancel">Cancel</button>
+        <button id="save-modal-ok">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="crash-banner" class="hidden">
+    <span id="crash-msg">Unsaved draft found</span>
+    <button id="crash-restore">Restore</button>
+    <button id="crash-dismiss" title="Dismiss">✕</button>
+  </div>
+
+  <div id="memo-body">
+    <div id="memo-editor"
+         contenteditable="true"
+         spellcheck="true"
+         data-placeholder="Start typing…"></div>
+
+    <div id="tok-panel">
+      <div id="tok-panel-hdr">
+        <span>Design Tokens</span>
+        <button onclick="toggleTokenPanel()" title="Close panel">✕</button>
+      </div>
+      <div id="tok-panel-search">
+        <input id="tok-search" type="text" placeholder="Filter tokens…" oninput="filterTokens(this.value)">
+      </div>
+      <div id="tok-panel-body">
+        <div class="tok-section-hdr">Colors</div>
+        <div id="tok-colors">
+          <span style="color:var(--text-dim);font-size:11px;padding:8px 10px;display:block">Loading…</span>
+        </div>
+        <div class="tok-section-hdr">Typography</div>
+        <div id="tok-type"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="memo-status">No file open</div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────────
+let currentPath = null;
+let loadedMtime = null;  // last-known file mtime for optimistic-concurrency (409) on save
+let dirty = false;
+let autoSaveTimer = null;
+let lastSaveTs = 0;
+let statusFilename = null;
+let wordDebounce = null;
+let draftTimer = null;
+
+const editor = document.getElementById('memo-editor');
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+(function init() {
+  const params = new URLSearchParams(window.location.search);
+  const path = params.get('path');
+  if (path) {
+    loadFile(path);
+  } else {
+    setStatus('No file open — use Open ▾ to open or create a file');
+  }
+  loadOpenMenuFiles();
+})();
+
+// ── File I/O ──────────────────────────────────────────────────────────────────
+async function loadFile(path) {
+  try {
+    // DEV workbench roots API: GET /_api/edit/file → { content, mtime, writable }.
+    const res = await fetch(`/_api/edit/file?path=${encodeURIComponent(path)}`);
+    if (!res.ok) { setStatus('Error loading file.'); return; }
+    const wrap = await res.json();
+    loadedMtime = wrap.mtime;
+    const content = wrap.content;
+    editor.innerHTML = content;
+    currentPath = path;
+    const name = path.split('/').pop();
+    statusFilename = name;
+    lastSaveTs = Date.now();
+    document.title = `${name} — Memo`;
+    setDirty(false);
+    showFileStatus();
+    checkDraft();
+  } catch {
+    setStatus('Network error loading file.');
+  }
+}
+
+async function saveFile() {
+  // v1: this surface edits an .html memo opened from the workbench (?path=). Creating a
+  // new memo from scratch needs a target path in a writable root — create the file in the
+  // workbench first, then open it here.
+  if (!currentPath) {
+    setStatus('Open an .html memo from the workbench to save.');
+    return;
+  }
+  const content = editor.innerHTML;
+  try {
+    // DEV workbench roots API: PUT /_api/edit/file with raw body + editor guard + mtime.
+    const headers = { 'X-Foundry-Editor': '1' };
+    if (loadedMtime != null) headers['X-Foundry-Mtime'] = String(loadedMtime);
+    const res = await fetch(`/_api/edit/file?path=${encodeURIComponent(currentPath)}`, {
+      method: 'PUT', headers, body: content,
+    });
+    if (res.ok) {
+      lastSaveTs = Date.now();
+      localStorage.removeItem(draftKey());
+      setDirty(false);
+      const name = currentPath.split('/').pop();
+      statusFilename = name;
+      document.title = `${name} — Memo`;
+      setStatus(`Saved — ${name}`);
+      try { const w = await (await fetch(`/_api/edit/file?path=${encodeURIComponent(currentPath)}`)).json(); loadedMtime = w.mtime; } catch {}
+      setTimeout(() => showFileStatus(), 2000);
+    } else if (res.status === 409) {
+      setStatus('Changed on disk — reload before saving.');
+    } else {
+      setStatus('Save failed.');
+    }
+  } catch {
+    setStatus('Network error saving file.');
+  }
+}
+
+// v1 edit-mode: New / Save-As create a file in a writable root, which needs a target-path
+// picker not yet wired. Create the file in the workbench, then open it here.
+async function promptNewDocument() {
+  hideOpenMenu();
+  setStatus('Create a new .html file in the workbench, then open it in Memo.');
+}
+
+async function saveFileAs() {
+  hideOpenMenu();
+  setStatus('Save As is not in v1 — create the target file in the workbench and open it.');
+}
+
+// Returns Promise<{name, dir}> — rejects if cancelled
+async function showSaveAsModal(defaultName, defaultDir) {
+  return new Promise((resolve, reject) => {
+    const modal = document.getElementById('save-as-modal');
+    const select = document.getElementById('save-dir-select');
+    const input = document.getElementById('save-name-input');
+    const okBtn = document.getElementById('save-modal-ok');
+    const cancelBtn = document.getElementById('save-modal-cancel');
+
+    // Populate dir list
+    select.innerHTML = '';
+    fetch('/api/memo/dirs').then(r => r.json()).then(data => {
+      (data.dirs || ['memo']).forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d; opt.textContent = d;
+        if (d === (defaultDir || 'memo')) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }).catch(() => {
+      const opt = document.createElement('option');
+      opt.value = 'memo'; opt.textContent = 'memo'; select.appendChild(opt);
+    });
+
+    input.value = defaultName || '';
+    modal.classList.remove('hidden');
+    input.focus();
+    input.select();
+
+    function cleanup() {
+      modal.classList.add('hidden');
+      okBtn.removeEventListener('click', onOk);
+      cancelBtn.removeEventListener('click', onCancel);
+      document.removeEventListener('keydown', onKey);
+    }
+    function onOk() {
+      const name = input.value.trim();
+      if (!name) { input.focus(); return; }
+      cleanup();
+      resolve({ name, dir: select.value });
+    }
+    function onCancel() { cleanup(); reject(); }
+    function onKey(e) {
+      if (e.key === 'Enter') { e.preventDefault(); onOk(); }
+      else if (e.key === 'Escape') { e.preventDefault(); onCancel(); }
+    }
+    okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+    document.addEventListener('keydown', onKey);
+  });
+}
+
+// v1: the "recent files" list came from the prototype's memo-only /api/files. In the
+// workbench, memos are opened from the file tree (any .html → "Open in Memo"), so the
+// menu just points there rather than maintaining a separate list.
+async function loadOpenMenuFiles() {
+  const container = document.getElementById('open-menu-files');
+  if (container) {
+    container.innerHTML = '<button disabled style="color:var(--text-dim);cursor:default">Open .html files from the workbench tree</button>';
+  }
+}
+
+// ── Formatting ────────────────────────────────────────────────────────────────
+function fmt(cmd) {
+  document.execCommand(cmd, false, null);
+  editor.focus();
+  updateToolbarState();
+}
+
+function fmtBlock(tag) {
+  document.execCommand('formatBlock', false, tag);
+  editor.focus();
+  updateToolbarState();
+}
+
+function updateToolbarState() {
+  const toggles = {
+    'btn-bold':         document.queryCommandState('bold'),
+    'btn-italic':       document.queryCommandState('italic'),
+    'btn-underline':    document.queryCommandState('underline'),
+    'btn-strike':       document.queryCommandState('strikeThrough'),
+    'btn-ul':           document.queryCommandState('insertUnorderedList'),
+    'btn-ol':           document.queryCommandState('insertOrderedList'),
+    'btn-align-left':   document.queryCommandState('justifyLeft'),
+    'btn-align-center': document.queryCommandState('justifyCenter'),
+    'btn-align-right':  document.queryCommandState('justifyRight'),
+  };
+  for (const [id, state] of Object.entries(toggles)) {
+    document.getElementById(id).classList.toggle('active', state);
+  }
+  const block = document.queryCommandValue('formatBlock').toLowerCase();
+  ['h1', 'h2', 'h3'].forEach(t => {
+    document.getElementById(`btn-${t}`).classList.toggle('active', block === t);
+  });
+  document.getElementById('btn-para').classList.toggle('active', block === 'p' || block === 'div');
+}
+
+// ── Status bar & word count ───────────────────────────────────────────────────
+function setStatus(msg) {
+  document.getElementById('memo-status').textContent = msg;
+}
+
+function showFileStatus() {
+  if (!statusFilename) return;
+  const text = editor.innerText.trim();
+  const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+  const chars = text.length;
+  document.getElementById('memo-status').textContent =
+    `${statusFilename}  ·  ${words} words  ·  ${chars} chars`;
+}
+
+// ── Dirty tracking ────────────────────────────────────────────────────────────
+function setDirty(val) {
+  dirty = val;
+  if (val) {
+    const base = statusFilename || 'Untitled';
+    document.title = `• ${base} — Memo`;
+  }
+  if (autoSaveTimer) clearTimeout(autoSaveTimer);
+  if (val && currentPath) {
+    autoSaveTimer = setTimeout(saveFile, 30000);
+  }
+}
+
+// ── Crash recovery (localStorage draft) ──────────────────────────────────────
+function draftKey() {
+  return 'memo-crash:' + (currentPath || '__unsaved__');
+}
+
+function saveDraft() {
+  if (!dirty) return;
+  try {
+    localStorage.setItem(draftKey(), JSON.stringify({
+      content: editor.innerHTML,
+      path: currentPath,
+      ts: Date.now(),
+    }));
+  } catch { /* storage full — silent */ }
+}
+
+function checkDraft() {
+  const raw = localStorage.getItem(draftKey());
+  if (!raw) return;
+  try {
+    const draft = JSON.parse(raw);
+    // only show banner if draft is newer than last load/save (with 2s grace)
+    if (draft.ts <= lastSaveTs + 2000) {
+      localStorage.removeItem(draftKey());
+      return;
+    }
+    const ageSec = Math.round((Date.now() - draft.ts) / 1000);
+    const ageLabel = ageSec < 120
+      ? `${ageSec}s ago`
+      : `${Math.round(ageSec / 60)}m ago`;
+    document.getElementById('crash-msg').textContent =
+      `Unsaved draft found (${ageLabel}) — restore it?`;
+    const banner = document.getElementById('crash-banner');
+    banner.classList.remove('hidden');
+    document.getElementById('crash-restore').onclick = () => {
+      editor.innerHTML = draft.content;
+      setDirty(true);
+      showFileStatus();
+      banner.classList.add('hidden');
+      localStorage.removeItem(draftKey());
+    };
+    document.getElementById('crash-dismiss').onclick = () => {
+      banner.classList.add('hidden');
+      localStorage.removeItem(draftKey());
+    };
+  } catch {
+    localStorage.removeItem(draftKey());
+  }
+}
+
+// ── Paste sanitization ────────────────────────────────────────────────────────
+const PASTE_ALLOW = new Set([
+  'B','STRONG','I','EM','U','S','STRIKE','DEL',
+  'H1','H2','H3','H4','H5','H6',
+  'P','DIV','BR','BLOCKQUOTE','PRE','CODE',
+  'UL','OL','LI',
+  'TABLE','THEAD','TBODY','TR','TH','TD',
+]);
+
+function sanitizePasteHtml(html) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  function clean(node) {
+    const out = [];
+    for (const child of [...node.childNodes]) {
+      if (child.nodeType === 3) {
+        out.push(escHtml(child.textContent));
+      } else if (child.nodeType === 1) {
+        const tag = child.tagName.toUpperCase();
+        if (tag === 'A') {
+          const href = (child.getAttribute('href') || '').trim();
+          const inner = clean(child);
+          if (href && /^https?:\/\//i.test(href)) {
+            out.push(`<a href="${escAttr(href)}">${inner}</a>`);
+          } else {
+            out.push(inner);
+          }
+        } else if (PASTE_ALLOW.has(tag)) {
+          const lower = tag.toLowerCase();
+          out.push(`<${lower}>${clean(child)}</${lower}>`);
+        } else {
+          out.push(clean(child));
+        }
+      }
+    }
+    return out.join('');
+  }
+  return clean(doc.body);
+}
+
+// ── Open menu ─────────────────────────────────────────────────────────────────
+function toggleOpenMenu() {
+  const menu = document.getElementById('open-menu');
+  const isOpen = menu.classList.contains('open');
+  if (!isOpen) loadOpenMenuFiles();
+  menu.classList.toggle('open', !isOpen);
+}
+
+function hideOpenMenu() {
+  document.getElementById('open-menu').classList.remove('open');
+}
+
+// ── Utility ───────────────────────────────────────────────────────────────────
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function escAttr(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ── Event wiring ──────────────────────────────────────────────────────────────
+editor.addEventListener('input', () => {
+  setDirty(true);
+  // word count: debounced 50ms
+  if (wordDebounce) clearTimeout(wordDebounce);
+  wordDebounce = setTimeout(showFileStatus, 50);
+  // draft save: throttled 2s
+  if (draftTimer) clearTimeout(draftTimer);
+  draftTimer = setTimeout(saveDraft, 2000);
+});
+
+document.addEventListener('selectionchange', updateToolbarState);
+
+editor.addEventListener('paste', e => {
+  e.preventDefault();
+  const html = e.clipboardData.getData('text/html');
+  const text = e.clipboardData.getData('text/plain');
+  let sanitized;
+  if (html) {
+    sanitized = sanitizePasteHtml(html);
+  } else {
+    // plain text: wrap each line in <p>
+    sanitized = text
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .split('\n')
+      .map(l => `<p>${l || '<br>'}</p>`)
+      .join('');
+  }
+  document.execCommand('insertHTML', false, sanitized);
+  setDirty(true);
+});
+
+document.addEventListener('keydown', e => {
+  const ctrl = e.ctrlKey || e.metaKey;
+
+  // Global shortcuts (work outside editor too)
+  if (ctrl && e.key === 's' && !e.shiftKey) { e.preventDefault(); saveFile(); return; }
+  if (ctrl && e.shiftKey && e.key === 'S') { e.preventDefault(); saveFileAs(); return; }
+
+  // Editor-scoped shortcuts
+  const inEditor = editor === document.activeElement || editor.contains(document.activeElement);
+  if (!inEditor) return;
+
+  if (ctrl && !e.altKey && !e.shiftKey) {
+    if (e.key === 'b')        { e.preventDefault(); fmt('bold'); }
+    else if (e.key === 'i')   { e.preventDefault(); fmt('italic'); }
+    else if (e.key === 'u')   { e.preventDefault(); fmt('underline'); }
+    else if (e.key === 'e')   { e.preventDefault(); fmt('justifyCenter'); }
+    else if (e.code === 'Backslash') { e.preventDefault(); fmt('removeFormat'); }
+  }
+  if (ctrl && e.shiftKey && !e.altKey) {
+    if (e.code === 'Digit7')  { e.preventDefault(); fmt('insertOrderedList'); }
+    else if (e.code === 'KeyX') { e.preventDefault(); fmt('strikeThrough'); }
+    else if (e.code === 'KeyL') { e.preventDefault(); fmt('justifyLeft'); }
+    else if (e.code === 'KeyR') { e.preventDefault(); fmt('justifyRight'); }
+  }
+  if (ctrl && e.altKey && !e.shiftKey) {
+    if (e.key === '1')        { e.preventDefault(); fmtBlock('h1'); }
+    else if (e.key === '2')   { e.preventDefault(); fmtBlock('h2'); }
+    else if (e.key === '3')   { e.preventDefault(); fmtBlock('h3'); }
+    else if (e.key === '0')   { e.preventDefault(); fmtBlock('p'); }
+  }
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.open-wrap')) hideOpenMenu();
+});
+
+// ── Token panel ────────────────────────────────────────────────────────────────
+let tokOpen = false;
+let tokLoaded = false;
+
+function toggleTokenPanel() {
+  tokOpen = !tokOpen;
+  document.getElementById('tok-panel').classList.toggle('open', tokOpen);
+  document.getElementById('btn-tokens').classList.toggle('active', tokOpen);
+  if (tokOpen && !tokLoaded) loadTokens();
+}
+
+async function loadTokens() {
+  try {
+    const res = await fetch('/_api/edit/tokens-data');
+    if (!res.ok) {
+      document.getElementById('tok-colors').innerHTML =
+        '<span style="color:var(--text-dim);font-size:11px;padding:8px 10px;display:block">Could not load tokens.</span>';
+      return;
+    }
+    const data = await res.json();
+    tokLoaded = true;
+    renderTokColors(data);
+    renderTokType(data);
+  } catch(e) {
+    document.getElementById('tok-colors').innerHTML =
+      `<span style="color:var(--text-dim);font-size:11px;padding:8px 10px;display:block">${escHtml(e.message)}</span>`;
+  }
+}
+
+function flattenTokGroup(group, prefix) {
+  const out = [];
+  for (const [k, v] of Object.entries(group)) {
+    if (k.startsWith('$') || !v || typeof v !== 'object') continue;
+    const path = prefix ? prefix + '/' + k : k;
+    if ('$value' in v) {
+      out.push({ name: k, path, value: String(v.$value), type: v.$type || '', desc: v.$description || '' });
+    } else {
+      out.push(...flattenTokGroup(v, path));
+    }
+  }
+  return out;
+}
+
+function renderTokColors(data) {
+  const tokens = flattenTokGroup((data.primitive || {}).color || {}, '');
+  const el = document.getElementById('tok-colors');
+  if (!tokens.length) {
+    el.innerHTML = '<span style="color:var(--text-dim);font-size:11px;padding:8px 10px;display:block">No colors found.</span>';
+    return;
+  }
+  el.innerHTML = tokens.map(t =>
+    `<div class="tok-chip" draggable="true" data-value="${escAttr(t.value)}" data-type="color"
+          title="${escAttr(t.name + ': ' + t.value + (t.desc ? '\n' + t.desc : ''))}"
+          onclick="applyTokColor('${escAttr(t.value)}')">
+       <span class="tok-chip-swatch" style="background:${escAttr(t.value)}"></span>
+       <span class="tok-chip-name">${escHtml(t.name)}</span>
+       <span class="tok-chip-val">${escHtml(t.value)}</span>
+     </div>`
+  ).join('');
+  wireTokDrag();
+}
+
+function renderTokType(data) {
+  const tokens = flattenTokGroup((data.primitive || {}).font || {}, '');
+  const el = document.getElementById('tok-type');
+  if (!tokens.length) { el.textContent = ''; return; }
+  el.innerHTML = tokens.map(t => {
+    const v = String(t.value);
+    return `<div class="tok-type-chip" title="${escAttr(v)}"
+                 onclick="applyTokFont('${escAttr(v)}')">
+       <span class="tok-type-sample" style="font-family:${escAttr(v)}">Aa</span>
+       <span class="tok-chip-name">${escHtml(t.name)}</span>
+     </div>`;
+  }).join('');
+}
+
+function applyTokColor(val) {
+  editor.focus();
+  document.execCommand('foreColor', false, val);
+}
+
+function applyTokFont(val) {
+  editor.focus();
+  document.execCommand('fontName', false, val);
+}
+
+function wireTokDrag() {
+  document.querySelectorAll('.tok-chip[draggable]').forEach(chip => {
+    chip.addEventListener('dragstart', e => {
+      e.dataTransfer.setData('application/x-token',
+        JSON.stringify({ type: chip.dataset.type, value: chip.dataset.value }));
+      e.dataTransfer.effectAllowed = 'copy';
+    });
+  });
+}
+
+function filterTokens(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('.tok-chip, .tok-type-chip').forEach(el => {
+    el.style.display = (!q || el.textContent.toLowerCase().includes(q)) ? '' : 'none';
+  });
+}
+
+// (Removed the /api/files/events SSE — the recent-files list is static in v1; memos are
+//  opened from the workbench file tree, so there is no separate list to live-update.)
+
+// ── Token drop on editor ──────────────────────────────────────────────────────
+editor.addEventListener('dragover', e => {
+  if (e.dataTransfer.types.includes('application/x-token')) {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }
+});
+editor.addEventListener('drop', e => {
+  const raw = e.dataTransfer.getData('application/x-token');
+  if (!raw) return;
+  e.preventDefault();
+  try {
+    const { type, value } = JSON.parse(raw);
+    if (document.caretRangeFromPoint) {
+      const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+      if (range) { const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range); }
+    }
+    if (type === 'color') document.execCommand('foreColor', false, value);
+  } catch { /* silent */ }
+});
+
+// ── Light / dark theme toggle ─────────────────────────────────────────────────
+(function() {
+  const btn = document.getElementById('btn-theme');
+  let isLight = document.documentElement.classList.contains('light');
+  function applyTheme() {
+    document.documentElement.classList.toggle('light', isLight);
+    btn.textContent = isLight ? '🌙' : '☀';
+    btn.title = isLight ? 'Switch to dark mode' : 'Switch to light mode';
+  }
+  applyTheme();
+  btn.addEventListener('click', () => {
+    isLight = !isLight;
+    localStorage.setItem('wp-theme', isLight ? 'light' : 'dark');
+    applyTheme();
+  });
+})();
+</script>
+</body>
+</html>
