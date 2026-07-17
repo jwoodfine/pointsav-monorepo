@@ -1973,14 +1973,31 @@ async function openFile(path, name) {
       // JSON schema detection — peek first 6 KB for known document types
       if (ext === 'json') {
         const peek = viewerText.slice(0, 6144);
-        // Schema-versioned formats
-        const isVersionedDoc = peek.includes('"proforma_version"') ||
+        // Proforma, all known shapes. NOTE (2026-07-16): the "proforma-v" check was the
+        // missing case — the proforma SURFACE writes `"schema": "proforma-v2.0"`, which
+        // neither this sniff nor the server DocType detector recognised, so surface-created
+        // files opened as raw JSON. Detection must match the UNION of shapes.
+        const isProforma =
+            peek.includes('"proforma_version"') ||
+            peek.includes('"schema": "proforma-v') || peek.includes('"schema":"proforma-v') ||
+            (peek.includes('"entity"') && peek.includes('"date"') &&
+             (peek.includes('"income"') || peek.includes('"years"') || peek.includes('"areas"')));
+        const isVersionedDoc = isProforma ||
             peek.includes('"presentation_version"') ||
             peek.includes('"schedule_version"');
-        // Bespoke tool-proforma output (entity + date + data section key)
-        const isBespokeProforma = peek.includes('"entity"') && peek.includes('"date"') &&
-            (peek.includes('"income"') || peek.includes('"years"') || peek.includes('"areas"'));
-        if (isVersionedDoc || isBespokeProforma) {
+        if (isVersionedDoc) {
+          // §S9 doc→surface routing: a proforma can open in the editable Proforma surface.
+          if (isProforma) {
+            const bar = document.getElementById('viewer-bar');
+            if (!bar.querySelector('.doc-surface-btn')) {
+              const sBtn = document.createElement('button');
+              sBtn.className = 'bar-btn doc-surface-btn';
+              sBtn.textContent = '✎ Open in Proforma';
+              sBtn.title = 'Open this file in the editable Proforma surface';
+              sBtn.addEventListener('click', () => window.open('/proforma?path=' + encodeURIComponent(apiPath), '_blank'));
+              bar.appendChild(sBtn);
+            }
+          }
           // Switch to server-side document renderer
           viewMode = 'iframe';
           tv.style.display = 'none';

@@ -29,6 +29,7 @@ use tokio_stream::{wrappers::BroadcastStream, StreamExt as _};
 const SPA_HTML: &str = include_str!("assets/index.html");
 // Schema surfaces (Phase 5) — full-page HTML served at their own routes.
 const TOKENS_HTML: &str = include_str!("assets/tokens.html");
+const PROFORMA_HTML: &str = include_str!("assets/proforma.html");
 
 // ---------------------------------------------------------------------------
 // Config
@@ -1660,6 +1661,7 @@ async fn main() -> Result<()> {
         // their data routes via `/_api/edit/…`.
         .route("/tokens", get(get_tokens_page))
         .route("/tokens-data", get(get_tokens_data))
+        .route("/proforma", get(get_proforma_page))
         .with_state(state);
 
     let addr: SocketAddr = config.bind.parse().context("parsing bind address")?;
@@ -1826,6 +1828,12 @@ fn tokens_path() -> String {
 /// GET /tokens — the read-only design-token browser page.
 async fn get_tokens_page() -> impl IntoResponse {
     Html(TOKENS_HTML)
+}
+
+/// GET /proforma — the proforma spreadsheet surface. Reads/writes the file named by
+/// its `?path=` query through the workbench's own roots file API (/_api/edit/file).
+async fn get_proforma_page() -> impl IntoResponse {
+    Html(PROFORMA_HTML)
 }
 
 /// GET /tokens-data — the DTCG bundle JSON the page renders (read-only).
