@@ -297,9 +297,31 @@ Ratified by Command 2026-07-16 (msg-id `command-20260716-ratified-app-orchestrat
 - Doctrine claim #40's Tier 0 definition vs. the new code-level `SLM_TIER=0` meaning is
   a real divergence worth a NEXT.md note at the workspace root — Command Session's
   document to amend, not either Totebox archive's.
-- seL4-native vs. NetBSD-VM for os-orchestration's actual OS-image target — open
-  question raised with the operator 2026-07-17; `capability-broker-pd` work shouldn't
-  start until this is confirmed one way or the other.
+- **seL4-native vs. NetBSD-VM — resolved 2026-07-17: abandon NetBSD-VM, commit to
+  seL4-native, as an R&D track parallel to (not blocking) the x86_64 CommandCentre
+  ship.** Third Opus deep-think pass (with seL4 Microkit documentation cross-check),
+  specifically re-verifying every claim from the prior audit rather than trusting it:
+  `os-interface/`'s NetBSD build script has never been run (needs absent cross-tools)
+  and is referenced by nothing live — free to abandon, and a NetBSD guest VM undercuts
+  the seL4-native sovereignty thesis anyway. `moonshot-sel4-vmm` is real (3031 LOC, 9
+  bins, not 8 — H1-H8 QEMU gates documented PASSED with commit SHAs) but its own
+  `CLAUDE.md` still says "Scaffold-coded (spec only)" — a real doc/reality gap.
+  `system-core`/`system-ledger` confirmed live (62 + 47 tests, actually ran
+  `cargo test`, both pass). The crux finding: `capability-broker-pd`'s own spec
+  (§4 — dynamic per-request capability delegation) fights seL4 Microkit's static
+  topology model; the 9 existing PDs are all static-config precedent, not dynamic-cap
+  precedent, and no multi-real-Rust-PD image has ever booted (only C-stub multi-PD
+  exists). Honest effort estimate: broker PD scaffold + smoke test ~1 session (solid
+  precedent); `os-orchestration.toml` boot to userspace ~2-3 sessions (first-of-kind
+  multi-Rust-PD boot, TOML itself is mechanical); actually enforcing the capability
+  chokepoint end-to-end is 2-4 sessions IF built as static-topology enforcement
+  (recommended — delivers the "structural, not audited" isolation property Doctrine
+  wants, achievable in weeks) vs. genuinely weeks-to-months if building true dynamic
+  cap-minting. **Next real step, whenever this track is picked up: scaffold
+  `capability-broker-pd` as a static-topology PD first — do not start with the dynamic
+  delegation reading of §4.** Same misplaced-ownership pattern as everything else this
+  session: `moonshot-sel4-vmm`/`moonshot-toolkit`/`system-*` all physically live in
+  project-totebox's tree — this needs cross-archive coordination from the start.
 - software.pointsav.com beta publish — concrete blocker list identified 2026-07-17
   (canonical workspace members, classification, Stage 6 promote order); mostly
   Command-Session-scope once project-orchestration's commits are promotable.
