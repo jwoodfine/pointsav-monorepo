@@ -52,26 +52,20 @@ Last updated: 2026-07-15
 - [x] **Phase 5b — Proforma surface** (commit by Peter): write surface on the workbench roots
       API (PUT /_api/edit/file + X-Foundry-Editor + mtime 409 guard); doc→surface routing +
       fixed the `proforma-v2.0` detection bug. Verified read/save/409/403 live. [2026-07-16 totebox@claude-code]
-- [ ] **Phase 5c — BIM surface** — port `app-workplace-http-prototype/src/assets/bim.html`
-      (515 lines) using the **proforma recipe**: copy to DEV assets; rewire 3 fetch calls
-      (`/api/files/read`→GET `/_api/edit/file`, `/api/files/save`→PUT with X-Foundry-Editor +
-      mtime, `/api/bim/create`→edit-mode/omit); add backend `const BIM_HTML` + `GET /bim`
-      route + palette entry; doc-routing: `.bim.json` → "Open in BIM" button in openFile().
-      **Extra vs proforma:** bim's own `<style>` is heavily hardcoded-DARK (#252526/#333/#444 +
-      dark JSON-preview colors) and it links `/style.css` — needs a light-theme conversion
-      (Decision B) + inlining the `#app-header`/4 vars it borrows, else it's a dark surface in
-      a light workbench. `.bim.json` list filter keys on the compound `.bim.json` extension
-      (Path::extension() returns just `json`). [2026-07-16 totebox@claude-code]
-- [ ] **Phase 5d — Memo surface** — port `memo.html` (797 lines), same recipe. **Most
-      entangled:** (1) needs `/api/memo/dirs` (a depth-2 dir walk) if the Save-As folder picker
-      is kept — or drop it for edit-mode v1; (2) memo files are `.html` FRAGMENTS, which collide
-      with the workbench's existing HTML handling — `detect_doc_type`→HtmlDoc renders them as a
-      page, not as an editable memo, so the doc-routing must special-case memo `.html` (e.g. by
-      a memo root or a marker) before the generic HTML path; (3) light-theme conversion +
-      `/style.css` inline like bim. [2026-07-16 totebox@claude-code]
-- [ ] **Phase 5 follow-ups (all surfaces):** a real surface BAR (not just palette entries) for
-      switching; a "New <schema>" create flow (v1 is edit-only — open an existing file via
-      `?path=`); Presentation/Schedule/Code/PDF/GIS are prototype "Coming soon" placeholders,
+- [x] **Phase 5c — BIM surface** (commit by Peter): `/bim` on the roots API, full dark→light
+      CSS conversion (VS Code Light+ JSON syntax colours), doc-routing `bim-workspace` →
+      "Open in BIM". Verified read/save live. [2026-07-16 totebox@claude-code]
+- [x] **Phase 5d — Memo surface** (commit by Peter): `/memo` rich-text editor on the roots API;
+      collapsed /style.css + html.light into one self-contained light stylesheet; reduced to v1
+      edit-mode (New/Save-As/recent-list/SSE dropped — needed workspace_dir endpoints); token
+      panel → /_api/edit/tokens-data; doc-routing any `.html` → "Open in Memo". Verified live.
+      [2026-07-16 totebox@claude-code]
+- [ ] **Phase 5 follow-ups (all surfaces):** (1) a real surface BAR (not just palette entries)
+      for switching between surfaces; (2) a "New <schema>" CREATE flow — v1 is edit-only (open
+      an existing file via `?path=`); creating needs a target-path picker in a writable root
+      (memo's Save-As modal HTML + `showSaveAsModal()` are retained-but-dead for this);
+      (3) memo's theme-toggle button is now inert (no dark styles) — hide it or wire a real
+      light/dark. Presentation/Schedule/Code/PDF/GIS are prototype "Coming soon" placeholders,
       nothing to port. [2026-07-16 totebox@claude-code]
 
 ---
