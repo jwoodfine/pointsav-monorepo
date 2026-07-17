@@ -7,6 +7,17 @@ Last updated: 2026-07-15
 
 ---
 
+## 2026-07-17 session — DEV feature-parity + visibility
+
+- [x] **DEV is now a TRUE superset of PROD.** Audit ("where are all my features") found DEV had
+      more features than PROD except one genuinely-missing control — the file **Sort button**
+      (a July fork leftover, never in DEV's branch). Restored it (Name ↔ Date; DEV listing has
+      mtime, not size). The PROD-vs-DEV functional-marker diff is now **empty**. [2026-07-17 totebox@claude-code]
+- [x] **Visible Surface bar** added (Files · Memo · Proforma · BIM · Tokens) between header and
+      tab-bar — surfaces were palette-only before. Buttons open each surface (new tab). [2026-07-17 totebox@claude-code]
+- [ ] **🟡 OPERATOR — click-test on `:9500`:** Sort button cycles A–Z ↔ Date and the tree
+      reorders (incl. expanded folders); the Surface bar buttons open each surface. [2026-07-17 totebox@claude-code]
+
 ## 2026-07-16 session — yesterday's work into DEV (chat + search + schema)
 
 - [ ] **🟡 OPERATOR — click through DEV at `http://10.8.0.9:9500/`** (chat + search):
