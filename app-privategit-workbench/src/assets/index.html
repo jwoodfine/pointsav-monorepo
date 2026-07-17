@@ -90,7 +90,9 @@ header .tag {
 .res-name { font-size: 12px; color: #a8d5a2; font-weight: 500; }
 .search-result.active .res-name { color: #c8e6c9; }
 .res-path { font-size: 10px; color: #666; margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.search-msg { padding: 12px; color: #555; font-size: 11px; font-style: italic; }
+.res-snippet { font-size: 10px; color: #888; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.search-band-head { padding: 6px 12px 3px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #888; position: sticky; top: 0; background: inherit; }
+.search-msg { padding: 12px; color: #555; font-size: 11px; font-style: italic; line-height: 1.5; }
 
 /* ── Tree panel ───────────────────────────────────────────────────── */
 #tree-panel { flex: 1; overflow-y: auto; }
@@ -629,7 +631,7 @@ header .tag {
   <span class="tag">private</span>
   <div class="search-wrap" role="search">
     <input type="text" id="search-input" placeholder="Search files…" autocomplete="off" spellcheck="false" aria-label="Search files">
-    <span id="search-status" role="status" aria-live="polite">indexing…</span>
+    <span id="search-status" role="status" aria-live="polite"></span>
   </div>
 </header>
 
@@ -795,8 +797,6 @@ header .tag {
 
 <script>
 // ── State ──────────────────────────────────────────────────────────────────────
-let searchIndex  = [];
-let indexingDone = false;
 let activeTreeEl = null;
 let viewMode     = 'none';  // 'none' | 'iframe' | 'text' | 'image'
 let currentPath  = null;
@@ -864,7 +864,6 @@ const TEXT_EXTS   = new Set([
   'py','rb','go','java','c','cpp','h','hpp','xml','html','htm',
 ]);
 const VIEWABLE_RE  = /\.(html?|pdf|md|txt|csv|json|yaml|yml|toml|ini|conf|env|log|sh|bash|rs|js|ts|jsx|tsx|css|py|png|jpg|jpeg|gif|svg|webp|bmp)$/i;
-const INDEXABLE_RE = /\.(html?|md|txt|pdf|csv|json|yaml|yml)$/i;
 
 // Document types rendered via the server-side /document route.
 // JSON schema detection (proforma, etc.) happens in openFile() after content is fetched.
@@ -3035,81 +3034,15 @@ document.addEventListener('mouseup', () => {
   document.getElementById('preview-frame').style.pointerEvents = '';
 });
 
-// ── Search index — background build ──────────────────────────────────────────
-
-// Global semaphore: cap background scan at 2 concurrent HTTP requests so
-// Chrome's 6-connection pool stays free for user-initiated clicks.
-const scanSem = (() => {
-  let count = 0, queue = [];
-  return {
-    acquire() {
-      if (count < 2) { count++; return Promise.resolve(); }
-      return new Promise(r => queue.push(r));
-    },
-    release() {
-      count--;
-      if (queue.length) { count++; queue.shift()(); }
-    }
-  };
-})();
-
-// Directory names we never recurse into (source trees, build artefacts)
-const SKIP_DIRS = new Set([
-  'node_modules','vendor','target','build','dist','__pycache__',
-  '.cargo','vendor-sel4-kernel','vendor-seL4','src'
-]);
-
-async function scanDir(apiBase, browseBase, label, subpath, depth, maxDepth) {
-  if (depth >= maxDepth) return;
-  let entries;
-  await scanSem.acquire();
-  try {
-    const res = await fetch(apiBase + subpath);
-    if (!res.ok) return;
-    entries = await res.json();
-  } catch(e) { return; }
-  finally { scanSem.release(); }
-
-  const subdirFns = [];
-  for (const e of entries) {
-    const name = e.name.replace(/\/$/, '');
-    if (name.startsWith('.') && name !== '.agent') continue;
-    if (e.type === 'directory') {
-      if (SKIP_DIRS.has(name)) continue;
-      subdirFns.push(() => scanDir(apiBase, browseBase, label, subpath + name + '/', depth + 1, maxDepth));
-    } else if (INDEXABLE_RE.test(name)) {
-      const folder = subpath ? label + ' / ' + subpath.replace(/\/$/, '') : label;
-      searchIndex.push({ name, path: browseBase + subpath + name, folder, key: (name + ' ' + folder).toLowerCase() });
-    }
-  }
-  // Run subdirectory scans sequentially to stay within semaphore budget
-  for (const fn of subdirFns) await fn();
-}
-
-async function buildSearchIndex() {
-  await scanDir('/_api/staged/',           '/',                   'Staged',   '', 0, 4);
-
-  // Clones: only .agent/ subfolder + top-level files (skip source trees)
-  try {
-    const res = await fetch('/_api/clones/');
-    if (res.ok) {
-      const archives = await res.json();
-      for (const e of archives.filter(e => e.type === 'directory' && !e.name.startsWith('.'))) {
-        const name = e.name.replace(/\/$/, '');
-        // Top-level files only (depth 1), then .agent/ up to depth 3
-        await scanDir('/_api/clones/', '/_clones/', name, name + '/', 0, 1);
-        await scanDir('/_api/clones/', '/_clones/', name, name + '/.agent/', 0, 3);
-      }
-    }
-  } catch(e) { /* ignore */ }
-
-  indexingDone = true;
-  const status = document.getElementById('search-status');
-  status.textContent = searchIndex.length + ' files';
-  setTimeout(() => { status.textContent = ''; }, 4000);
-}
-
-buildSearchIndex();
+// ── Search — server-side via service-search ──────────────────────────────────
+//
+// The old client-side index builder (scanSem + scanDir + buildSearchIndex +
+// INDEXABLE_RE/SKIP_DIRS) was removed 2026-07-16. It was filename-only, capped
+// file types (no .rs), and excluded the 'src' directory outright — the exact
+// silent-miss failure this rework was written to end. Search now proxies to the
+// service-search Strike via /_api/edit/search: a trigram substring floor (no
+// silent misses) fused with Tantivy BM25, returning two bands (filenames /
+// contents) + a coverage line. The query implementation is in renderSearch().
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Tabs
@@ -4176,8 +4109,31 @@ const searchPanel   = document.getElementById('search-panel');
 const searchResults = document.getElementById('search-results');
 const treePanel     = document.getElementById('tree-panel');
 
-function renderSearch() {
-  const q = searchInput.value.trim().toLowerCase();
+// Monotonic token so a slow response for an old query never overwrites a newer one.
+let searchSeq = 0;
+
+// Render one result row. `id` is a workbench file path (the Strike qualifies ids with
+// the same url_prefix the workbench config uses), so it opens directly.
+function searchRow(hit, query) {
+  const div = document.createElement('div');
+  div.className = 'search-result';
+  const base = hit.name.split('/').pop();
+  const snip = hit.snippet
+    ? `<div class="res-snippet">${esc(hit.snippet)}</div>`
+    : '';
+  div.innerHTML = `<div class="res-name">${esc(base)}</div><div class="res-path">${esc(hit.name)}</div>${snip}`;
+  div.addEventListener('click', () => {
+    searchResults.querySelectorAll('.search-result.active').forEach(el => el.classList.remove('active'));
+    div.classList.add('active');
+    setTreeActive(null);
+    logActivity('search-open', hit.id, { query: query.slice(0, 80) });
+    openFile(hit.id, base);
+  });
+  return div;
+}
+
+async function renderSearch() {
+  const q = searchInput.value.trim();
   if (!q) {
     searchPanel.classList.remove('visible');
     treePanel.classList.remove('hidden');
@@ -4185,52 +4141,61 @@ function renderSearch() {
   }
   searchPanel.classList.add('visible');
   treePanel.classList.add('hidden');
+  const seq = ++searchSeq;
+  const status = document.getElementById('search-status');
+  if (status) status.textContent = 'searching…';
 
-  if (!searchIndex.length) {
-    searchResults.innerHTML = '<div class="search-msg">Still indexing, try again in a moment…</div>';
+  let data;
+  try {
+    const res = await fetch('/_api/edit/search?q=' + encodeURIComponent(q));
+    data = await res.json();
+  } catch (e) {
+    if (seq === searchSeq) searchResults.innerHTML = '<div class="search-msg">Search unavailable.</div>';
     return;
   }
-  const matches = searchIndex.filter(f => f.key.includes(q)).slice(0, 80);
-  if (!matches.length) {
-    searchResults.innerHTML = `<div class="search-msg">No files match "${esc(q)}"</div>`;
-    return;
+  if (seq !== searchSeq) return; // a newer query superseded this one
+
+  const files = data.filenames || [];
+  const contents = data.contents || [];
+  if (status) {
+    status.textContent = data.error
+      ? 'index unavailable'
+      : `${data.files_indexed || 0} files · ${data.roots_indexed || 0} roots`;
   }
+
   searchResults.innerHTML = '';
-  matches.forEach(m => {
-    const div = document.createElement('div');
-    div.className = 'search-result';
-    div.innerHTML = `<div class="res-name">${esc(m.name)}</div><div class="res-path">${esc(m.folder)}</div>`;
-    div.addEventListener('click', () => {
-      searchResults.querySelectorAll('.search-result.active').forEach(el => el.classList.remove('active'));
-      div.classList.add('active');
-      setTreeActive(null);
-      logActivity('search-open', m.path, { query: q.slice(0, 80), rank: matches.indexOf(m), results: matches.length });
-      openFile(m.path, m.name);
-    });
-    searchResults.appendChild(div);
-  });
+  if (data.error) {
+    searchResults.innerHTML = `<div class="search-msg">Search index unavailable — the service-search Strike is not reachable.<br><span style="opacity:.6">${esc(data.error)}</span></div>`;
+  } else if (!files.length && !contents.length) {
+    // A trustworthy zero: we say what we searched, so empty means truly absent.
+    searchResults.innerHTML = `<div class="search-msg">No matches for "${esc(q)}"<br><span style="opacity:.6">Searched ${data.files_indexed || 0} files across ${data.roots_indexed || 0} roots.</span></div>`;
+  } else {
+    if (files.length) {
+      const h = document.createElement('div');
+      h.className = 'search-band-head';
+      h.textContent = 'In file names (' + files.length + ')';
+      searchResults.appendChild(h);
+      files.forEach(hit => searchResults.appendChild(searchRow(hit, q)));
+    }
+    if (contents.length) {
+      const h = document.createElement('div');
+      h.className = 'search-band-head';
+      h.textContent = 'In contents (' + contents.length + ')';
+      searchResults.appendChild(h);
+      contents.forEach(hit => searchResults.appendChild(searchRow(hit, q)));
+    }
+  }
+  logActivity('search', null, { query: q.slice(0, 80), results: files.length + contents.length });
 }
 
-let searchLogTimer = null;
+let searchDebounce = null;
 searchInput.addEventListener('input', () => {
-  renderSearch();
-  clearTimeout(searchLogTimer);
-  const q = searchInput.value.trim();
-  if (q) {
-    searchLogTimer = setTimeout(() => {
-      const matches = searchIndex.filter(f => f.key.includes(q.toLowerCase())).slice(0, 80);
-      logActivity('search', null, { query: q.slice(0, 80), results: matches.length });
-    }, 600);
-  }
+  clearTimeout(searchDebounce);
+  searchDebounce = setTimeout(renderSearch, 180);
 });
 searchInput.addEventListener('keydown', e => {
   if (e.key === 'Escape') { searchInput.value = ''; renderSearch(); searchInput.blur(); }
 });
-
-(function pollIndex() {
-  if (indexingDone) { if (searchInput.value.trim()) renderSearch(); return; }
-  setTimeout(pollIndex, 500);
-})();
 
 // ── Sidebar toolbar wiring ────────────────────────────────────────────────────
 (function initSidebarToolbar() {
