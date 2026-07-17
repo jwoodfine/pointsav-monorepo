@@ -7,6 +7,49 @@ Last updated: 2026-07-15
 
 ---
 
+## 2026-07-16 session — yesterday's work into DEV (chat + search + schema)
+
+- [ ] **🟡 OPERATOR — click through DEV at `http://10.8.0.9:9500/`** (chat + search):
+      (1) **AI chat** — Ctrl/Cmd+L (or palette → "Toggle AI Chat"), send a message; reply
+      takes 3–50s from local OLMo. (2) **Search** — type in the sidebar search box; expect
+      two bands (In file names / In contents) with snippets + a coverage line, and results
+      that include `.rs`/`src/` files the old search could never find. [2026-07-16 totebox@claude-code]
+- [ ] **🔴 Strike is an ephemeral bg process — needs a systemd unit (Command scope).**
+      `service-search` Strike serves DEV search on `127.0.0.1:9310` but is a bare background
+      process right now (like the :9119 canary) — **dies on reboot**, and DEV search then
+      shows "index unavailable". Also needs the Forge on a timer to keep the index fresh.
+      Routed to Command. Manual restart meanwhile:
+      `/srv/foundry/cargo-target/jennifer/service-search/release/strike \
+       /srv/foundry/cargo-target/jennifer/service-search/dev.toml &`
+      (re-forge with `release/forge <same config>` if the index is stale/missing).
+      [2026-07-16 totebox@claude-code]
+- [ ] **`service-search` → monorepo root workspace member (Command scope).** It is a
+      standalone `[workspace]` with its own `[patch.crates-io]` mirroring root's vendored
+      Tantivy. Making it a root `members` entry (and dropping the standalone block) touches
+      the shared root `Cargo.toml` — Command's. Routed. [2026-07-16 totebox@claude-code]
+- [ ] **Migrate `app-privategit-design` off the legacy `InvertedIndex`.** Phase 2 kept
+      `moonshot-index::InvertedIndex` alive ONLY because `app-privategit-design` still uses it
+      (`src/state.rs`, `src/main.rs`). It should query the `service-search` Strike instead —
+      then `InvertedIndex` can be deleted and there is truly one search. Same-archive work,
+      not yet done. [2026-07-16 totebox@claude-code]
+- [ ] **`os-totebox` integration for `service-search`** — its README + the operator model
+      say it runs once inside an `os-*` bundle (the Doorman precedent), other `service-*` log
+      in. That OS wiring is `os-totebox`'s archive scope — route a handoff. [2026-07-16 totebox@claude-code]
+- [x] **Phase 1 — AI chat into DEV** (commit `a66a4059`): ported from http-prototype; toggle
+      via Ctrl/Cmd+L + palette (not ShellChrome); fetch on `/_api/edit/chat` (120s timeout).
+      Verified live (model returned PONG). [2026-07-16 totebox@claude-code]
+- [x] **Phase 2 — one search engine** (commit `1a1dac92`): deleted the hand-rolled `SearchEngine`
+      BM25 (−232 lines); `moonshot-index` = trigram floor only; added `index_dir` exclusions.
+      13 tests green. [2026-07-16 totebox@claude-code]
+- [x] **Phase 3 — `service-search` activated** (commits `b5a22ae1`+`cfeb5efc`): Forge + Strike;
+      trigram floor ∪ Tantivy BM25; ~6MB Strike RSS; substring guarantee verified live +
+      integration test. [2026-07-16 totebox@claude-code]
+- [x] **Phase 4 — DEV search wired to the Strike** (this session): two-band server search
+      replaces the filename-only client filter; verified on a real 7,489-file index.
+      [2026-07-16 totebox@claude-code]
+
+---
+
 ## 2026-07-15 session — PROD/DEV locked pair
 
 - [ ] **🟡 OPERATOR — click through DEV at `http://10.8.0.9:9500/`.** Everything below is
