@@ -30,6 +30,7 @@ const SPA_HTML: &str = include_str!("assets/index.html");
 // Schema surfaces (Phase 5) — full-page HTML served at their own routes.
 const TOKENS_HTML: &str = include_str!("assets/tokens.html");
 const PROFORMA_HTML: &str = include_str!("assets/proforma.html");
+const BIM_HTML: &str = include_str!("assets/bim.html");
 
 // ---------------------------------------------------------------------------
 // Config
@@ -1662,6 +1663,7 @@ async fn main() -> Result<()> {
         .route("/tokens", get(get_tokens_page))
         .route("/tokens-data", get(get_tokens_data))
         .route("/proforma", get(get_proforma_page))
+        .route("/bim", get(get_bim_page))
         .with_state(state);
 
     let addr: SocketAddr = config.bind.parse().context("parsing bind address")?;
@@ -1834,6 +1836,12 @@ async fn get_tokens_page() -> impl IntoResponse {
 /// its `?path=` query through the workbench's own roots file API (/_api/edit/file).
 async fn get_proforma_page() -> impl IntoResponse {
     Html(PROFORMA_HTML)
+}
+
+/// GET /bim — the BIM workspace surface (IFC element styles + DTCG preview). Reads/writes
+/// its `?path=` `.bim.json` file through the workbench roots file API.
+async fn get_bim_page() -> impl IntoResponse {
+    Html(BIM_HTML)
 }
 
 /// GET /tokens-data — the DTCG bundle JSON the page renders (read-only).
