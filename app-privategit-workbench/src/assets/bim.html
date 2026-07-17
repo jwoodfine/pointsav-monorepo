@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BIM — Workplace</title>
+<style>
+/* Self-contained LIGHT theme (matches the DEV workbench). Ported from
+   app-workplace-http-prototype/src/assets/bim.html; the /style.css dependency was
+   inlined and the whole palette converted dark→light. JSON-preview syntax colours use
+   VS Code Light+ equivalents. Class names are unchanged. */
+:root {
+  --bg: #ffffff; --panel: #f6f6f6; --border: #d0d0d0; --border-strong: #b8b8b8;
+  --text: #333333; --text-dim: #777777; --text-heading: #1a1a1a;
+  --accent: #094771; --accent-line: #007acc; --danger: #cd3131;
+  --font-mono: ui-monospace, 'Cascadia Code', 'SF Mono', 'Source Code Pro', Menlo, monospace;
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+* { box-sizing: border-box; }
+body { margin: 0; display: flex; flex-direction: column; height: 100vh;
+  font-family: var(--font-ui); background: var(--bg); color: var(--text); font-size: 13px; }
+#app-header { display: flex; align-items: baseline; gap: 10px;
+  padding: 10px 16px; border-bottom: 1px solid var(--border); background: var(--panel); flex-shrink: 0; }
+#app-header .logo { font-size: 13px; font-weight: 600; color: var(--text-heading); }
+#app-header .version { font-size: 11px; color: var(--text-dim); }
+
+#bim-layout { display: flex; flex: 1; height: calc(100vh - 90px); overflow: hidden; gap: 0; }
+
+/* ── Toolbar ── */
+#bim-toolbar { display: flex; align-items: center; gap: 10px; padding: 8px 14px;
+  background: var(--panel); border-bottom: 1px solid var(--border); flex-shrink: 0; }
+#title-input { background: transparent; border: none; border-bottom: 1px solid var(--border-strong);
+  color: var(--text-heading); font-size: 15px; font-weight: 600; outline: none; padding: 2px 4px;
+  min-width: 180px; flex: 1; max-width: 320px; }
+#title-input:focus { border-bottom-color: var(--accent-line); }
+.ifc-wrap { display: flex; align-items: center; gap: 6px; }
+.ifc-label { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+#ifc-input { background: var(--bg); border: 1px solid var(--border); border-radius: 3px;
+  color: var(--text); font-size: 12px; font-family: var(--font-mono); outline: none; padding: 3px 8px; width: 240px; }
+#ifc-input:focus { border-color: var(--accent-line); }
+#ifc-input::placeholder { color: #aaa; }
+.bim-save-btn { background: var(--accent); border: none; border-radius: 3px; color: #fff;
+  cursor: pointer; font-size: 12px; padding: 4px 14px; white-space: nowrap; }
+.bim-save-btn:hover { background: #0b5a91; }
+#status-span { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+
+/* ── Left panel — element styles ── */
+#bim-left { width: 420px; flex-shrink: 0; display: flex; flex-direction: column;
+  border-right: 1px solid var(--border); overflow: hidden; }
+#bim-left-header { padding: 8px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-dim); background: var(--panel);
+  border-bottom: 1px solid var(--border); flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; }
+#add-type-btn { background: none; border: 1px solid var(--border-strong); border-radius: 3px;
+  color: var(--text-dim); cursor: pointer; font-size: 11px; padding: 2px 8px; }
+#add-type-btn:hover { border-color: var(--accent-line); color: var(--accent-line); }
+#elements-table-wrap { flex: 1; overflow-y: auto; padding: 8px 0; }
+table#elements-table { width: 100%; border-collapse: collapse; }
+#elements-table th { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;
+  color: var(--text-dim); padding: 4px 14px; text-align: left; position: sticky; top: 0; background: var(--bg); }
+#elements-table td { padding: 5px 14px; vertical-align: middle; border-bottom: 1px solid var(--border); }
+.el-name { font-family: var(--font-mono); font-size: 12px; color: var(--accent); }
+.swatch-wrap { display: flex; align-items: center; gap: 8px; }
+.color-swatch { width: 22px; height: 22px; border-radius: 3px; border: 1px solid var(--border-strong);
+  cursor: pointer; flex-shrink: 0; }
+.color-swatch:hover { border-color: var(--text-dim); }
+.color-picker { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+.color-hex { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); }
+.visible-check { cursor: pointer; accent-color: var(--accent-line); width: 14px; height: 14px; }
+.del-btn { background: none; border: none; color: #aaa; cursor: pointer; font-size: 14px; padding: 0 4px; }
+.del-btn:hover { color: var(--danger); }
+
+/* ── Right panel — JSON preview (light code view) ── */
+#bim-right { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+#bim-right-header { padding: 8px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--text-dim); background: var(--panel);
+  border-bottom: 1px solid var(--border); flex-shrink: 0; }
+#json-preview { flex: 1; overflow: auto; margin: 0; padding: 14px; font-family: var(--font-mono);
+  font-size: 12px; line-height: 1.6; color: #333; background: #fbfbfb; white-space: pre; tab-size: 2; }
+/* DTCG key colouring — VS Code Light+ palette */
+.jk-schema  { color: #af00db; }   /* $schema */
+.jk-ext     { color: #795e26; }   /* $extensions */
+.jk-type    { color: #267f99; }   /* $type */
+.jk-value   { color: #a31515; }   /* $value */
+.jk-desc    { color: #777; }      /* $description */
+.jk-group   { color: #001080; }   /* group keys */
+.jv-color   { color: #a31515; }   /* color hex values */
+.jv-bool    { color: #0000ff; }   /* true/false */
+.jv-str     { color: #333; }      /* other string values */
+.jp         { color: #999; }      /* punctuation */
+</style>
+</head>
+<body>
+<header id="app-header">
+  <span class="logo"><a href="/" style="color:inherit;text-decoration:none">Workplace</a></span>
+  <span class="version">BIM Workspace</span>
+</header>
+
+<div id="bim-toolbar">
+  <input type="text" id="title-input" placeholder="Workspace title…" autocomplete="off">
+  <div class="ifc-wrap">
+    <span class="ifc-label">IFC file:</span>
+    <input type="text" id="ifc-input" placeholder="path/to/model.ifc" autocomplete="off">
+  </div>
+  <button class="bim-save-btn" onclick="doSave()">Save</button>
+  <span id="status-span"></span>
+</div>
+
+<div id="bim-layout">
+  <div id="bim-left">
+    <div id="bim-left-header">
+      <span>Element Styles</span>
+      <button id="add-type-btn" onclick="addElementRow()">+ Add type</button>
+    </div>
+    <div id="elements-table-wrap">
+      <table id="elements-table">
+        <thead>
+          <tr>
+            <th style="width:140px">IFC Type</th>
+            <th style="width:130px">Color</th>
+            <th style="width:60px;text-align:center">Visible</th>
+            <th style="width:30px"></th>
+          </tr>
+        </thead>
+        <tbody id="elements-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="bim-right">
+    <div id="bim-right-header">W3C DTCG format · bim-workspace v1.0</div>
+    <pre id="json-preview"></pre>
+  </div>
+</div>
+
+<script>
+const DEFAULT_STYLES = {
+  IfcWall:   { color: '#c8c8c8', visible: true },
+  IfcDoor:   { color: '#8b6914', visible: true },
+  IfcWindow: { color: '#88c8e8', visible: true },
+  IfcSlab:   { color: '#a0a0a0', visible: true },
+  IfcColumn: { color: '#b0b0b0', visible: true },
+  IfcBeam:   { color: '#909090', visible: true },
+  IfcStair:  { color: '#d4c08c', visible: true },
+  IfcRoof:   { color: '#8c6060', visible: true },
+};
+
+let filePath = null;
+let loadedMtime = null;  // last-known file mtime for optimistic-concurrency (409) on save
+let saveTimer = null;
+
+// ── Startup ──────────────────────────────────────────────────────────────────
+(async function init() {
+  const params = new URLSearchParams(location.search);
+  const path   = params.get('path');
+  const isNew  = params.get('new') === '1';
+  const name   = params.get('name') || 'Untitled';
+
+  if (path) {
+    filePath = path;
+    await loadFile(path);
+  } else if (isNew) {
+    await createNew(name);
+  } else {
+    setStatus('No file specified — open from the Workbench.');
+    renderDefaults();
+  }
+  refreshPreview();
+
+  document.getElementById('title-input').addEventListener('input', scheduleAutosave);
+  document.getElementById('ifc-input').addEventListener('input', scheduleAutosave);
+})();
+
+// ── File load / create ────────────────────────────────────────────────────────
+async function loadFile(path) {
+  try {
+    // DEV workbench roots API: GET /_api/edit/file → { content, mtime, writable }.
+    const res = await fetch('/_api/edit/file?path=' + encodeURIComponent(path));
+    if (!res.ok) { setStatus('Could not load file.'); renderDefaults(); return; }
+    const wrap = await res.json();
+    loadedMtime = wrap.mtime;
+    const data = JSON.parse(wrap.content);
+    populateFromData(data);
+    document.title = (data.project?.title?.['$value'] || 'BIM') + ' — Workplace';
+    setStatus('Loaded');
+  } catch(e) {
+    setStatus('Error: ' + e.message);
+    renderDefaults();
+  }
+}
+
+async function createNew(name) {
+  // v1: this surface edits a .bim.json opened from the workbench (?path=). Creating a
+  // new workspace from scratch needs a target path in a writable root — create the file
+  // in the workbench first, then open it here. Render defaults so the UI is usable.
+  setStatus('Create a .bim.json in the workbench, then open it here.');
+  renderDefaults();
+}
+
+// ── Populate UI from bim-workspace data (handles legacy v1.0 and DTCG format) ─
+function populateFromData(data) {
+  const isLegacy = data?.['$schema'] === 'bim-workspace-v1.0';
+
+  let title, ifcFile;
+  if (isLegacy) {
+    title   = data?.project?.title?.['$value']        || '';
+    ifcFile = data?.project?.['ifc-file']?.['$value'] || '';
+  } else {
+    const bimExt = data?.['$extensions']?.['bim-workspace'] || {};
+    title   = bimExt?.project?.title        || '';
+    ifcFile = bimExt?.project?.['ifc-file'] || '';
+  }
+  document.getElementById('title-input').value = title;
+  document.getElementById('ifc-input').value   = ifcFile;
+
+  const styles = data?.['element-styles'] || {};
+  const tbody  = document.getElementById('elements-tbody');
+  tbody.innerHTML = '';
+
+  const keys = Object.keys(styles).length > 0 ? Object.keys(styles) : Object.keys(DEFAULT_STYLES);
+  for (const typeName of keys) {
+    const s = styles[typeName] || {};
+    let color, visible;
+    if (isLegacy) {
+      color   = s?.color?.['$value']   || DEFAULT_STYLES[typeName]?.color || '#808080';
+      visible = s?.visible?.['$value'] !== undefined ? s.visible['$value'] : true;
+    } else {
+      color   = s?.['$value'] || DEFAULT_STYLES[typeName]?.color || '#808080';
+      visible = s?.['$extensions']?.['bim-workspace']?.visible !== undefined
+                ? s['$extensions']['bim-workspace'].visible : true;
+    }
+    appendRow(typeName, color, visible);
+  }
+}
+
+function renderDefaults() {
+  const tbody = document.getElementById('elements-tbody');
+  tbody.innerHTML = '';
+  for (const [typeName, s] of Object.entries(DEFAULT_STYLES)) {
+    appendRow(typeName, s.color, s.visible);
+  }
+}
+
+// ── Row management ────────────────────────────────────────────────────────────
+function appendRow(typeName, color, visible) {
+  const tbody = document.getElementById('elements-tbody');
+  const tr = document.createElement('tr');
+  tr.dataset.type = typeName;
+
+  const pickerId = 'picker-' + typeName.replace(/\W/g, '_') + '-' + Date.now();
+
+  tr.innerHTML = `
+    <td><span class="el-name">${esc(typeName)}</span></td>
+    <td>
+      <div class="swatch-wrap">
+        <div class="color-swatch" style="background:${esc(color)}"
+             onclick="document.getElementById('${esc(pickerId)}').click()"></div>
+        <input type="color" id="${esc(pickerId)}" class="color-picker" value="${esc(color)}">
+        <span class="color-hex">${esc(color)}</span>
+      </div>
+    </td>
+    <td style="text-align:center">
+      <input type="checkbox" class="visible-check" ${visible ? 'checked' : ''}>
+    </td>
+    <td>
+      <button class="del-btn" title="Remove" onclick="removeRow(this)">×</button>
+    </td>
+  `;
+
+  const picker = tr.querySelector('input[type="color"]');
+  const swatch = tr.querySelector('.color-swatch');
+  const hex    = tr.querySelector('.color-hex');
+  picker.addEventListener('input', () => {
+    swatch.style.background = picker.value;
+    hex.textContent = picker.value;
+    scheduleAutosave();
+    refreshPreview();
+  });
+  tr.querySelector('.visible-check').addEventListener('change', () => {
+    scheduleAutosave();
+    refreshPreview();
+  });
+
+  tbody.appendChild(tr);
+  refreshPreview();
+}
+
+function addElementRow() {
+  const typeName = prompt('IFC type name (e.g. IfcFurnishingElement):');
+  if (!typeName || !typeName.trim()) return;
+  appendRow(typeName.trim(), '#808080', true);
+  scheduleAutosave();
+}
+
+function removeRow(btn) {
+  btn.closest('tr').remove();
+  scheduleAutosave();
+  refreshPreview();
+}
+
+// ── Build W3C DTCG data object ────────────────────────────────────────────────
+function buildData() {
+  const title   = document.getElementById('title-input').value.trim() || 'Untitled';
+  const ifcFile = document.getElementById('ifc-input').value.trim();
+
+  const elementStyles = {};
+  document.querySelectorAll('#elements-tbody tr').forEach(tr => {
+    const typeName = tr.dataset.type;
+    if (!typeName) return;
+    const color   = tr.querySelector('input[type="color"]').value;
+    const visible = tr.querySelector('.visible-check').checked;
+    elementStyles[typeName] = {
+      '$value':      color,
+      '$type':       'color',
+      '$extensions': { 'bim-workspace': { visible } },
+    };
+  });
+
+  return {
+    '$schema': 'https://design-tokens.github.io/community-group/format/',
+    'element-styles': elementStyles,
+    '$extensions': {
+      'bim-workspace': {
+        version: '1.0',
+        project: { title, 'ifc-file': ifcFile },
+      },
+    },
+  };
+}
+
+// ── JSON preview with DTCG syntax colouring ───────────────────────────────────
+function refreshPreview() {
+  const data = buildData();
+  const raw  = JSON.stringify(data, null, 2);
+  document.getElementById('json-preview').innerHTML = colorizeJson(raw);
+}
+
+function colorizeJson(raw) {
+  return raw
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"(\$schema)"(\s*:)/g,     '<span class="jk-schema">"$1"</span>$2')
+    .replace(/"(\$extensions)"(\s*:)/g, '<span class="jk-ext">"$1"</span>$2')
+    .replace(/"(\$type)"(\s*:)/g,       '<span class="jk-type">"$1"</span>$2')
+    .replace(/"(\$value)"(\s*:)/g,      '<span class="jk-value">"$1"</span>$2')
+    .replace(/"(\$description)"(\s*:)/g,'<span class="jk-desc">"$1"</span>$2')
+    .replace(/"(Ifc[A-Za-z]+)"(\s*:)/g, '<span class="jk-group">"$1"</span>$2')
+    .replace(/"(#[0-9a-fA-F]{3,8})"/g,  '"<span class="jv-color">$1</span>"')
+    .replace(/: (true|false)/g,          ': <span class="jv-bool">$1</span>');
+}
+
+// ── Save ──────────────────────────────────────────────────────────────────────
+async function doSave() {
+  if (!filePath) { setStatus('Open a .bim.json from the workbench to save.'); return; }
+  const data    = buildData();
+  const content = JSON.stringify(data, null, 2);
+  document.title = (data.project?.title?.['$value'] || 'BIM') + ' — Workbench';
+  try {
+    // DEV workbench roots API: PUT /_api/edit/file with raw body + editor guard + mtime.
+    const headers = { 'X-Foundry-Editor': '1' };
+    if (loadedMtime != null) headers['X-Foundry-Mtime'] = String(loadedMtime);
+    const res = await fetch('/_api/edit/file?path=' + encodeURIComponent(filePath), {
+      method: 'PUT', headers, body: content,
+    });
+    if (res.ok) {
+      setStatus('Saved');
+      try { const w = await (await fetch('/_api/edit/file?path=' + encodeURIComponent(filePath))).json(); loadedMtime = w.mtime; } catch {}
+    } else if (res.status === 409) {
+      setStatus('Changed on disk — reload before saving');
+    } else {
+      setStatus('Save failed (HTTP ' + res.status + ')');
+    }
+  } catch(e) {
+    setStatus('Save error: ' + e.message);
+  }
+}
+
+function scheduleAutosave() {
+  clearTimeout(saveTimer);
+  setStatus('Unsaved…');
+  refreshPreview();
+  saveTimer = setTimeout(doSave, 3000);
+}
+
+// ── Keyboard shortcut ─────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); doSave(); }
+});
+
+// ── Utilities ─────────────────────────────────────────────────────────────────
+function setStatus(msg) {
+  document.getElementById('status-span').textContent = msg;
+}
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+</script>
+</body>
+</html>

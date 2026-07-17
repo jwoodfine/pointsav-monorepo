@@ -1982,19 +1982,24 @@ async function openFile(path, name) {
             peek.includes('"schema": "proforma-v') || peek.includes('"schema":"proforma-v') ||
             (peek.includes('"entity"') && peek.includes('"date"') &&
              (peek.includes('"income"') || peek.includes('"years"') || peek.includes('"areas"')));
-        const isVersionedDoc = isProforma ||
+        // BIM workspace: `$schema: bim-workspace-*` or a `bim-workspace` DTCG extension.
+        const isBim = peek.includes('bim-workspace');
+        const isVersionedDoc = isProforma || isBim ||
             peek.includes('"presentation_version"') ||
             peek.includes('"schedule_version"');
         if (isVersionedDoc) {
-          // §S9 doc→surface routing: a proforma can open in the editable Proforma surface.
-          if (isProforma) {
+          // §S9 doc→surface routing: dispatch to the editable surface matching the schema.
+          const surface = isProforma ? { path: '/proforma', label: '✎ Open in Proforma' }
+                        : isBim      ? { path: '/bim',      label: '✎ Open in BIM' }
+                        : null;
+          if (surface) {
             const bar = document.getElementById('viewer-bar');
             if (!bar.querySelector('.doc-surface-btn')) {
               const sBtn = document.createElement('button');
               sBtn.className = 'bar-btn doc-surface-btn';
-              sBtn.textContent = '✎ Open in Proforma';
-              sBtn.title = 'Open this file in the editable Proforma surface';
-              sBtn.addEventListener('click', () => window.open('/proforma?path=' + encodeURIComponent(apiPath), '_blank'));
+              sBtn.textContent = surface.label;
+              sBtn.title = 'Open this file in its editable surface';
+              sBtn.addEventListener('click', () => window.open(surface.path + '?path=' + encodeURIComponent(apiPath), '_blank'));
               bar.appendChild(sBtn);
             }
           }
@@ -2497,6 +2502,7 @@ const COMMANDS = [
   { id: 'focus-search',    title: 'Focus File Search',      category: 'Navigate', shortcut: '',                  when: () => true,                                                      run: () => document.getElementById('search-input').focus() },
   { id: 'ai-chat',         title: 'Toggle AI Chat',         category: 'AI',       shortcut: '⌘L / Ctrl+L',       when: () => true,                                                      run: () => { if (window.__toggleAiChat) window.__toggleAiChat(); } },
   { id: 'surface-tokens',  title: 'Open Design Tokens',     category: 'Surface',  shortcut: '',                  when: () => true,                                                      run: () => { window.open('/tokens', '_blank'); } },
+  { id: 'surface-bim',     title: 'Open BIM Workspace',     category: 'Surface',  shortcut: '',                  when: () => true,                                                      run: () => { window.open('/bim', '_blank'); } },
 ];
 
 let cmdpalFocusIdx  = -1;
