@@ -71,6 +71,7 @@ header .tag {
 .sb-tool-btn:hover { background: #3c3c3c; color: #ccc; }
 .sb-tool-btn.active { color: #4d9fff; background: #0d3a5c; }
 #sb-toggle-btn { font-size: 15px; }
+#sb-sort-btn { font-size: 11px; font-weight: 600; letter-spacing: 0.02em; }
 .sidebar.sb-collapsed #sidebar-toolbar { justify-content: center; }
 .sidebar.sb-collapsed .sb-tool-btn:not(#sb-toggle-btn) { display: none; }
 
@@ -420,6 +421,36 @@ header .tag {
   scrollbar-width: thin;
   flex-shrink: 0;
 }
+/* Surface bar — visible switcher for the schema surfaces (matches the dark chrome). */
+#surface-bar {
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  background: #252526;
+  border-bottom: 1px solid #333;
+  padding: 0 6px;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+#surface-bar::-webkit-scrollbar { display: none; }
+.surface-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 12px;
+  padding: 6px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+}
+.surface-btn:hover { background: #2a2d2e; color: #ccc; }
+.surface-btn.active { color: #4d9fff; border-bottom-color: #4d9fff; }
+.surface-btn .s-icon { font-size: 13px; }
+.surface-sep { width: 1px; background: #333; margin: 5px 4px; }
 #tab-bar:empty { display: none; }
 #tab-bar::-webkit-scrollbar { height: 3px; }
 #tab-bar::-webkit-scrollbar-thumb { background: #444; border-radius: 2px; }
@@ -635,6 +666,15 @@ header .tag {
   </div>
 </header>
 
+<div id="surface-bar" role="toolbar" aria-label="Surfaces">
+  <button class="surface-btn active" data-surface="files" title="Files (the workbench)"><span class="s-icon">📁</span> Files</button>
+  <div class="surface-sep"></div>
+  <button class="surface-btn" data-surface="memo" title="Open the Memo editor"><span class="s-icon">📝</span> Memo</button>
+  <button class="surface-btn" data-surface="proforma" title="Open the Proforma surface"><span class="s-icon">📊</span> Proforma</button>
+  <button class="surface-btn" data-surface="bim" title="Open the BIM workspace"><span class="s-icon">🏗</span> BIM</button>
+  <button class="surface-btn" data-surface="tokens" title="Open the Design Tokens browser"><span class="s-icon">🎨</span> Tokens</button>
+</div>
+
 <div id="tab-bar" role="tablist" aria-label="Open files"></div>
 
 <div class="layout">
@@ -644,6 +684,7 @@ header .tag {
     <div id="sidebar-toolbar" role="toolbar" aria-label="Sidebar tools">
       <button id="sb-toggle-btn" class="sb-tool-btn" title="Toggle sidebar (collapse/expand)" aria-label="Toggle sidebar (collapse/expand)">☰</button>
       <button id="sb-hidden-btn" class="sb-tool-btn" title="Toggle hidden files (.agent, .claude, etc.)" aria-label="Toggle hidden files" aria-pressed="false">👁</button>
+      <button id="sb-sort-btn" class="sb-tool-btn" title="Sort: A–Z — click for Date" aria-label="Cycle file sort order">A–Z</button>
     </div>
 
     <div id="search-panel">
@@ -2885,6 +2926,37 @@ function buildItem(entry, apiBase, browseBase, depth) {
   return node;
 }
 
+// ── File-tree sort (restored 2026-07-17) — cycles Name ↔ Date ─────────────────
+// DEV's listing returns {name, type, mtime}; Size isn't available, so only Name/Date.
+let treeSortMode = localStorage.getItem('wb-sort') || 'name';
+
+// Order a directory's entries per treeSortMode, keeping directories first in both modes.
+function sortTreeEntries(entries) {
+  const dirs  = entries.filter(e => e.type === 'directory');
+  const files = entries.filter(e => e.type !== 'directory');
+  if (treeSortMode === 'date') {
+    const byDate = (a, b) => (b.mtime || '').localeCompare(a.mtime || '') || a.name.localeCompare(b.name);
+    return [...dirs.slice().sort(byDate), ...files.slice().sort(byDate)];
+  }
+  // 'name' — dirs alpha, then viewable files alpha, then the rest alpha.
+  const byName = (a, b) => a.name.localeCompare(b.name);
+  const viewable = files.filter(e => VIEWABLE_RE.test(e.name)).sort(byName);
+  const rest     = files.filter(e => !VIEWABLE_RE.test(e.name)).sort(byName);
+  return [...dirs.slice().sort(byName), ...viewable, ...rest];
+}
+
+// Re-render every currently-expanded directory after the sort mode changes.
+function reloadExpandedDirs() {
+  document.querySelectorAll('.tree-item.open[data-type="dir"]').forEach(item => {
+    const childrenEl = item.nextElementSibling;
+    if (!childrenEl || !childrenEl.classList.contains('tree-children') || childrenEl.classList.contains('collapsed')) return;
+    delete item.dataset.loaded;   // clear the load-once guard so loadChildren re-fetches
+    childrenEl.innerHTML = '';
+    const depth = Math.round((parseInt(item.style.paddingLeft) - 14) / 14) + 1;
+    loadChildren(item, childrenEl, depth);
+  });
+}
+
 // ── Load directory children ───────────────────────────────────────────────────
 async function loadChildren(item, childrenEl, depth) {
   if (item.dataset.loaded) return;
@@ -2909,11 +2981,7 @@ async function loadChildren(item, childrenEl, depth) {
     const apiBase    = item.dataset.api;
     const browseBase = item.dataset.browse;
 
-    const dirs     = entries.filter(e => e.type === 'directory').sort((a,b) => a.name.localeCompare(b.name));
-    const viewable = entries.filter(e => e.type !== 'directory' && VIEWABLE_RE.test(e.name)).sort((a,b) => a.name.localeCompare(b.name));
-    const rest     = entries.filter(e => e.type !== 'directory' && !VIEWABLE_RE.test(e.name)).sort((a,b) => a.name.localeCompare(b.name));
-
-    [...dirs, ...viewable, ...rest].forEach(entry => {
+    sortTreeEntries(entries).forEach(entry => {
       if (!showHidden && entry.name.startsWith('.')) return;
       const node = buildItem(entry, apiBase, browseBase, depth);
       childrenEl.appendChild(node);
@@ -3358,10 +3426,7 @@ function renderPinnedSection() {
             const entries = await res.json();
             children.innerHTML = '';
             if (!entries.length) { children.innerHTML = '<div class="empty">Empty</div>'; return; }
-            const dirs = entries.filter(e => e.type === 'directory').sort((a,b) => a.name.localeCompare(b.name));
-            const vw   = entries.filter(e => e.type !== 'directory' && VIEWABLE_RE.test(e.name)).sort((a,b) => a.name.localeCompare(b.name));
-            const rest = entries.filter(e => e.type !== 'directory' && !VIEWABLE_RE.test(e.name)).sort((a,b) => a.name.localeCompare(b.name));
-            [...dirs, ...vw, ...rest].forEach(entry => {
+            sortTreeEntries(entries).forEach(entry => {
               if (!showHidden && entry.name.startsWith('.')) return;
               const childNode = buildItem(entry, pin.apiPath, pin.path, 1);
               children.appendChild(childNode);
@@ -4236,6 +4301,25 @@ searchInput.addEventListener('keydown', e => {
   if (e.key === 'Escape') { searchInput.value = ''; renderSearch(); searchInput.blur(); }
 });
 
+// ── Surface bar — visible switcher for the schema surfaces ────────────────────
+// "Files" is the workbench itself; the others open their surface page (new tab),
+// matching the existing palette "Open …" commands (preserves the workbench + tabs).
+(function initSurfaceBar() {
+  const bar = document.getElementById('surface-bar');
+  if (!bar) return;
+  bar.querySelectorAll('.surface-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const surface = btn.dataset.surface;
+      if (surface === 'files') {
+        const si = document.getElementById('search-input');
+        if (si) si.blur();
+        return; // already in the workbench
+      }
+      window.open('/' + surface, '_blank');
+    });
+  });
+})();
+
 // ── Sidebar toolbar wiring ────────────────────────────────────────────────────
 (function initSidebarToolbar() {
   // Apply saved sidebar width on startup.
@@ -4252,6 +4336,26 @@ searchInput.addEventListener('keydown', e => {
     hiddenBtn.classList.toggle('active', showHidden);
     hiddenBtn.setAttribute('aria-pressed', String(showHidden));
     hiddenBtn.addEventListener('click', e => { e.stopPropagation(); toggleHiddenFiles(); });
+  }
+
+  // Sort button — cycles the file tree Name ↔ Date (mtime desc), persisted.
+  const sortBtn = document.getElementById('sb-sort-btn');
+  if (sortBtn) {
+    const sortLabel = { name: 'A–Z', date: 'Date' };
+    const sortTitle = { name: 'Sort: A–Z — click for Date', date: 'Sort: Date (newest first) — click for A–Z' };
+    const applySortBtn = () => {
+      sortBtn.textContent = sortLabel[treeSortMode] || 'A–Z';
+      sortBtn.title       = sortTitle[treeSortMode] || '';
+      sortBtn.classList.toggle('active', treeSortMode !== 'name');
+    };
+    applySortBtn();
+    sortBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      treeSortMode = (treeSortMode === 'name') ? 'date' : 'name';
+      localStorage.setItem('wb-sort', treeSortMode);
+      applySortBtn();
+      reloadExpandedDirs();
+    });
   }
 
   // Clicking anywhere on a collapsed sidebar expands it
