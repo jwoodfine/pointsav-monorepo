@@ -27,6 +27,8 @@ use tokio::sync::broadcast;
 use tokio_stream::{wrappers::BroadcastStream, StreamExt as _};
 
 const SPA_HTML: &str = include_str!("assets/index.html");
+// Schema surfaces (Phase 5) — full-page HTML served at their own routes.
+const TOKENS_HTML: &str = include_str!("assets/tokens.html");
 
 // ---------------------------------------------------------------------------
 // Config
@@ -1654,6 +1656,10 @@ async fn main() -> Result<()> {
         // Comprehensive search — proxies to the service-search Strike (no-silent-miss
         // trigram floor + Tantivy BM25). Reached from the frontend as /_api/edit/search.
         .route("/search", get(search))
+        // Schema surfaces (Phase 5). Page routes are reached via nginx `location /`;
+        // their data routes via `/_api/edit/…`.
+        .route("/tokens", get(get_tokens_page))
+        .route("/tokens-data", get(get_tokens_data))
         .with_state(state);
 
     let addr: SocketAddr = config.bind.parse().context("parsing bind address")?;
@@ -1804,4 +1810,36 @@ fn search_unavailable(q: &str, why: &str) -> Response {
         "files_indexed": 0, "roots_indexed": 0, "error": why
     }))
     .into_response()
+}
+
+// ---------------------------------------------------------------------------
+// Schema surfaces (Phase 5)
+// ---------------------------------------------------------------------------
+
+/// Vendored DTCG design-token bundle. Override with DESIGN_TOKENS_PATH.
+fn tokens_path() -> String {
+    std::env::var("DESIGN_TOKENS_PATH").unwrap_or_else(|_| {
+        "/srv/foundry/vendor/pointsav-design-system/tokens/dtcg-bundle.json".to_string()
+    })
+}
+
+/// GET /tokens — the read-only design-token browser page.
+async fn get_tokens_page() -> impl IntoResponse {
+    Html(TOKENS_HTML)
+}
+
+/// GET /tokens-data — the DTCG bundle JSON the page renders (read-only).
+async fn get_tokens_data() -> Response {
+    match std::fs::read_to_string(tokens_path()) {
+        Ok(content) => (
+            [(axum::http::header::CONTENT_TYPE, "application/json; charset=utf-8")],
+            content,
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::NOT_FOUND,
+            format!("design tokens not found: {e}"),
+        )
+            .into_response(),
+    }
 }

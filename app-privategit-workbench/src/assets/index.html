@@ -2479,6 +2479,7 @@ const COMMANDS = [
   { id: 'toggle-editor',   title: 'Toggle Editor Panel',    category: 'View',     shortcut: '',                  when: () => editorPanelVisible(),                                      run: toggleEditorCollapse },
   { id: 'focus-search',    title: 'Focus File Search',      category: 'Navigate', shortcut: '',                  when: () => true,                                                      run: () => document.getElementById('search-input').focus() },
   { id: 'ai-chat',         title: 'Toggle AI Chat',         category: 'AI',       shortcut: '⌘L / Ctrl+L',       when: () => true,                                                      run: () => { if (window.__toggleAiChat) window.__toggleAiChat(); } },
+  { id: 'surface-tokens',  title: 'Open Design Tokens',     category: 'Surface',  shortcut: '',                  when: () => true,                                                      run: () => { window.open('/tokens', '_blank'); } },
 ];
 
 let cmdpalFocusIdx  = -1;
