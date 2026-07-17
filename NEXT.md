@@ -47,6 +47,32 @@ Last updated: 2026-07-15
 - [x] **Phase 4 — DEV search wired to the Strike** (this session): two-band server search
       replaces the filename-only client filter; verified on a real 7,489-file index.
       [2026-07-16 totebox@claude-code]
+- [x] **Phase 5a — Design Tokens surface** (commit by Jennifer): read-only DTCG browser at
+      `/tokens`, self-contained light CSS, palette entry "Open Design Tokens". [2026-07-16 totebox@claude-code]
+- [x] **Phase 5b — Proforma surface** (commit by Peter): write surface on the workbench roots
+      API (PUT /_api/edit/file + X-Foundry-Editor + mtime 409 guard); doc→surface routing +
+      fixed the `proforma-v2.0` detection bug. Verified read/save/409/403 live. [2026-07-16 totebox@claude-code]
+- [ ] **Phase 5c — BIM surface** — port `app-workplace-http-prototype/src/assets/bim.html`
+      (515 lines) using the **proforma recipe**: copy to DEV assets; rewire 3 fetch calls
+      (`/api/files/read`→GET `/_api/edit/file`, `/api/files/save`→PUT with X-Foundry-Editor +
+      mtime, `/api/bim/create`→edit-mode/omit); add backend `const BIM_HTML` + `GET /bim`
+      route + palette entry; doc-routing: `.bim.json` → "Open in BIM" button in openFile().
+      **Extra vs proforma:** bim's own `<style>` is heavily hardcoded-DARK (#252526/#333/#444 +
+      dark JSON-preview colors) and it links `/style.css` — needs a light-theme conversion
+      (Decision B) + inlining the `#app-header`/4 vars it borrows, else it's a dark surface in
+      a light workbench. `.bim.json` list filter keys on the compound `.bim.json` extension
+      (Path::extension() returns just `json`). [2026-07-16 totebox@claude-code]
+- [ ] **Phase 5d — Memo surface** — port `memo.html` (797 lines), same recipe. **Most
+      entangled:** (1) needs `/api/memo/dirs` (a depth-2 dir walk) if the Save-As folder picker
+      is kept — or drop it for edit-mode v1; (2) memo files are `.html` FRAGMENTS, which collide
+      with the workbench's existing HTML handling — `detect_doc_type`→HtmlDoc renders them as a
+      page, not as an editable memo, so the doc-routing must special-case memo `.html` (e.g. by
+      a memo root or a marker) before the generic HTML path; (3) light-theme conversion +
+      `/style.css` inline like bim. [2026-07-16 totebox@claude-code]
+- [ ] **Phase 5 follow-ups (all surfaces):** a real surface BAR (not just palette entries) for
+      switching; a "New <schema>" create flow (v1 is edit-only — open an existing file via
+      `?path=`); Presentation/Schedule/Code/PDF/GIS are prototype "Coming soon" placeholders,
+      nothing to port. [2026-07-16 totebox@claude-code]
 
 ---
 
