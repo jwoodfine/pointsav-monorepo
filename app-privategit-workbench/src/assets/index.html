@@ -126,6 +126,8 @@ header .tag {
 
 .tree-item .icon { font-size: 12px; flex-shrink: 0; }
 .tree-item .label { flex: 1; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.tree-date { margin-left: auto; padding-left: 10px; font-size: 10px; color: #777; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
+.tree-item.active .tree-date { color: #ccd; }
 .tree-item .arrow { font-size: 9px; color: #555; flex-shrink: 0; transition: transform 0.15s; margin-right: 2px; }
 .tree-item.open .arrow { transform: rotate(90deg); }
 
@@ -2872,11 +2874,19 @@ function treeParentOf(el) {
   return hdr && hdr.getAttribute('role') === 'treeitem' ? hdr : null;
 }
 
+// "2026-07-03T00:05:37" → "2026-07-03 00:05" (full value kept in the row's title tooltip).
+function fmtMtime(iso) {
+  if (!iso || iso.length < 16) return '';
+  return iso.slice(0, 10) + ' ' + iso.slice(11, 16);
+}
+
 function buildItem(entry, apiBase, browseBase, depth) {
   const isDir      = entry.type === 'directory';
   const name       = entry.name.replace(/\/$/, '');
   const indent     = 14 + depth * 14;
   const isViewable = !isDir && VIEWABLE_RE.test(name);
+  const dt         = fmtMtime(entry.mtime);
+  const dateSpan   = dt ? `<span class="tree-date" title="${entry.mtime}">${dt}</span>` : '';
 
   const node = document.createElement('div');
   node.className = 'tree-node';
@@ -2900,7 +2910,7 @@ function buildItem(entry, apiBase, browseBase, depth) {
     item.innerHTML =
       `<span class="arrow">▶</span>` +
       `<span class="icon">${iconFor(name, true)}</span>` +
-      `<span class="label">${name}</span>`;
+      `<span class="label">${name}</span>` + dateSpan;
   } else {
     item.dataset.href  = browseBase + name;
     item.dataset.type  = 'file';
@@ -2909,7 +2919,7 @@ function buildItem(entry, apiBase, browseBase, depth) {
     const badge = gs ? `<span class="tree-git" data-s="${gs}">●</span>` : '';
     item.innerHTML =
       `<span class="icon" style="margin-left:14px">${iconFor(name, false)}</span>` +
-      `<span class="label">${name}</span>` + badge;
+      `<span class="label">${name}</span>` + badge + dateSpan;
   }
 
   const children = document.createElement('div');
