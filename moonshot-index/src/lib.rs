@@ -175,6 +175,9 @@ struct TriDoc {
     /// Empty when the body exceeded the size cap and was skipped — the filename is
     /// still fully indexed and searchable (anti-Spotlight rule: never drop a name).
     content_lc: String,
+    /// false = tombstoned (superseded by an upsert, or removed). Its slot lingers in
+    /// `postings` until [`compact`](TrigramIndex::compact) reclaims it; queries skip it.
+    live: bool,
 }
 
 /// Default per-file content cap (bytes). Files larger than this still have their
@@ -183,11 +186,20 @@ pub const DEFAULT_MAX_CONTENT_BYTES: usize = 5 * 1024 * 1024;
 
 /// Substring correctness floor (Russ Cox / Zoekt trigram model). See module docs
 /// for the guarantee.
+///
+/// **Mutable & live** (2026-07-17): `upsert`/`remove` support live updates without a
+/// rebuild — a changed/removed doc is tombstoned (O(1)); [`compact`](Self::compact)
+/// reclaims the dead slots by a cheap monotonic renumber of the posting lists (no
+/// re-trigramming, no filesystem I/O). This is what lets `service-search` stay always-live.
 pub struct TrigramIndex {
     docs: Vec<TriDoc>,
     /// trigram -> ascending, deduped doc indices.
     postings: HashMap<[u8; 3], Vec<u32>>,
     max_content_bytes: usize,
+    /// live id -> current slot. The join key for upsert/remove.
+    id_to_idx: HashMap<String, u32>,
+    /// count of `!live` slots awaiting compaction.
+    tombstones: usize,
 }
 
 impl TrigramIndex {
@@ -200,22 +212,32 @@ impl TrigramIndex {
             docs: Vec::new(),
             postings: HashMap::new(),
             max_content_bytes,
+            id_to_idx: HashMap::new(),
+            tombstones: 0,
         }
     }
 
+    /// Number of LIVE documents (excludes tombstones).
     pub fn len(&self) -> usize {
-        self.docs.len()
+        self.docs.len() - self.tombstones
     }
 
     pub fn is_empty(&self) -> bool {
-        self.docs.is_empty()
+        self.len() == 0
     }
 
-    /// Index one document. `name` is the filename/path (always fully indexed);
-    /// `content` is the body (indexed unless it exceeds the size cap).
+    /// Index one document (append-only). `name` is the filename/path (always fully
+    /// indexed); `content` is the body (indexed unless it exceeds the size cap). Used by
+    /// [`index_dir`](Self::index_dir) during a fresh build where ids are unique. For live
+    /// updates that may replace an existing id, use [`upsert`](Self::upsert).
     pub fn add_document(&mut self, id: impl Into<String>, name: impl Into<String>, content: &str) {
-        let id = id.into();
-        let name = name.into();
+        self.append(id.into(), name.into(), content);
+    }
+
+    /// Internal append: builds trigrams, pushes a new live slot, records `id_to_idx`.
+    /// Returns the new doc index. Postings stay ascending & deduped because doc indices
+    /// are assigned monotonically.
+    fn append(&mut self, id: String, name: String, content: &str) -> u32 {
         let name_lc = name.to_lowercase();
         let within_cap = content.len() <= self.max_content_bytes;
         let content_lc = if within_cap {
@@ -226,9 +248,6 @@ impl TrigramIndex {
 
         let doc_idx = self.docs.len() as u32;
 
-        // Collect the doc's distinct trigrams (from name, and content if indexed),
-        // then append this doc index to each — postings stay ascending & deduped
-        // because doc indices are assigned monotonically.
         let mut tris: HashSet<[u8; 3]> = HashSet::new();
         each_trigram(&name_lc, |t| {
             tris.insert(t);
@@ -242,12 +261,94 @@ impl TrigramIndex {
             self.postings.entry(t).or_default().push(doc_idx);
         }
 
+        self.id_to_idx.insert(id.clone(), doc_idx);
         self.docs.push(TriDoc {
             id,
             name,
             name_lc,
             content_lc,
+            live: true,
         });
+        doc_idx
+    }
+
+    /// Insert-or-replace by id — the live-update entry point. If `id` already exists, its
+    /// old slot is tombstoned (O(1); postings untouched) and a fresh slot appended. The
+    /// substring guarantee is preserved: the old version is skipped at query time, the new
+    /// version is its own live slot. Triggers compaction when tombstones pile up.
+    pub fn upsert(&mut self, id: impl Into<String>, name: impl Into<String>, content: &str) {
+        let id = id.into();
+        if let Some(&old) = self.id_to_idx.get(&id) {
+            if self.docs[old as usize].live {
+                self.docs[old as usize].live = false;
+                self.tombstones += 1;
+            }
+        }
+        self.append(id, name.into(), content);
+        self.maybe_compact();
+    }
+
+    /// Remove a document by id. O(1) tombstone; the slot's postings are reclaimed at the
+    /// next [`compact`](Self::compact). Returns whether the id was present.
+    pub fn remove(&mut self, id: &str) -> bool {
+        if let Some(idx) = self.id_to_idx.remove(id) {
+            if self.docs[idx as usize].live {
+                self.docs[idx as usize].live = false;
+                self.tombstones += 1;
+            }
+            self.maybe_compact();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Compact when dead slots exceed ~1/3 of all slots (and an absolute floor, so tiny
+    /// indexes don't churn).
+    fn maybe_compact(&mut self) {
+        if self.tombstones * 3 > self.docs.len() && self.tombstones >= 4096 {
+            self.compact();
+        }
+    }
+
+    /// Reclaim tombstoned slots: renumber the live docs 0..N and filter+remap every
+    /// posting list in place. Postings stay ascending & deduped because the old→new map
+    /// is monotonic. Pure in-RAM: no content re-read, no re-trigramming, no filesystem I/O.
+    /// ~linear in the total posting size (a few seconds for a large index).
+    pub fn compact(&mut self) {
+        if self.tombstones == 0 {
+            return;
+        }
+        // 1. Monotonic old->new index map over live slots.
+        let mut remap = vec![u32::MAX; self.docs.len()];
+        let mut new_docs: Vec<TriDoc> = Vec::with_capacity(self.docs.len() - self.tombstones);
+        for (old, doc) in std::mem::take(&mut self.docs).into_iter().enumerate() {
+            if doc.live {
+                remap[old] = new_docs.len() as u32;
+                new_docs.push(doc);
+            }
+        }
+        // 2. Filter+renumber every posting list in place (stays ascending & deduped).
+        self.postings.retain(|_, list| {
+            let mut w = 0;
+            for r in 0..list.len() {
+                let n = remap[list[r] as usize];
+                if n != u32::MAX {
+                    list[w] = n;
+                    w += 1;
+                }
+            }
+            list.truncate(w);
+            !list.is_empty()
+        });
+        // 3. Rebuild id_to_idx from the compacted docs.
+        self.id_to_idx = new_docs
+            .iter()
+            .enumerate()
+            .map(|(i, d)| (d.id.clone(), i as u32))
+            .collect();
+        self.docs = new_docs;
+        self.tombstones = 0;
     }
 
     /// Recursively index every regular file under `root`. The document id and name
@@ -344,6 +445,9 @@ impl TrigramIndex {
         let mut hits: Vec<SearchHit> = Vec::new();
         for idx in candidates {
             let doc = &self.docs[idx as usize];
+            if !doc.live {
+                continue; // tombstoned (superseded/removed) — skip
+            }
             // Verify — the trigram filter is a superset; confirm the real substring.
             let in_name = doc.name_lc.contains(&q);
             let in_content = doc.content_lc.contains(&q);
@@ -438,6 +542,7 @@ impl TrigramIndex {
         };
         cands
             .into_iter()
+            .filter(|&i| self.docs[i as usize].live) // skip tombstoned slots
             .map(|i| {
                 let d = &self.docs[i as usize];
                 CandidateHit {
@@ -458,17 +563,63 @@ impl TrigramIndex {
     pub fn save_lite(&self, w: &mut impl std::io::Write) -> std::io::Result<()> {
         w.write_all(b"MSIX1\n")?; // magic + format version
         write_u64(w, self.max_content_bytes as u64)?;
-        write_u64(w, self.docs.len() as u64)?;
-        for d in &self.docs {
-            write_str(w, &d.id)?;
-            write_str(w, &d.name)?;
+
+        // Fast path: no tombstones → write slots directly (identity remap).
+        if self.tombstones == 0 {
+            write_u64(w, self.docs.len() as u64)?;
+            for d in &self.docs {
+                write_str(w, &d.id)?;
+                write_str(w, &d.name)?;
+            }
+            write_u64(w, self.postings.len() as u64)?;
+            for (tri, list) in &self.postings {
+                w.write_all(tri)?;
+                write_u64(w, list.len() as u64)?;
+                for v in list {
+                    w.write_all(&v.to_le_bytes())?;
+                }
+            }
+            return Ok(());
         }
-        write_u64(w, self.postings.len() as u64)?;
+
+        // Compact-on-save: monotonic old->new remap over live docs, so the on-disk file
+        // carries no tombstones (and stays byte-compatible with load_lite / the format).
+        let mut remap = vec![u32::MAX; self.docs.len()];
+        let mut nlive = 0u32;
+        for (i, d) in self.docs.iter().enumerate() {
+            if d.live {
+                remap[i] = nlive;
+                nlive += 1;
+            }
+        }
+        write_u64(w, nlive as u64)?;
+        for d in &self.docs {
+            if d.live {
+                write_str(w, &d.id)?;
+                write_str(w, &d.name)?;
+            }
+        }
+        // Count non-empty remapped posting lists, then stream them (two passes to avoid
+        // buffering a full remapped copy of all postings in RAM).
+        let count = self
+            .postings
+            .values()
+            .filter(|list| list.iter().any(|&v| remap[v as usize] != u32::MAX))
+            .count();
+        write_u64(w, count as u64)?;
         for (tri, list) in &self.postings {
+            let live_len = list.iter().filter(|&&v| remap[v as usize] != u32::MAX).count();
+            if live_len == 0 {
+                continue;
+            }
             w.write_all(tri)?;
-            write_u64(w, list.len() as u64)?;
-            for v in list {
-                w.write_all(&v.to_le_bytes())?;
+            write_u64(w, live_len as u64)?;
+            // Original list is ascending and remap is monotonic → output stays ascending.
+            for &v in list {
+                let n = remap[v as usize];
+                if n != u32::MAX {
+                    w.write_all(&n.to_le_bytes())?;
+                }
             }
         }
         Ok(())
@@ -488,15 +639,18 @@ impl TrigramIndex {
         let max_content_bytes = read_u64(r)? as usize;
         let ndocs = read_u64(r)? as usize;
         let mut docs = Vec::with_capacity(ndocs);
-        for _ in 0..ndocs {
+        let mut id_to_idx: HashMap<String, u32> = HashMap::with_capacity(ndocs);
+        for i in 0..ndocs {
             let id = read_str(r)?;
             let name = read_str(r)?;
             let name_lc = name.to_lowercase();
+            id_to_idx.insert(id.clone(), i as u32);
             docs.push(TriDoc {
                 id,
                 name,
                 name_lc,
                 content_lc: String::new(),
+                live: true,
             });
         }
         let nposts = read_u64(r)? as usize;
@@ -517,6 +671,8 @@ impl TrigramIndex {
             docs,
             postings,
             max_content_bytes,
+            id_to_idx,
+            tombstones: 0,
         })
     }
 }
@@ -675,6 +831,79 @@ mod trigram_tests {
 
     fn ids(hits: &[SearchHit]) -> Vec<&str> {
         hits.iter().map(|h| h.id.as_str()).collect()
+    }
+
+    // ── Live mutation (2026-07-17) ──────────────────────────────────────────
+
+    #[test]
+    fn upsert_replaces_without_duplicating() {
+        let mut t = idx(&[("f1", "budget.md", "old draft alpha")]);
+        // Modify the same id: new content, term "alpha" gone, "omega" added.
+        t.upsert("f1", "budget.md", "new draft omega");
+        assert_eq!(t.len(), 1, "still one live doc after modify");
+        // Old content no longer found.
+        assert!(t.search("alpha").is_empty(), "stale content must be gone");
+        // New content found, exactly once (no duplicate).
+        assert_eq!(ids(&t.search("omega")), vec!["f1"]);
+        // Filename still found, exactly once (no duplicate filename hit).
+        assert_eq!(t.search("budget").len(), 1);
+    }
+
+    #[test]
+    fn remove_drops_the_hit() {
+        let mut t = idx(&[("f1", "invoice.pdf", "amount due"), ("f2", "memo.md", "amount noted")]);
+        assert!(t.remove("f1"));
+        assert!(!t.remove("f1"), "second remove is a no-op");
+        assert_eq!(t.len(), 1);
+        // f1's filename and content are gone; f2 survives.
+        assert!(t.search("invoice").is_empty());
+        assert_eq!(ids(&t.search("amount")), vec!["f2"]);
+    }
+
+    #[test]
+    fn compact_reclaims_and_preserves_correctness() {
+        let mut t = TrigramIndex::new();
+        for i in 0..100 {
+            t.add_document(format!("d{i}"), format!("doc_{i}.txt"), &format!("body content {i}"));
+        }
+        // Churn: remove evens, re-upsert odds with new content.
+        for i in 0..100 {
+            if i % 2 == 0 {
+                t.remove(&format!("d{i}"));
+            } else {
+                t.upsert(format!("d{i}"), format!("doc_{i}.txt"), &format!("updated body {i}"));
+            }
+        }
+        assert_eq!(t.len(), 50, "50 live (odds) after churn");
+        t.compact();
+        assert_eq!(t.tombstones, 0, "no tombstones after compact");
+        assert_eq!(t.docs.len(), 50, "dead slots reclaimed");
+        // Correctness survives compaction. Use filename queries with the `.txt` boundary so
+        // they're unambiguous (doc_9.txt is NOT a substring of doc_90.txt).
+        assert_eq!(ids(&t.search("doc_9.txt")), vec!["d9"], "survivor found once");
+        assert!(t.search("doc_4.txt").is_empty(), "removed (even) doc gone");
+        // Content: the pre-upsert body phrase "body content" exists in no LIVE doc
+        // (survivors say "updated body"); it must not surface from tombstoned slots.
+        assert!(t.search("body content").is_empty(), "stale pre-upsert body gone");
+        assert!(t.search("updated body 91").iter().any(|h| h.id == "d91"), "new body found");
+    }
+
+    #[test]
+    fn lite_roundtrip_after_mutation_is_clean() {
+        // Mutate, then save_lite (compact-on-save) and load — the persisted index must
+        // carry no tombstones and answer candidate_ids correctly.
+        let mut t = idx(&[("f1", "a.md", "alpha"), ("f2", "b.md", "beta"), ("f3", "c.md", "gamma")]);
+        t.remove("f2");
+        t.upsert("f1", "a.md", "alpha-two");
+        let mut buf = Vec::new();
+        t.save_lite(&mut buf).unwrap();
+        let lite = TrigramIndex::load_lite(&mut &buf[..]).unwrap();
+        assert_eq!(lite.len(), 2, "f1(updated)+f3 live; f2 removed");
+        assert_eq!(lite.tombstones, 0, "on-disk carried no tombstones");
+        // Removed doc absent; survivors present by filename candidate.
+        assert!(!lite.candidate_ids("b.md").iter().any(|h| h.id == "f2"));
+        assert!(lite.candidate_ids("a.md").iter().any(|h| h.id == "f1" && h.name_matches));
+        assert!(lite.candidate_ids("c.md").iter().any(|h| h.id == "f3"));
     }
 
     #[test]
