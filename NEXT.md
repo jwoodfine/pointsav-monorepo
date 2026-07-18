@@ -14,13 +14,25 @@ Last updated: 2026-07-15
       setup error). Re-forged over ALL 23 workbench roots (22 clones + sandbox, minus 83GB `_command`)
       — **88,186 files / 23 roots** (was 7,489 / 1). Business-admin archives indexed with operator
       sign-off (read-only, lexical, not AI). The exact file now resolves. [2026-07-17 totebox@claude-code]
-- [ ] **🔴 Search freshness + Strike unit → routed to Command (HIGH).** Index is point-in-time;
-      needs a Forge timer (≈30min) + the Strike systemd unit + stable-binary path
-      (`…/service-search-bin/`, because the churny cargo-target `release/` keeps getting cleaned).
-      Until then, new downloads need a manual re-forge. Msg sent 2026-07-17. [2026-07-17 totebox@claude-code]
+- [x] **🔴 Search freshness → SOLVED: the index is now always-live (no rebuild).** Built the
+      always-live core (Stages 1-3 of the eager-iverson plan): notify watcher + debounce + apply +
+      commit ticker (create/edit/delete reflected in ~1-3s) + a stat-diff reconciliation sweep that
+      catches changes made while the Strike was down. The point-in-time Forge is no longer needed
+      for freshness. Commits `0f60e333`/`7ea7d690`/`0c92af10`; verified live on `:9310`.
+      [2026-07-18 totebox@claude-code]
+- [ ] **🔴 Strike systemd unit + downgrade the Forge timer → Command scope (re-route).** The DEV
+      Strike on `127.0.0.1:9310` is now always-live but is STILL a bare background process — dies on
+      reboot. Command should wrap it in a systemd unit and *downgrade* the nightly-Forge-timer
+      request (freshness no longer needs it; a weekly compaction re-forge is optional at most).
+      [2026-07-18 totebox@claude-code]
 - [ ] **🟡 Search perf: short/2-word queries slow (~10-30s)** over 88K files — the trigram floor
       fails open to a near-full scan for <3-char / very common tokens. Add a bounded-scan cap or a
-      min-query-length guard. Exact/longer queries are fast. [2026-07-17 totebox@claude-code]
+      min-query-length guard. Exact/longer queries are fast. Stage 4 OID-dedup would also cut the
+      doc count. [2026-07-17 totebox@claude-code]
+- [ ] **🟢 Search Stage 4-5 (content-OID dedup + free rename; Merkle reconciliation) — needs
+      operator go-ahead.** The novel phase-2 layer. Stage 4 requires a supervised re-forge /
+      index-format migration (Tantivy re-keyed by BLAKE3 OID) — NOT a hot binary swap. See
+      `~/.claude/plans/we-need-to-be-eager-iverson.md` § COMPLETION STATUS. [2026-07-18 totebox@claude-code]
 - [x] **File date/time stamps in the tree** — each file/folder now shows its mtime
       (`YYYY-MM-DD HH:MM`, full on hover); pairs with the Date sort. [2026-07-17 totebox@claude-code]
 
