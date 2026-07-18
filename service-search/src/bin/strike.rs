@@ -45,11 +45,17 @@ async fn main() -> anyhow::Result<()> {
 
     // ── Live filesystem watcher → debounce → apply ────────────────────────────
     let (raw_tx, mut raw_rx) = tokio::sync::mpsc::unbounded_channel::<PathBuf>();
-    let mut watcher = recommended_watcher(move |res: notify::Result<notify::Event>| {
-        if let Ok(event) = res {
+    // Reconciliation trigger: the callback signals this on an inotify overflow/error so the sweep
+    // self-corrects the events it dropped.
+    let (recon_tx, mut recon_rx) = tokio::sync::mpsc::unbounded_channel::<()>();
+    let mut watcher = recommended_watcher(move |res: notify::Result<notify::Event>| match res {
+        Ok(event) => {
             for p in event.paths {
                 let _ = raw_tx.send(p);
             }
+        }
+        Err(_) => {
+            let _ = recon_tx.send(());
         }
     })?;
     let mut watched = 0;
@@ -127,6 +133,29 @@ async fn main() -> anyhow::Result<()> {
         });
     }
 
+    // Reconciliation sweep: a startup pass (seeds the watermark on a fresh index; catches any
+    // drift from while the Strike was down), then every 15 min, plus on inotify overflow. This is
+    // the backstop that lets us delete the rebuild entirely — event loss self-corrects.
+    {
+        let strike = strike.clone();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(20)).await; // let the watcher settle first
+            run_reconcile(&strike).await;
+            let mut ticker = tokio::time::interval(Duration::from_secs(900));
+            ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+            ticker.tick().await; // consume the immediate first tick (already reconciled above)
+            loop {
+                tokio::select! {
+                    _ = ticker.tick() => run_reconcile(&strike).await,
+                    _ = recon_rx.recv() => {
+                        eprintln!("strike: inotify overflow/error — running reconciliation");
+                        run_reconcile(&strike).await;
+                    }
+                }
+            }
+        });
+    }
+
     let app = Router::new()
         .route("/search", get(search))
         .route("/healthz", get(|| async { "ok" }))
@@ -137,6 +166,22 @@ async fn main() -> anyhow::Result<()> {
     let _watcher = watcher;
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+/// Run one reconciliation sweep off the async reactor and log what it did.
+async fn run_reconcile(strike: &Arc<Strike>) {
+    let s = strike.clone();
+    match tokio::task::spawn_blocking(move || s.reconcile()).await {
+        Ok(Ok(st)) if st.seeding => {
+            eprintln!("strike: reconcile seeded {} watermarks (no reindex)", st.seeded)
+        }
+        Ok(Ok(st)) => eprintln!(
+            "strike: reconcile scanned {} — {} upserted, {} deleted",
+            st.scanned, st.upserted, st.deleted
+        ),
+        Ok(Err(e)) => eprintln!("strike: reconcile error: {e}"),
+        Err(e) => eprintln!("strike: reconcile task panicked: {e}"),
+    }
 }
 
 /// Watch `dir` recursively, resilient to unreadable subdirectories. notify aborts an entire

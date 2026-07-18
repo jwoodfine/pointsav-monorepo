@@ -29,6 +29,9 @@ use tantivy::{doc, Index, IndexReader, IndexWriter, TantivyDocument, Term};
 
 pub const TRIGRAM_FILE: &str = "trigram.msix";
 pub const TANTIVY_DIR: &str = "tantivy";
+/// Per-file `(mtime,size)` watermark, persisted so the reconciliation sweep has a baseline
+/// across restarts (and can catch changes that happened while the Strike was down).
+pub const MTIMES_FILE: &str = "mtimes.tsv";
 /// Cap the fused result set — v1 shows the top hits per band, not the whole corpus.
 pub const MAX_HITS: usize = 200;
 
@@ -303,6 +306,10 @@ impl Strike {
         let writer = index.writer(200_000_000)?;
         let files_indexed = trigram.len();
 
+        // Restore the reconciliation watermark if a prior run persisted one. Absent (a fresh
+        // forge) → the first reconcile seeds it from disk instead of reparsing everything.
+        let mtimes = load_mtimes(&out.join(MTIMES_FILE)).unwrap_or_default();
+
         Ok(Strike {
             trigram: RwLock::new(trigram),
             index,
@@ -312,7 +319,7 @@ impl Strike {
             config: config.clone(),
             files_indexed: AtomicUsize::new(files_indexed),
             dirty: AtomicUsize::new(0),
-            mtimes: Mutex::new(HashMap::new()),
+            mtimes: Mutex::new(mtimes),
         })
     }
 
@@ -375,6 +382,143 @@ impl Strike {
         Ok(true)
     }
 
+    /// Reconciliation sweep — the backstop for inotify event loss, and the sole mechanism that
+    /// catches changes made while the Strike was down. Metadata-only: stat-walk every root, diff
+    /// `(mtime,size)` against the watermark, and re-read content ONLY for files that are new or
+    /// genuinely changed. O(N stat) ~1-2s over 88K files, not an O(N parse) rebuild.
+    ///
+    /// First run against a freshly-forged index (empty watermark) SEEDS the watermark from disk
+    /// without reindexing — the index is already current as of the forge, so a blanket upsert of
+    /// every file would be wasted work.
+    pub fn reconcile(&self) -> anyhow::Result<ReconcileStats> {
+        let seeding = self.mtimes.lock().unwrap().is_empty();
+        let mut stats = ReconcileStats {
+            seeding,
+            ..Default::default()
+        };
+        let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
+
+        for root in &self.config.roots {
+            let base = PathBuf::from(&root.fs_path);
+            if !base.is_dir() {
+                continue;
+            }
+            let mut stack = vec![base.clone()];
+            while let Some(dir) = stack.pop() {
+                let entries = match std::fs::read_dir(&dir) {
+                    Ok(e) => e,
+                    Err(_) => continue,
+                };
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    let ft = match entry.file_type() {
+                        Ok(t) => t,
+                        Err(_) => continue,
+                    };
+                    if ft.is_symlink() {
+                        continue;
+                    }
+                    if ft.is_dir() {
+                        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                        if name == ".git" || self.config.is_excluded_dir(&path) {
+                            continue;
+                        }
+                        stack.push(path);
+                        continue;
+                    }
+                    if !ft.is_file() {
+                        continue;
+                    }
+                    let rel = path.strip_prefix(&base).unwrap_or(&path).to_string_lossy();
+                    let id = format!("{}/{}", root.url_prefix, rel);
+                    seen.insert(id.clone());
+                    stats.scanned += 1;
+
+                    let meta = match entry.metadata() {
+                        Ok(m) => m,
+                        Err(_) => continue,
+                    };
+                    let mtime = meta
+                        .modified()
+                        .ok()
+                        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+                    let wm = (mtime, meta.len());
+
+                    if seeding {
+                        // Trust the freshly-forged index; just record the baseline, no reindex.
+                        self.mtimes.lock().unwrap().insert(id, wm);
+                        stats.seeded += 1;
+                        continue;
+                    }
+                    // Drop the lock before apply() (which re-takes it) to avoid deadlock.
+                    let prior = self.mtimes.lock().unwrap().get(&id).copied();
+                    if prior != Some(wm) {
+                        self.apply(Change::Upsert(path))?;
+                        stats.upserted += 1;
+                    }
+                }
+            }
+        }
+
+        if !seeding {
+            // Anything in the watermark we did NOT see on disk has vanished — drop it directly
+            // (we already hold the id, no need to round-trip through a path).
+            let gone: Vec<String> = {
+                let mt = self.mtimes.lock().unwrap();
+                mt.keys().filter(|k| !seen.contains(*k)).cloned().collect()
+            };
+            for id in gone {
+                // Guard against a transient dir-read error masquerading as a deletion: `stat`
+                // needs only `x` on the parent (not `r`), so it still resolves a file whose
+                // directory this sweep failed to `read_dir`. Only drop the entry if the path
+                // genuinely no longer exists — never merely because the walk couldn't see it.
+                if let Some(p) = self.id_to_path(&id) {
+                    if p.symlink_metadata().is_ok() {
+                        continue; // still on disk; the walk just missed it — keep it
+                    }
+                }
+                self.writer
+                    .lock()
+                    .unwrap()
+                    .delete_term(Term::from_field_text(self.fields.id, &id));
+                self.trigram.write().unwrap().remove(&id);
+                self.mtimes.lock().unwrap().remove(&id);
+                self.dirty.fetch_add(1, Ordering::Relaxed);
+                stats.deleted += 1;
+            }
+        }
+
+        self.commit_if_dirty()?;
+        if let Err(e) = self.save_mtimes() {
+            eprintln!("strike: could not persist reconciliation watermark: {e}");
+        }
+        Ok(stats)
+    }
+
+    /// Persist the reconciliation watermark next to the index (atomic rename). Lines are
+    /// `mtime\tsize\tid`; ids are path-derived so they never contain a tab or newline (any that
+    /// somehow would are skipped — reconcile re-seeds them next run, harmlessly).
+    fn save_mtimes(&self) -> anyhow::Result<()> {
+        use std::io::Write;
+        let path = self.config.index_path().join(MTIMES_FILE);
+        let tmp = path.with_extension("tsv.tmp");
+        {
+            let mt = self.mtimes.lock().unwrap();
+            let mut w = std::io::BufWriter::new(std::fs::File::create(&tmp)?);
+            for (id, (mtime, size)) in mt.iter() {
+                if id.contains('\t') || id.contains('\n') {
+                    continue;
+                }
+                writeln!(w, "{mtime}\t{size}\t{id}")?;
+            }
+            w.flush()?;
+        }
+        std::fs::rename(&tmp, &path)?;
+        Ok(())
+    }
+
     /// Map an absolute filesystem path → root-qualified id (`<url_prefix>/<rel>`), or None if
     /// it isn't under a configured root or lies in an excluded directory.
     pub fn qualify(&self, path: &Path) -> Option<String> {
@@ -394,6 +538,18 @@ impl Strike {
                     return None;
                 }
                 return Some(format!("{}/{}", root.url_prefix, rel));
+            }
+        }
+        None
+    }
+
+    /// Reverse of `qualify`: root-qualified id → absolute filesystem path, or None if no root's
+    /// `url_prefix` matches. Used only to confirm a file is truly gone before a reconcile delete.
+    fn id_to_path(&self, id: &str) -> Option<PathBuf> {
+        for root in &self.config.roots {
+            let prefix = format!("{}/", root.url_prefix);
+            if let Some(rel) = id.strip_prefix(&prefix) {
+                return Some(Path::new(&root.fs_path).join(rel));
             }
         }
         None
@@ -494,6 +650,36 @@ impl Strike {
         }
         Ok(None)
     }
+}
+
+/// What a reconciliation sweep did. `seeding` is true on the first run against a freshly-forged
+/// index — the watermark was populated from disk without reindexing.
+#[derive(Debug, Default, Clone, Serialize)]
+pub struct ReconcileStats {
+    pub seeding: bool,
+    pub scanned: usize,
+    pub seeded: usize,
+    pub upserted: usize,
+    pub deleted: usize,
+}
+
+/// Load the persisted reconciliation watermark (`mtime\tsize\tid` per line). Missing file → Err
+/// (caller treats it as an empty watermark → first reconcile seeds from disk).
+fn load_mtimes(path: &Path) -> anyhow::Result<HashMap<String, (u64, u64)>> {
+    use std::io::BufRead;
+    let f = std::fs::File::open(path)?;
+    let mut map = HashMap::new();
+    for line in std::io::BufReader::new(f).lines() {
+        let line = line?;
+        let mut it = line.splitn(3, '\t');
+        let (Some(mt), Some(sz), Some(id)) = (it.next(), it.next(), it.next()) else {
+            continue;
+        };
+        if let (Ok(mt), Ok(sz)) = (mt.parse::<u64>(), sz.parse::<u64>()) {
+            map.insert(id.to_string(), (mt, sz));
+        }
+    }
+    Ok(map)
 }
 
 /// Rebuild the trigram floor from Tantivy's stored docs — no filesystem walk. Used at startup
