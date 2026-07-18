@@ -7,6 +7,23 @@ Last updated: 2026-07-15
 
 ---
 
+## 2026-07-17 session — search coverage + tree dates + parity
+
+- [x] **🔴 Search missed a real file → FIXED.** Operator searched a compliance PDF in
+      `project-documents` and got nothing: the index only covered `project-workplace` (my test-corpus
+      setup error). Re-forged over ALL 23 workbench roots (22 clones + sandbox, minus 83GB `_command`)
+      — **88,186 files / 23 roots** (was 7,489 / 1). Business-admin archives indexed with operator
+      sign-off (read-only, lexical, not AI). The exact file now resolves. [2026-07-17 totebox@claude-code]
+- [ ] **🔴 Search freshness + Strike unit → routed to Command (HIGH).** Index is point-in-time;
+      needs a Forge timer (≈30min) + the Strike systemd unit + stable-binary path
+      (`…/service-search-bin/`, because the churny cargo-target `release/` keeps getting cleaned).
+      Until then, new downloads need a manual re-forge. Msg sent 2026-07-17. [2026-07-17 totebox@claude-code]
+- [ ] **🟡 Search perf: short/2-word queries slow (~10-30s)** over 88K files — the trigram floor
+      fails open to a near-full scan for <3-char / very common tokens. Add a bounded-scan cap or a
+      min-query-length guard. Exact/longer queries are fast. [2026-07-17 totebox@claude-code]
+- [x] **File date/time stamps in the tree** — each file/folder now shows its mtime
+      (`YYYY-MM-DD HH:MM`, full on hover); pairs with the Date sort. [2026-07-17 totebox@claude-code]
+
 ## 2026-07-17 session — DEV feature-parity + visibility
 
 - [x] **DEV is now a TRUE superset of PROD.** Audit ("where are all my features") found DEV had
