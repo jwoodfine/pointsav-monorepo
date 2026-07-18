@@ -1,4 +1,4 @@
-const CACHE = 'bread-v4';
+const CACHE = 'bread-v5';
 const STATIC = ['/', '/manifest.json', '/icon-192.png', '/icon-512.png'];
 
 self.addEventListener('install', e => {
@@ -18,9 +18,14 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
 
-  // API calls: network-first, no cache
+  // API calls: network-first, no cache. On failure, return a real 503 (not a
+  // fake-successful empty array) so the client can tell "offline" apart from
+  // "server genuinely has no data" — see loadFromServer()'s res.ok check.
   if (url.pathname.startsWith('/api/')) {
-    e.respondWith(fetch(e.request).catch(() => new Response('[]', { headers: { 'Content-Type': 'application/json' } })));
+    e.respondWith(fetch(e.request).catch(() => new Response('[]', {
+      status: 503,
+      headers: { 'Content-Type': 'application/json', 'X-Offline-Fallback': 'true' },
+    })));
     return;
   }
 

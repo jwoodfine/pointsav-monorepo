@@ -3,32 +3,66 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="theme-color" content="#54924E">
+  <meta name="theme-color" content="#164679">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="/manifest.json">
   <title>Sourdough Tracker</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <meta name="description" content="A baking log for tracking sourdough loaves — flour ratios, hydration, fermentation timing, and scoring, with photos and research-backed suggestions for what to try next.">
   <style>
+    /* ── PointSav Design System: Woodfine institutional theme ──────────────
+       Semantic base (theme-generic.css) + Woodfine customer override
+       (theme-woodfine.css), inlined from vendor/pointsav-design-system —
+       no build step in this app, so the tokens are copied in rather than
+       linked. Source: pointsav-design-system/tokens/{theme-generic,theme-woodfine}.css */
+    :root {
+      --sys-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --sys-canvas: #F7F9FA;
+      --sys-card: #F7F9FA;
+      --sys-text: #111827;
+      --sys-muted: #6B7280;
+      --sys-border: #111827;
+      --sys-hairline: rgba(17, 24, 39, 0.15);
+      --sys-accent: #164679;
+      --color-interactive: #0E3A66;
+      --sys-touch-target: 44px;
+      --wf-blue: #164679;
+      --wf-blue-tint: #E8EFF7;
+      --wf-gold: #C89211;
+      --wf-gold-tint: #FAEFCC;
+      --wf-red: #A2191F;
+      --wf-red-tint: #FFB3B8;
+
+      /* spacing scale — tokens/global/token-global-spacing.yaml (8px grid) */
+      --sp-1: 8px;  --sp-2: 12px; --sp-3: 16px; --sp-4: 20px;
+      --sp-5: 24px; --sp-6: 32px; --sp-7: 40px; --sp-8: 48px;
+
+      /* typography scale — tokens/global/token-global-typography.yaml */
+      --fs-xs: 0.75rem; --fs-sm: 0.875rem; --fs-base: 1.125rem;
+      --fs-heading-sm: 1.125rem; --fs-heading-md: 1.25rem;
+      --tracking-wide: 0.05em;
+      --radius: 2px; /* Woodfine "brutalist contrast" — sharp corners, kept as one token */
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg:           #F5F0E5;
-      --card:         #FAF9F6;
-      --card-alt:     #F4ECD8;
-      --primary:      #4A7C44;
-      --primary-dark: #3A6434;
-      --accent:       #C9A227;
-      --good:         #164679;
-      --bad:          #A2191F;
-      --text:         #1C1917;
-      --muted:        #78613A;
-      --border:       #D8C6A8;
-      --hover:        #EAF0E6;
-      --font-display: 'Nunito Sans', -apple-system, BlinkMacSystemFont, sans-serif;
-      --font-body:    'Nunito Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      /* bread/'s local names, aliased onto the tokens above rather than
+         renamed at every call site — keeps this a small, reviewable diff */
+      --bg:           var(--sys-canvas);
+      --card:         var(--sys-card);
+      --card-alt:     #EEF2F5;
+      --primary:      var(--color-interactive);
+      --primary-dark: #082B4D;
+      --accent:       var(--wf-gold);
+      --good:         var(--wf-blue);
+      --bad:          var(--wf-red);
+      --text:         var(--sys-text);
+      --muted:        var(--sys-muted);
+      --border:       var(--sys-border);
+      --hover:        var(--wf-blue-tint);
+      --font-display: var(--sys-font-sans);
+      --font-body:    var(--sys-font-sans);
     }
 
     body {
@@ -72,10 +106,11 @@
       border: none;
       background: none;
       padding: 0.85rem 1.25rem;
-      font-size: 0.9rem;
-      font-weight: 400;
+      min-height: var(--sys-touch-target);
+      font-size: 0.82rem;
+      font-weight: 600;
       font-family: var(--font-body);
-      font-variant: small-caps;
+      text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--muted);
       cursor: pointer;
@@ -95,12 +130,21 @@
     .card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 2px;
+      border-radius: var(--radius);
       padding: 1.25rem;
       margin-bottom: 1rem;
     }
 
     .card-title { font-family: var(--font-display); font-size: 1.15rem; font-weight: 500; letter-spacing: 0.02em; margin-bottom: 1rem; color: var(--text); }
+
+    footer {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: var(--sp-5) var(--sp-4) var(--sp-6);
+      font-size: var(--fs-xs);
+      color: var(--muted);
+      text-align: center;
+    }
 
     .header-row {
       display: flex;
@@ -115,7 +159,7 @@
       font-size: 0.75rem;
       font-weight: 400;
       padding: 2px 8px;
-      border-radius: 2px;
+      border-radius: var(--radius);
     }
 
     /* ── Loaf table ── */
@@ -126,28 +170,35 @@
       padding: 0.8rem 1rem;
       background: transparent;
       color: var(--muted);
-      font-weight: 400;
-      font-size: 0.72rem;
-      font-variant: small-caps;
+      font-weight: 600;
+      font-size: 0.7rem;
+      text-transform: uppercase;
       letter-spacing: 0.10em;
       border-bottom: 1px solid var(--accent);
+      white-space: nowrap;
     }
 
     .loaf-table td {
       padding: 0.9rem 1rem;
       border-bottom: 1px solid var(--border);
       vertical-align: middle;
+      white-space: nowrap;
     }
 
     .loaf-table tbody tr { cursor: pointer; }
     .loaf-table tbody tr:hover td { background: var(--card-alt); }
     .loaf-table tbody tr.expanded td { background: var(--card-alt); }
+    .loaf-table tbody tr:focus-visible, .loaf-mobile-card:focus-visible {
+      outline: 2px solid var(--primary);
+      outline-offset: -2px;
+    }
 
     .expand-row td {
       background: var(--card-alt) !important;
-      border-left: 3px solid #a8413a;
+      border-left: 3px solid var(--primary);
       padding: 1rem 1.25rem !important;
       cursor: default;
+      white-space: normal;
     }
 
     .loaf-num { font-family: var(--font-display); font-size: 1.2rem; font-weight: 400; letter-spacing: 0.01em; color: var(--text); }
@@ -155,7 +206,7 @@
     .rating-badge {
       display: inline-block;
       padding: 2px 8px;
-      border-radius: 2px;
+      border-radius: var(--radius);
       font-weight: 400;
       font-size: 0.78rem;
       font-family: var(--font-body);
@@ -206,7 +257,7 @@
     .form-group select,
     .form-group textarea {
       border: 1px solid var(--border);
-      border-radius: 2px;
+      border-radius: var(--radius);
       padding: 0.5rem 0.65rem;
       font-size: 0.9rem;
       font-family: var(--font-body);
@@ -243,9 +294,14 @@
     .form-section-header:first-child { margin-top: 0; }
 
     /* ── Y/N radio toggle ── */
-    .yn-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: 2px; overflow: hidden; }
+    .yn-toggle { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
     .yn-toggle input[type="radio"] { display: none; }
     .yn-toggle label {
+      min-width: var(--sys-touch-target);
+      min-height: var(--sys-touch-target);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       padding: 0.3rem 0.6rem;
       font-size: 0.75rem;
       font-weight: 600;
@@ -276,7 +332,7 @@
     .ferment-matrix td:not(:first-child) { text-align: center; }
     .ferment-matrix tr:last-child td { border-bottom: none; }
     .ferment-matrix input[type="text"] {
-      border: 1px solid var(--border); border-radius: 2px; padding: 0.3rem 0.5rem;
+      border: 1px solid var(--border); border-radius: var(--radius); padding: 0.3rem 0.5rem;
       font-size: 0.875rem; font-family: var(--font-body); color: var(--text);
       background: var(--card); width: 6rem; text-align: center;
     }
@@ -349,7 +405,7 @@
     .loaf-mobile-card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 2px;
+      border-radius: var(--radius);
       padding: 0.85rem 1rem;
       cursor: pointer;
       transition: background 0.12s;
@@ -380,8 +436,8 @@
       background: var(--card-alt);
       border: 1px solid var(--border);
       border-top: none;
-      border-left: 3px solid #a8413a;
-      border-radius: 0 0 2px 2px;
+      border-left: 3px solid var(--primary);
+      border-radius: 0 0 var(--radius) var(--radius);
       padding: 0.85rem 1rem;
       margin-top: -2px;
     }
@@ -418,7 +474,7 @@
     .gap-panel {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 2px;
+      border-radius: var(--radius);
       padding: 1.25rem;
     }
 
@@ -444,6 +500,33 @@
     .gap-text .un { color: var(--bad); font-weight: 600; }
     .gap-text .tr { color: var(--good); font-weight: 600; }
 
+    .gap-section-title {
+      font-family: var(--font-display);
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      border-bottom: 1px solid var(--accent);
+      padding-bottom: var(--sp-1);
+      margin-top: var(--sp-2);
+    }
+
+    .matrix-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .matrix-table th { font-weight: 600; color: var(--muted); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 0.4rem; text-align: center; }
+    .matrix-table th[scope="row"] { text-align: right; padding-right: 0.6rem; }
+    .matrix-cell {
+      border: 1px solid var(--border);
+      text-align: center;
+      padding: 0.5rem 0.35rem;
+      min-width: 4.5rem;
+      vertical-align: middle;
+    }
+    .matrix-cell.empty { background: var(--card-alt); }
+    .matrix-count { display: block; font-weight: 700; color: var(--text); }
+    .matrix-score { display: block; font-size: 0.72rem; color: var(--muted); }
+    .matrix-empty { color: var(--muted); opacity: 0.6; }
+
     .chart-legend {
       display: flex;
       gap: 0.6rem;
@@ -465,7 +548,7 @@
     .sugg-card {
       background: var(--card);
       border: 1px solid var(--border);
-      border-radius: 2px;
+      border-radius: var(--radius);
       padding: 1rem;
       display: flex;
       flex-direction: column;
@@ -480,7 +563,7 @@
       letter-spacing: 0.05em;
       text-transform: uppercase;
       padding: 0.15rem 0.45rem;
-      border-radius: 2px;
+      border-radius: var(--radius);
       white-space: nowrap;
       flex-shrink: 0;
       background: transparent;
@@ -505,7 +588,7 @@
       font-size: 0.76rem;
       color: #7C4700;
       background: #F7EDDA;
-      border-radius: 2px;
+      border-radius: var(--radius);
       border: 1px solid #D4A96A;
       padding: 0.35rem 0.5rem;
     }
@@ -530,7 +613,7 @@
     .best-card {
       background: var(--card-alt);
       border: 1px solid var(--accent);
-      border-radius: 2px;
+      border-radius: var(--radius);
       padding: 1.25rem;
       grid-column: 1 / -1;
     }
@@ -587,12 +670,24 @@
       gap: 0.35rem;
     }
 
+    .sr-only-file, .visually-hidden {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden;
+      clip: rect(0,0,0,0);
+      white-space: nowrap;
+      border: 0;
+    }
+    .sr-only-file:focus-visible ~ .photo-zone-inner { outline: 2px solid var(--primary); outline-offset: 2px; }
+
     .photo-zone-inner {
+      display: block;
       width: 100%;
       aspect-ratio: 1/1;
       background: var(--bg);
       border: 2px dashed var(--border);
-      border-radius: 2px;
+      border-radius: var(--radius);
       overflow: hidden;
       cursor: pointer;
       position: relative;
@@ -658,7 +753,7 @@
       width: 97px;
       height: 97px;
       object-fit: cover;
-      border-radius: 2px;
+      border-radius: var(--radius);
       cursor: pointer;
       transition: opacity 0.15s;
       border: 1px solid var(--border);
@@ -668,7 +763,7 @@
       width: 78px;
       height: 97px;
       object-fit: cover;
-      border-radius: 2px;
+      border-radius: var(--radius);
       cursor: pointer;
       transition: opacity 0.15s;
       border: 1px solid var(--border);
@@ -885,7 +980,7 @@
     }
 
     @media print {
-      header, nav.tabs, main { display: none !important; }
+      header, nav.tabs, main, footer { display: none !important; }
       #print-sheet {
         display: block !important;
         -webkit-print-color-adjust: exact;
@@ -898,15 +993,14 @@
 
 <header>
   <h1>Sourdough Tracker</h1>
-  <span class="subtitle" id="header-count"></span>
   <span id="sync-label" style="display:flex;align-items:center;gap:0.25rem;margin-left:auto"></span>
   <button onclick="printForm()" style="background:rgba(255,255,255,0.18);color:white;border:1px solid rgba(255,255,255,0.4);border-radius:5px;padding:0.35rem 0.85rem;font-size:0.8rem;font-weight:600;cursor:pointer;white-space:nowrap">Print Form</button>
 </header>
 
-<nav class="tabs" id="main-nav">
+<nav class="tabs" id="main-nav" aria-label="Primary">
   <button class="active" onclick="showTab('loaves',this)">All Loaves</button>
   <button onclick="showTab('add',this)">Add Loaf</button>
-  <button onclick="showTab('gaps',this)">What Haven't I Tried?</button>
+  <button onclick="showTab('gaps',this)">Suggestions</button>
 </nav>
 
 <main>
@@ -928,6 +1022,7 @@
               <th class="chev-th"></th>
               <th>#</th>
               <th>Date</th>
+              <th>Score</th>
               <th>Flour blend</th>
               <th>Starter</th>
               <th>Hydration</th>
@@ -940,7 +1035,6 @@
               <th class="score-col">Crust</th>
               <th class="score-col">Spring</th>
               <th class="score-col">Overall</th>
-              <th>Score</th>
             </tr>
           </thead>
           <tbody id="loaf-tbody"></tbody>
@@ -961,34 +1055,34 @@
           <div class="form-section-header">Ingredients</div>
 
           <div class="form-group">
-            <label>Date</label>
+            <label for="f-date">Date</label>
             <input type="date" id="f-date">
           </div>
 
           <div class="form-group">
-            <label>White flour (g) *</label>
+            <label for="f-white">White flour (g) *</label>
             <input type="number" id="f-white" placeholder="325" min="0" oninput="updateHydration()">
           </div>
 
           <div class="form-group">
-            <label>Whole wheat (g)</label>
+            <label for="f-wheat">Whole wheat (g)</label>
             <input type="number" id="f-wheat" placeholder="293" min="0" oninput="updateHydration()">
           </div>
 
           <div class="form-group">
-            <label>Rye (g)</label>
+            <label for="f-rye">Rye (g)</label>
             <input type="number" id="f-rye" placeholder="32" min="0" oninput="updateHydration()">
           </div>
 
           <div class="form-group">
-            <label>Water (g)</label>
+            <label for="f-water">Water (g)</label>
             <input type="number" id="f-water" placeholder="455" min="0" oninput="updateHydration()">
             <div class="hydration-preview" id="hydration-preview"></div>
           </div>
 
           <div class="form-group">
-            <label>Water added all at once</label>
-            <div class="process-row">
+            <label id="label-water-aao">Water added all at once</label>
+            <div class="process-row" role="group" aria-labelledby="label-water-aao">
               <div class="yn-toggle">
                 <input type="radio" name="water-all-at-once" id="water-aao-y" value="true">
                 <label for="water-aao-y">Y</label>
@@ -996,24 +1090,24 @@
                 <label for="water-aao-n">N</label>
               </div>
               <div style="display:flex;align-items:center;gap:0.4rem">
-                <input type="number" id="f-water-leftover" placeholder="0" min="0" style="width:4.5rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:2px;font-family:var(--font-body);font-size:0.875rem;background:var(--card);color:var(--text)">
+                <input type="number" id="f-water-leftover" placeholder="0" min="0" style="width:4.5rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font-body);font-size:0.875rem;background:var(--card);color:var(--text)">
                 <span class="proc-unit">g left</span>
               </div>
             </div>
           </div>
 
           <div class="form-group">
-            <label>Salt (g)</label>
+            <label for="f-salt">Salt (g)</label>
             <input type="number" id="f-salt" placeholder="20" min="0" step="0.5">
           </div>
 
           <div class="form-group">
-            <label>Starter (g)</label>
+            <label for="f-starter">Starter (g)</label>
             <input type="number" id="f-starter" placeholder="7" min="0">
           </div>
 
           <div class="form-group">
-            <label>Starter day</label>
+            <label for="f-starter-day">Starter day</label>
             <select id="f-starter-day">
               <option value="">Unknown</option>
               <option value="1">Day 1</option>
@@ -1023,8 +1117,26 @@
             </select>
           </div>
 
+          <!-- ── Starter recipe (feed ratio, informational — not part of dough hydration) ── -->
+          <div class="form-section-header">Starter recipe</div>
+
           <div class="form-group">
-            <label>Ice water?</label>
+            <label for="f-sr-starter">Starter (g)</label>
+            <input type="number" id="f-sr-starter" placeholder="20" min="0">
+          </div>
+
+          <div class="form-group">
+            <label for="f-sr-water">Water (g)</label>
+            <input type="number" id="f-sr-water" placeholder="40" min="0">
+          </div>
+
+          <div class="form-group">
+            <label for="f-sr-flour">Flour (g)</label>
+            <input type="number" id="f-sr-flour" placeholder="40" min="0">
+          </div>
+
+          <div class="form-group">
+            <label for="f-ice">Ice water?</label>
             <select id="f-ice">
               <option value="">Unknown</option>
               <option value="true">Yes</option>
@@ -1036,13 +1148,13 @@
           <div class="form-section-header">Process</div>
 
           <div class="form-group">
-            <label>Ambient temp (°C)</label>
+            <label for="f-temp">Ambient temp (°C)</label>
             <input type="number" id="f-temp" placeholder="18" step="0.5">
           </div>
 
           <div class="form-group full">
-            <label>Fermentation</label>
-            <table class="ferment-matrix">
+            <label id="label-fermentation">Fermentation</label>
+            <table class="ferment-matrix" aria-labelledby="label-fermentation">
               <thead>
                 <tr>
                   <th></th>
@@ -1097,25 +1209,25 @@
           </div>
 
           <div class="form-group">
-            <label>Proof start (HH:MM)</label>
+            <label for="f-proof-start">Proof start (HH:MM)</label>
             <input type="text" id="f-proof-start" placeholder="9:10" pattern="\d{1,2}:\d{2}">
           </div>
 
           <div class="form-group">
-            <label>Proof end / fridge (HH:MM)</label>
+            <label for="f-proof-end">Proof end / fridge (HH:MM)</label>
             <input type="text" id="f-proof-end" placeholder="7:25" pattern="\d{1,2}:\d{2}">
           </div>
 
           <div class="form-group">
-            <label>Straight to oven</label>
-            <div class="process-row">
+            <label id="label-straight-oven">Straight to oven</label>
+            <div class="process-row" role="group" aria-labelledby="label-straight-oven">
               <div class="yn-toggle">
                 <input type="radio" name="straight-oven" id="straight-oven-y" value="true">
                 <label for="straight-oven-y">Y</label>
                 <input type="radio" name="straight-oven" id="straight-oven-n" value="false">
                 <label for="straight-oven-n">N</label>
               </div>
-              <input type="text" id="f-straight-oven-time" placeholder="0:30" pattern="\d{1,2}:\d{2}" style="width:5.5rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:2px;font-family:var(--font-body);font-size:0.875rem;background:var(--card);color:var(--text)">
+              <input type="text" id="f-straight-oven-time" placeholder="0:30" pattern="\d{1,2}:\d{2}" style="width:5.5rem;padding:0.3rem 0.5rem;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font-body);font-size:0.875rem;background:var(--card);color:var(--text)">
             </div>
           </div>
 
@@ -1123,12 +1235,12 @@
           <div class="form-section-header">Bake</div>
 
           <div class="form-group">
-            <label>Bake temp (°C)</label>
+            <label for="f-bake-temp">Bake temp (°C)</label>
             <input type="number" id="f-bake-temp" placeholder="230" min="100" max="300" step="5">
           </div>
 
           <div class="form-group">
-            <label>Bake duration (min)</label>
+            <label for="f-bake-duration">Bake duration (min)</label>
             <input type="number" id="f-bake-duration" placeholder="45" min="1" max="120">
           </div>
 
@@ -1136,50 +1248,50 @@
           <div class="form-section-header">Scoring</div>
 
           <div class="form-group">
-            <label>Flavor (/5)</label>
+            <label for="f-flavor">Flavor (/5)</label>
             <input type="number" id="f-flavor" placeholder="4" min="0" max="5" step="0.5" oninput="updateScore()">
           </div>
 
           <div class="form-group">
-            <label>Crumb (/5)</label>
+            <label for="f-crumb">Crumb (/5)</label>
             <input type="number" id="f-crumb" placeholder="4" min="0" max="5" step="0.5" oninput="updateScore()">
           </div>
 
           <div class="form-group">
-            <label>Crust (/5)</label>
+            <label for="f-crust">Crust (/5)</label>
             <input type="number" id="f-crust" placeholder="4" min="0" max="5" step="0.5" oninput="updateScore()">
           </div>
 
           <div class="form-group">
-            <label>Spring (/5)</label>
+            <label for="f-spring">Spring (/5)</label>
             <input type="number" id="f-spring" placeholder="4" min="0" max="5" step="0.5" oninput="updateScore()">
           </div>
 
           <div class="form-group">
-            <label>Overall (/10)</label>
+            <label for="f-overall">Overall (/10)</label>
             <input type="number" id="f-overall" placeholder="7" min="0" max="10" step="0.5" oninput="updateScore()">
             <div class="hydration-preview" id="score-preview"></div>
           </div>
 
           <div class="form-group full">
-            <label>Techniques</label>
+            <label for="f-techniques">Techniques</label>
             <input type="text" id="f-techniques" placeholder="e.g. lamination, 3x coil folds, pumpkin folds">
           </div>
 
           <div class="form-group full">
-            <label>Notes</label>
+            <label for="f-notes">Notes</label>
             <textarea id="f-notes" rows="2" placeholder="Any observations…"></textarea>
           </div>
 
           <div class="form-group full">
-            <label>Score Card (reference photo)</label>
-            <div style="display:flex;gap:0.75rem;align-items:flex-start;flex-wrap:wrap">
+            <label id="label-scorecard">Score Card (reference photo)</label>
+            <div style="display:flex;gap:0.75rem;align-items:flex-start;flex-wrap:wrap" role="group" aria-labelledby="label-scorecard">
               <div class="photo-zone" style="width:180px;flex-shrink:0">
-                <div class="photo-zone-inner" id="photo-zone-scorecard" onclick="document.getElementById('f-photo-scorecard').click()">
+                <input type="file" class="sr-only-file" id="f-photo-scorecard" accept="image/*" onchange="readPhotoFile(this,'scorecard')">
+                <label class="photo-zone-inner" for="f-photo-scorecard" id="photo-zone-scorecard">
                   <div class="photo-placeholder-text" id="photo-placeholder-scorecard">Score Card</div>
-                </div>
+                </label>
                 <span class="photo-zone-label">Tap to add</span>
-                <input type="file" id="f-photo-scorecard" accept="image/*" style="display:none" onchange="readPhotoFile(this,'scorecard')">
               </div>
               <div style="font-size:0.78rem;color:var(--muted);line-height:1.6;padding-top:0.25rem;max-width:260px">
                 Photograph your paper score card — it stays attached to this loaf so you can refer back to it.
@@ -1188,28 +1300,28 @@
           </div>
 
           <div class="form-group full">
-            <label>Loaf Photos</label>
-            <div class="photo-upload-grid">
+            <label id="label-loaf-photos">Loaf Photos</label>
+            <div class="photo-upload-grid" role="group" aria-labelledby="label-loaf-photos">
               <div class="photo-zone">
-                <div class="photo-zone-inner" id="photo-zone-crumb" style="aspect-ratio:4/5" onclick="document.getElementById('f-photo-crumb').click()">
-                  <div class="photo-placeholder-text" id="photo-placeholder-crumb">Crumb</div>
-                </div>
+                <input type="file" class="sr-only-file" id="f-photo-crumb" accept="image/*" onchange="readPhotoFile(this,'crumb')">
+                <label class="photo-zone-inner" for="f-photo-crumb" id="photo-zone-crumb" style="aspect-ratio:1/1">
+                  <div class="photo-placeholder-text" id="photo-placeholder-crumb"></div>
+                </label>
                 <span class="photo-zone-label">Crumb (inside)</span>
-                <input type="file" id="f-photo-crumb" accept="image/*" style="display:none" onchange="readPhotoFile(this,'crumb')">
               </div>
               <div class="photo-zone">
-                <div class="photo-zone-inner" id="photo-zone-top" style="aspect-ratio:1/1" onclick="document.getElementById('f-photo-top').click()">
-                  <div class="photo-placeholder-text" id="photo-placeholder-top">Top</div>
-                </div>
+                <input type="file" class="sr-only-file" id="f-photo-top" accept="image/*" onchange="readPhotoFile(this,'top')">
+                <label class="photo-zone-inner" for="f-photo-top" id="photo-zone-top" style="aspect-ratio:1/1">
+                  <div class="photo-placeholder-text" id="photo-placeholder-top"></div>
+                </label>
                 <span class="photo-zone-label">Top</span>
-                <input type="file" id="f-photo-top" accept="image/*" style="display:none" onchange="readPhotoFile(this,'top')">
               </div>
               <div class="photo-zone">
-                <div class="photo-zone-inner" id="photo-zone-bottom" style="aspect-ratio:1/1" onclick="document.getElementById('f-photo-bottom').click()">
-                  <div class="photo-placeholder-text" id="photo-placeholder-bottom">Bottom</div>
-                </div>
+                <input type="file" class="sr-only-file" id="f-photo-bottom" accept="image/*" onchange="readPhotoFile(this,'bottom')">
+                <label class="photo-zone-inner" for="f-photo-bottom" id="photo-zone-bottom" style="aspect-ratio:1/1">
+                  <div class="photo-placeholder-text" id="photo-placeholder-bottom"></div>
+                </label>
                 <span class="photo-zone-label">Bottom</span>
-                <input type="file" id="f-photo-bottom" accept="image/*" style="display:none" onchange="readPhotoFile(this,'bottom')">
               </div>
             </div>
           </div>
@@ -1246,6 +1358,32 @@
         <div class="gap-text" id="text-temp"></div>
       </div>
 
+      <div class="gap-section-title" style="grid-column: 1 / -1">Untried combinations</div>
+
+      <div class="gap-panel">
+        <h3>The retard grid — bulk × final proof</h3>
+        <div id="matrix-retard"></div>
+        <div class="gap-text" id="text-matrix-retard"></div>
+      </div>
+
+      <div class="gap-panel">
+        <h3>Fermentation matrix — ambient temp × inoculation</h3>
+        <div id="matrix-ferment"></div>
+        <div class="gap-text" id="text-matrix-ferment"></div>
+      </div>
+
+      <div class="gap-panel">
+        <h3>The bake-step grid — oven temp × duration</h3>
+        <div id="matrix-bake"></div>
+        <div class="gap-text" id="text-matrix-bake"></div>
+      </div>
+
+      <div class="gap-panel">
+        <h3>Levain build matrix — feed ratio × starter day</h3>
+        <div id="matrix-levain"></div>
+        <div class="gap-text" id="text-matrix-levain"></div>
+      </div>
+
       <div class="best-card">
         <h3>Best-rated loaf — what made it work?</h3>
         <div id="best-content"></div>
@@ -1260,6 +1398,10 @@
   </section>
 
 </main>
+
+<footer>
+  Sourdough Tracker — a baking log for tracking sourdough loaves, maintained by Woodfine Group.
+</footer>
 
 <script>
 // ─── Research-backed suggestions (Opus-generated 2026-06-17) ─────────────────
@@ -1406,9 +1548,12 @@ const SEED = [
 const KEY = 'sourdough_loaves';
 
 // ─── Lightbox ─────────────────────────────────────────────────────────────────
-function openLightbox(src) {
-  document.getElementById('lightbox-img').src = src;
+function openLightbox(src, alt) {
+  const img = document.getElementById('lightbox-img');
+  img.src = src;
+  img.alt = alt || '';
   document.getElementById('lightbox').classList.add('open');
+  document.getElementById('lightbox-close').focus();
 }
 function closeLightbox() {
   document.getElementById('lightbox').classList.remove('open');
@@ -1528,7 +1673,11 @@ async function syncToServer(loaves) {
 async function loadFromServer() {
   try {
     const res = await fetch('/api/data');
-    if (!res.ok) { setSyncStatus('error', 'Sync error'); return; }
+    if (!res.ok) {
+      if (res.headers.get('X-Offline-Fallback')) { setSyncStatus('offline', 'Offline — showing cached data'); return; }
+      setSyncStatus('error', 'Sync error');
+      return;
+    }
     const serverLoaves = await res.json();
     if (!Array.isArray(serverLoaves) || serverLoaves.length === 0) {
       // Server is empty — push local data up
@@ -1719,13 +1868,12 @@ function showTab(name, btn) {
 function renderLoaves() {
   const loaves = load();
   document.getElementById('loaf-count').textContent = loaves.length;
-  document.getElementById('header-count').textContent = loaves.length + ' loaves tracked';
 
   const tbody = document.getElementById('loaf-tbody');
   const cardList = document.getElementById('loaf-card-list');
 
   if (loaves.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="15"><div class="empty-state">No loaves yet — add your first one!</div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="16"><div class="empty-state">No loaves yet — add your first one!</div></td></tr>';
     if (cardList) cardList.innerHTML = '<div class="empty-state">No loaves yet — add your first one!</div>';
     return;
   }
@@ -1751,9 +1899,10 @@ function renderLoaves() {
       ? [l.bake_temp_c != null ? l.bake_temp_c+'°C' : null, l.bake_duration_min != null ? l.bake_duration_min+'m' : null].filter(Boolean).join(' · ')
       : '—';
     row.innerHTML = `
-      <td class="chev-td"><span class="row-chev">›</span></td>
+      <td class="chev-td"><span class="row-chev" aria-hidden="true">›</span></td>
       <td><span class="loaf-num">#${l.id}</span></td>
       <td>${l.date || '—'}</td>
+      <td><span class="rating-badge ${ratingCls(l)}">${sc != null ? sc+'/30' : sl ?? '—'}</span></td>
       <td>${blend}</td>
       <td>${l.starter_g != null ? l.starter_g+'g'+(l.starter_day?' D'+l.starter_day:'') : '—'}</td>
       <td>${h != null ? h+'%' : '—'}</td>
@@ -1766,9 +1915,11 @@ function renderLoaves() {
       <td class="score-cell">${l.crust   != null ? l.crust   : '<span class="score-empty">—</span>'}</td>
       <td class="score-cell">${l.spring  != null ? l.spring  : '<span class="score-empty">—</span>'}</td>
       <td class="score-cell">${l.overall != null ? l.overall : '<span class="score-empty">—</span>'}</td>
-      <td><span class="rating-badge ${ratingCls(l)}">${sc != null ? sc+'/30' : sl ?? '—'}</span></td>
     `;
     row.onclick = () => toggleDetail(l, row);
+    row.tabIndex = 0;
+    row.setAttribute('aria-expanded', 'false');
+    row.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleDetail(l, row); } };
     tbody.appendChild(row);
 
     // Mobile card
@@ -1793,22 +1944,19 @@ function renderLoaves() {
         <div class="loaf-mobile-card-meta">${metaParts.join(' &middot; ') || '—'}</div>
       `;
       card.onclick = () => toggleMobileDetail(l, card);
+      card.tabIndex = 0;
+      card.setAttribute('aria-expanded', 'false');
+      card.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleMobileDetail(l, card); } };
       cardList.appendChild(card);
     }
   });
 }
 
-function toggleMobileDetail(l, card) {
-  const next = card.nextSibling;
-  if (next && next.classList && next.classList.contains('loaf-mobile-expand')) {
-    next.remove(); card.classList.remove('expanded'); return;
-  }
-  card.classList.add('expanded');
+// Shared by toggleDetail (desktop table) and toggleMobileDetail (mobile card) —
+// both need the identical detail-grid markup, just wrapped differently.
+function renderDetailGrid(l) {
   const h = hydration(l), pm = proofMins(l), f = totalFlour(l);
-  const exp = document.createElement('div');
-  exp.className = 'loaf-mobile-expand';
-  exp.onclick = e => e.stopPropagation();
-  exp.innerHTML = `<div class="detail-grid">
+  return `<div class="detail-grid">
     <div class="detail-item"><span>White flour</span><span>${dot(l.white_g,'g')}</span></div>
     <div class="detail-item"><span>Wheat flour</span><span>${dot(l.wheat_g,'g')}</span></div>
     <div class="detail-item"><span>Rye flour</span><span>${dot(l.rye_g,'g')}</span></div>
@@ -1840,65 +1988,40 @@ function toggleMobileDetail(l, card) {
     ${(l.photos && (l.photos.top || l.photos.bottom || l.photos.crumb || l.photos.scorecard)) ? `<div class="detail-item" style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:0.5rem;margin-top:0.25rem">
       <span>Photos</span>
       <div class="photo-thumb-row">
-        ${l.photos.crumb     ? `<div class="photo-thumb-wrap"><img src="${l.photos.crumb}"     class="photo-thumb-crumb" alt="Crumb"      onclick="openLightbox(this.src)"><span class="photo-thumb-label">Crumb</span></div>`      : ''}
-        ${l.photos.top       ? `<div class="photo-thumb-wrap"><img src="${l.photos.top}"       class="photo-thumb" alt="Top"        onclick="openLightbox(this.src)"><span class="photo-thumb-label">Top</span></div>`        : ''}
-        ${l.photos.bottom    ? `<div class="photo-thumb-wrap"><img src="${l.photos.bottom}"    class="photo-thumb" alt="Bottom"     onclick="openLightbox(this.src)"><span class="photo-thumb-label">Bottom</span></div>`     : ''}
-        ${l.photos.scorecard ? `<div class="photo-thumb-wrap"><img src="${l.photos.scorecard}" class="photo-thumb" alt="Score Card" onclick="openLightbox(this.src)"><span class="photo-thumb-label">Score Card</span></div>` : ''}
+        ${l.photos.crumb     ? `<div class="photo-thumb-wrap"><img src="${l.photos.crumb}"     class="photo-thumb-crumb" alt="Crumb"      onclick="openLightbox(this.src,this.alt)"><span class="photo-thumb-label">Crumb</span></div>`      : ''}
+        ${l.photos.top       ? `<div class="photo-thumb-wrap"><img src="${l.photos.top}"       class="photo-thumb" alt="Top"        onclick="openLightbox(this.src,this.alt)"><span class="photo-thumb-label">Top</span></div>`        : ''}
+        ${l.photos.bottom    ? `<div class="photo-thumb-wrap"><img src="${l.photos.bottom}"    class="photo-thumb" alt="Bottom"     onclick="openLightbox(this.src,this.alt)"><span class="photo-thumb-label">Bottom</span></div>`     : ''}
+        ${l.photos.scorecard ? `<div class="photo-thumb-wrap"><img src="${l.photos.scorecard}" class="photo-thumb" alt="Score Card" onclick="openLightbox(this.src,this.alt)"><span class="photo-thumb-label">Score Card</span></div>` : ''}
       </div>
     </div>` : ''}
   </div>`;
+}
+
+function toggleMobileDetail(l, card) {
+  const next = card.nextSibling;
+  if (next && next.classList && next.classList.contains('loaf-mobile-expand')) {
+    next.remove(); card.classList.remove('expanded'); card.setAttribute('aria-expanded', 'false'); return;
+  }
+  card.classList.add('expanded');
+  card.setAttribute('aria-expanded', 'true');
+  const exp = document.createElement('div');
+  exp.className = 'loaf-mobile-expand';
+  exp.onclick = e => e.stopPropagation();
+  exp.innerHTML = renderDetailGrid(l);
   card.after(exp);
 }
 
 function toggleDetail(l, row) {
   const next = row.nextSibling;
   if (next && next.classList && next.classList.contains('expand-row')) {
-    next.remove(); row.classList.remove('expanded'); return;
+    next.remove(); row.classList.remove('expanded'); row.setAttribute('aria-expanded', 'false'); return;
   }
   row.classList.add('expanded');
-  const h = hydration(l), pm = proofMins(l), f = totalFlour(l);
+  row.setAttribute('aria-expanded', 'true');
   const exp = document.createElement('tr');
   exp.className = 'expand-row';
   exp.onclick = e => e.stopPropagation();
-  exp.innerHTML = `<td colspan="14"><div class="detail-grid">
-    <div class="detail-item"><span>White flour</span><span>${dot(l.white_g,'g')}</span></div>
-    <div class="detail-item"><span>Wheat flour</span><span>${dot(l.wheat_g,'g')}</span></div>
-    <div class="detail-item"><span>Rye flour</span><span>${dot(l.rye_g,'g')}</span></div>
-    <div class="detail-item"><span>Total flour</span><span>${f ? f+'g' : '—'}</span></div>
-    <div class="detail-item"><span>Water</span><span>${dot(l.water_g,'g')}</span></div>
-    <div class="detail-item"><span>Hydration</span><span>${h != null ? h+'%' : '—'}</span></div>
-    <div class="detail-item"><span>Salt</span><span>${dot(l.salt_g,'g')}</span></div>
-    <div class="detail-item"><span>Starter</span><span>${l.starter_g != null ? l.starter_g+'g' : '—'}</span></div>
-    <div class="detail-item"><span>Starter day</span><span>${l.starter_day != null ? 'Day '+l.starter_day : '—'}</span></div>
-    <div class="detail-item"><span>Ice water</span><span>${l.ice===true?'Yes':l.ice===false?'No':'—'}</span></div>
-    <div class="detail-item"><span>Ambient temp</span><span>${l.ambient_temp_c != null ? l.ambient_temp_c+'°C' : '—'}</span></div>
-    <div class="detail-item"><span>Proof window</span><span>${l.proof_start&&l.proof_end ? l.proof_start+'–'+l.proof_end+(pm?' ('+pm+' min)':'') : '—'}</span></div>
-    <div class="detail-item"><span>Bake temp</span><span>${l.bake_temp_c != null ? l.bake_temp_c+'°C' : '—'}</span></div>
-    <div class="detail-item"><span>Bake duration</span><span>${l.bake_duration_min != null ? l.bake_duration_min+' min' : '—'}</span></div>
-    ${fermentSection(l)}
-    ${l.techniques ? `<div class="detail-item" style="grid-column:1/-1"><span>Techniques</span><span>${l.techniques}</span></div>` : ''}
-    ${l.notes ? `<div class="detail-item" style="grid-column:1/-1"><span>Notes</span><span>${l.notes}</span></div>` : ''}
-    ${(hasSubScores(l) || l.overall != null) ? `<div class="detail-item" style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:0.5rem;margin-top:0.25rem">
-      <span>Scores</span>
-      <span style="display:flex;gap:1rem;flex-wrap:wrap">
-        ${l.flavor  != null ? `<span><span style="color:var(--muted);font-size:0.7rem">Flavor </span>${l.flavor}/5</span>` : ''}
-        ${l.crumb   != null ? `<span><span style="color:var(--muted);font-size:0.7rem">Crumb </span>${l.crumb}/5</span>`  : ''}
-        ${l.crust   != null ? `<span><span style="color:var(--muted);font-size:0.7rem">Crust </span>${l.crust}/5</span>`  : ''}
-        ${l.spring  != null ? `<span><span style="color:var(--muted);font-size:0.7rem">Spring </span>${l.spring}/5</span>` : ''}
-        ${l.overall != null ? `<span><span style="color:var(--muted);font-size:0.7rem">Overall </span>${l.overall}/10</span>` : ''}
-        ${hasSubScores(l)   ? `<span style="font-weight:700;color:var(--primary)">Score ${score(l)}/30</span>` : ''}
-      </span>
-    </div>` : ''}
-    ${(l.photos && (l.photos.top || l.photos.bottom || l.photos.crumb || l.photos.scorecard)) ? `<div class="detail-item" style="grid-column:1/-1;border-top:1px solid var(--border);padding-top:0.5rem;margin-top:0.25rem">
-      <span>Photos</span>
-      <div class="photo-thumb-row">
-        ${l.photos.crumb     ? `<div class="photo-thumb-wrap"><img src="${l.photos.crumb}"     class="photo-thumb-crumb" alt="Crumb"      onclick="openLightbox(this.src)"><span class="photo-thumb-label">Crumb</span></div>`      : ''}
-        ${l.photos.top       ? `<div class="photo-thumb-wrap"><img src="${l.photos.top}"       class="photo-thumb" alt="Top"        onclick="openLightbox(this.src)"><span class="photo-thumb-label">Top</span></div>`        : ''}
-        ${l.photos.bottom    ? `<div class="photo-thumb-wrap"><img src="${l.photos.bottom}"    class="photo-thumb" alt="Bottom"     onclick="openLightbox(this.src)"><span class="photo-thumb-label">Bottom</span></div>`     : ''}
-        ${l.photos.scorecard ? `<div class="photo-thumb-wrap"><img src="${l.photos.scorecard}" class="photo-thumb" alt="Score Card" onclick="openLightbox(this.src)"><span class="photo-thumb-label">Score Card</span></div>` : ''}
-      </div>
-    </div>` : ''}
-  </div></td>`;
+  exp.innerHTML = `<td colspan="16">${renderDetailGrid(l)}</td>`;
   row.after(exp);
 }
 
@@ -1955,6 +2078,9 @@ function submitLoaf(e) {
     rye_g:        parseFloat(document.getElementById('f-rye').value) || null,
     starter_g:    parseFloat(document.getElementById('f-starter').value) || null,
     starter_day:  parseInt(document.getElementById('f-starter-day').value) || null,
+    starter_recipe_starter_g: parseFloat(document.getElementById('f-sr-starter').value) || null,
+    starter_recipe_water_g:   parseFloat(document.getElementById('f-sr-water').value) || null,
+    starter_recipe_flour_g:   parseFloat(document.getElementById('f-sr-flour').value) || null,
     salt_g:       parseFloat(document.getElementById('f-salt').value) || null,
     water_g:      parseFloat(document.getElementById('f-water').value) || null,
     ice:          document.getElementById('f-ice').value === 'true' ? true
@@ -2256,6 +2382,109 @@ function renderTempGap(loaves) {
   textEl.innerHTML = html + (gaps.length ? gaps.join('<br>') : '<span class="tr">Good coverage</span>') + '.';
 }
 
+// ─── Gap: two-variable matrices ────────────────────────────────────────────────
+// Shared by all four "untried combinations" grids below — each just supplies
+// bin definitions and value-getters; the render/scoring/gap-text logic is one
+// place instead of four near-copies (cf. the flour/starter/temp charts above,
+// which predate this and are each bespoke).
+function renderMatrix(loaves, config) {
+  const { containerId, textId, rowLabel, colLabel, rowBins, colBins, getRow, getCol } = config;
+  const container = document.getElementById(containerId);
+  const textEl = document.getElementById(textId);
+
+  const cells = rowBins.map(() => colBins.map(() => []));
+  let anyValid = false;
+  loaves.forEach(l => {
+    const rv = getRow(l), cv = getCol(l);
+    if (rv == null || cv == null) return;
+    const ri = rowBins.findIndex(b => b.test(rv));
+    const ci = colBins.findIndex(b => b.test(cv));
+    if (ri < 0 || ci < 0) return;
+    anyValid = true;
+    cells[ri][ci].push(l);
+  });
+
+  let html = `<table class="matrix-table"><caption class="visually-hidden">${rowLabel} by ${colLabel}</caption><thead><tr><th scope="col">${rowLabel} \\ ${colLabel}</th>`
+    + colBins.map(b => `<th scope="col">${b.label}</th>`).join('') + '</tr></thead><tbody>';
+  rowBins.forEach((rb, ri) => {
+    html += `<tr><th scope="row">${rb.label}</th>`;
+    colBins.forEach((cb, ci) => {
+      const group = cells[ri][ci];
+      const rated = group.filter(l => normScore(l) != null);
+      const avg = rated.length ? rated.reduce((s,l) => s+normScore(l), 0) / rated.length : null;
+      const col = group.length ? normToColor(avg) : null;
+      const style = col ? `background:${col}22;border-color:${col}` : '';
+      const content = group.length
+        ? `<span class="matrix-count">${group.length}×</span>${avg != null ? `<span class="matrix-score">${(avg*10).toFixed(1)}</span>` : ''}`
+        : '<span class="matrix-empty">—</span>';
+      const ids = group.map(l => '#'+l.id).join(', ');
+      html += `<td class="matrix-cell${group.length ? '' : ' empty'}" style="${style}" title="${ids || 'untried'}">${content}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  container.innerHTML = html;
+
+  if (!anyValid) {
+    textEl.innerHTML = `<span class="un">No loaves have both ${rowLabel.toLowerCase()} and ${colLabel.toLowerCase()} logged yet</span> — this entire grid is untried.`;
+    return;
+  }
+  const emptyCells = [];
+  rowBins.forEach((rb, ri) => colBins.forEach((cb, ci) => { if (!cells[ri][ci].length) emptyCells.push(`${rb.label} × ${cb.label}`); }));
+  const total = rowBins.length * colBins.length;
+  textEl.innerHTML = emptyCells.length
+    ? `<span class="un">${emptyCells.length}/${total} combinations untried:</span> ${emptyCells.join(', ')}.`
+    : '<span class="tr">Every combination tried at least once.</span>';
+}
+
+function bulkMethod(l)  { return l.bulk_cold === true ? 'cold' : l.bulk_ambient === true ? 'ambient' : null; }
+function proofMethod(l) { return l.proof_cold === true ? 'cold' : l.proof_ambient === true ? 'ambient' : null; }
+function inoculationPct(l) { const f = totalFlour(l); return (l.starter_g != null && f) ? l.starter_g/f*100 : null; }
+function feedRatio(l) {
+  return (l.starter_recipe_water_g != null && l.starter_recipe_flour_g)
+    ? l.starter_recipe_water_g / l.starter_recipe_flour_g : null;
+}
+
+function renderRetardMatrix(loaves) {
+  renderMatrix(loaves, {
+    containerId: 'matrix-retard', textId: 'text-matrix-retard',
+    rowLabel: 'Bulk', colLabel: 'Final proof',
+    rowBins: [{label:'Cold bulk', test:v=>v==='cold'}, {label:'Ambient bulk', test:v=>v==='ambient'}],
+    colBins: [{label:'Cold proof', test:v=>v==='cold'}, {label:'Ambient proof', test:v=>v==='ambient'}],
+    getRow: bulkMethod, getCol: proofMethod,
+  });
+}
+
+function renderFermentMatrix(loaves) {
+  renderMatrix(loaves, {
+    containerId: 'matrix-ferment', textId: 'text-matrix-ferment',
+    rowLabel: 'Ambient temp', colLabel: 'Inoculation',
+    rowBins: [{label:'<14°C', test:v=>v<14}, {label:'14–18°C', test:v=>v>=14&&v<=18}, {label:'>18°C', test:v=>v>18}],
+    colBins: [{label:'<1.5%', test:v=>v<1.5}, {label:'1.5–2.5%', test:v=>v>=1.5&&v<=2.5}, {label:'>2.5%', test:v=>v>2.5}],
+    getRow: l => l.ambient_temp_c, getCol: inoculationPct,
+  });
+}
+
+function renderBakeMatrix(loaves) {
+  renderMatrix(loaves, {
+    containerId: 'matrix-bake', textId: 'text-matrix-bake',
+    rowLabel: 'Oven temp', colLabel: 'Bake duration',
+    rowBins: [{label:'<230°C', test:v=>v<230}, {label:'230–245°C', test:v=>v>=230&&v<=245}, {label:'>245°C', test:v=>v>245}],
+    colBins: [{label:'<40 min', test:v=>v<40}, {label:'40–50 min', test:v=>v>=40&&v<=50}, {label:'>50 min', test:v=>v>50}],
+    getRow: l => l.bake_temp_c, getCol: l => l.bake_duration_min,
+  });
+}
+
+function renderLevainMatrix(loaves) {
+  renderMatrix(loaves, {
+    containerId: 'matrix-levain', textId: 'text-matrix-levain',
+    rowLabel: 'Feed ratio', colLabel: 'Starter day',
+    rowBins: [{label:'Stiff (<0.8)', test:v=>v<0.8}, {label:'Standard (0.8–1.2)', test:v=>v>=0.8&&v<=1.2}, {label:'Liquid (>1.2)', test:v=>v>1.2}],
+    colBins: [{label:'Day 1', test:v=>v===1}, {label:'Day 2', test:v=>v===2}, {label:'Day 3+', test:v=>v>=3}],
+    getRow: feedRatio, getCol: l => l.starter_day,
+  });
+}
+
 // ─── Best-rated loaf breakdown ────────────────────────────────────────────────
 function renderBestLoaf(loaves) {
   const rated = loaves.filter(l => normScore(l) != null);
@@ -2430,6 +2659,10 @@ function renderGaps() {
   renderFlourGap(loaves);
   renderStarterGap(loaves);
   renderTempGap(loaves);
+  renderRetardMatrix(loaves);
+  renderFermentMatrix(loaves);
+  renderBakeMatrix(loaves);
+  renderLevainMatrix(loaves);
   renderBestLoaf(loaves);
   renderSuggestions(loaves);
 }
@@ -2684,8 +2917,8 @@ if ('serviceWorker' in navigator) {
   </div>
 </div>
 
-<div id="lightbox" onclick="closeLightbox()">
-  <span id="lightbox-close" onclick="closeLightbox()">&times;</span>
+<div id="lightbox" onclick="closeLightbox()" role="dialog" aria-modal="true" aria-label="Photo preview">
+  <span id="lightbox-close" onclick="closeLightbox()" role="button" tabindex="0" aria-label="Close" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();closeLightbox();}">&times;</span>
   <img id="lightbox-img" src="" alt="">
 </div>
 
