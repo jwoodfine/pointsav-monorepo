@@ -16,13 +16,16 @@
 //! content candidates are verified by reading that stored field back — never from a RAM
 //! copy, never from a second filesystem pass.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Mutex, RwLock};
 
 use serde::{Deserialize, Serialize};
 use tantivy::collector::TopDocs;
 use tantivy::query::QueryParser;
 use tantivy::schema::{Schema, Value, STORED, STRING, TEXT};
-use tantivy::{doc, Index, IndexWriter, TantivyDocument};
+use tantivy::{doc, Index, IndexReader, IndexWriter, TantivyDocument, Term};
 
 pub const TRIGRAM_FILE: &str = "trigram.msix";
 pub const TANTIVY_DIR: &str = "tantivy";
@@ -254,41 +257,154 @@ pub fn forge(config: &Config) -> anyhow::Result<ForgeStats> {
 // Strike — load both indexes read-only and answer queries
 // ---------------------------------------------------------------------------
 
+/// A filesystem change to apply to the live index.
+pub enum Change {
+    /// Create or modify — read the file and (re)index it in both bands.
+    Upsert(PathBuf),
+    /// Delete — drop it from both bands.
+    Delete(PathBuf),
+}
+
+/// The live, self-updating search server. Loads the index, serves queries, and applies
+/// filesystem changes IN PLACE — no periodic rebuild. Shared as `Arc<Strike>`; all mutation
+/// goes through interior locks so `search(&self)` and `apply(&self)` run concurrently.
 pub struct Strike {
-    trigram: moonshot_index::TrigramIndex,
+    trigram: RwLock<moonshot_index::TrigramIndex>,
     index: Index,
+    writer: Mutex<IndexWriter>,
+    reader: IndexReader, // one persistent reader; auto-reloads on commit (OnCommitWithDelay)
     fields: Fields,
-    files_indexed: usize,
-    roots_indexed: usize,
+    config: Config,
+    files_indexed: AtomicUsize,
+    dirty: AtomicUsize, // pending uncommitted Tantivy ops
+    /// id -> (mtime_secs, size) — the watermark the reconciliation sweep diffs against.
+    mtimes: Mutex<HashMap<String, (u64, u64)>>,
 }
 
 impl Strike {
-    /// Load the persisted indexes. Cheap: mmaps Tantivy and reads the small trigram
-    /// sidecar — no filesystem walk, no content copy in RAM.
+    /// Load the index and open it for live updates. Fast path: read the persisted trigram
+    /// sidecar. Fallback (no sidecar): rebuild the trigram floor from Tantivy's stored docs —
+    /// no filesystem walk, ~30-60s for a large corpus vs a 13-min cold forge.
     pub fn load(config: &Config) -> anyhow::Result<Self> {
-        use std::io::BufReader;
         let out = config.index_path();
-        let mut r = BufReader::new(std::fs::File::open(out.join(TRIGRAM_FILE))?);
-        let trigram = moonshot_index::TrigramIndex::load_lite(&mut r)?;
         let index = Index::open_in_dir(out.join(TANTIVY_DIR))?;
         let (_schema, fields) = build_schema();
+
+        let sidecar = out.join(TRIGRAM_FILE);
+        let trigram = if sidecar.exists() {
+            use std::io::BufReader;
+            let mut r = BufReader::new(std::fs::File::open(&sidecar)?);
+            moonshot_index::TrigramIndex::load_lite(&mut r)?
+        } else {
+            trigram_from_tantivy(&index, &fields, config.max_content_bytes)?
+        };
+
+        let reader = index.reader()?; // persistent, auto-reloading
+        let writer = index.writer(200_000_000)?;
         let files_indexed = trigram.len();
+
         Ok(Strike {
-            trigram,
+            trigram: RwLock::new(trigram),
             index,
+            writer: Mutex::new(writer),
+            reader,
             fields,
-            files_indexed,
-            roots_indexed: config.roots.len(),
+            config: config.clone(),
+            files_indexed: AtomicUsize::new(files_indexed),
+            dirty: AtomicUsize::new(0),
+            mtimes: Mutex::new(HashMap::new()),
         })
+    }
+
+    pub fn files_indexed(&self) -> usize {
+        self.files_indexed.load(Ordering::Relaxed)
+    }
+
+    /// Apply one filesystem change to both bands in place. Content correctness is exact
+    /// (Tantivy `delete_term` + `add`); filenames go live instantly (trigram `upsert`/`remove`).
+    pub fn apply(&self, change: Change) -> anyhow::Result<()> {
+        match change {
+            Change::Upsert(path) => {
+                let id = match self.qualify(&path) {
+                    Some(id) => id,
+                    None => return Ok(()),
+                };
+                let (content, meta) = read_capped(&path, self.config.max_content_bytes);
+                {
+                    let w = self.writer.lock().unwrap();
+                    w.delete_term(Term::from_field_text(self.fields.id, &id));
+                    w.add_document(doc!(
+                        self.fields.id => id.clone(),
+                        self.fields.path => id.clone(),
+                        self.fields.body => content.clone(),
+                    ))?;
+                }
+                self.trigram.write().unwrap().upsert(&id, &id, &content);
+                if let Some(m) = meta {
+                    self.mtimes.lock().unwrap().insert(id, m);
+                }
+                self.dirty.fetch_add(1, Ordering::Relaxed);
+            }
+            Change::Delete(path) => {
+                let id = match self.qualify(&path) {
+                    Some(id) => id,
+                    None => return Ok(()),
+                };
+                self.writer
+                    .lock()
+                    .unwrap()
+                    .delete_term(Term::from_field_text(self.fields.id, &id));
+                self.trigram.write().unwrap().remove(&id);
+                self.mtimes.lock().unwrap().remove(&id);
+                self.dirty.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+        Ok(())
+    }
+
+    /// Commit pending Tantivy ops (the reader auto-reloads → content hits become visible).
+    /// Filename hits were already live. Returns whether anything was committed.
+    pub fn commit_if_dirty(&self) -> anyhow::Result<bool> {
+        if self.dirty.load(Ordering::Relaxed) == 0 {
+            return Ok(false);
+        }
+        self.writer.lock().unwrap().commit()?;
+        self.dirty.store(0, Ordering::Relaxed);
+        self.files_indexed
+            .store(self.trigram.read().unwrap().len(), Ordering::Relaxed);
+        Ok(true)
+    }
+
+    /// Map an absolute filesystem path → root-qualified id (`<url_prefix>/<rel>`), or None if
+    /// it isn't under a configured root or lies in an excluded directory.
+    pub fn qualify(&self, path: &Path) -> Option<String> {
+        for comp in path.components() {
+            if let std::path::Component::Normal(c) = comp {
+                if let Some(s) = c.to_str() {
+                    if self.config.exclude_dirs.iter().any(|e| e == s) {
+                        return None;
+                    }
+                }
+            }
+        }
+        for root in &self.config.roots {
+            if let Ok(rel) = path.strip_prefix(Path::new(&root.fs_path)) {
+                let rel = rel.to_string_lossy();
+                if rel.is_empty() {
+                    return None;
+                }
+                return Some(format!("{}/{}", root.url_prefix, rel));
+            }
+        }
+        None
     }
 
     /// Fuse ranked (Tantivy BM25) and guaranteed (trigram floor) hits into two bands.
     /// Recall is never traded for ranking: every trigram-verified hit is returned even
     /// if Tantivy's tokenizer did not surface it.
     pub fn search(&self, query: &str) -> anyhow::Result<SearchResponse> {
-        use std::collections::{HashMap, HashSet};
-        let reader = self.index.reader()?;
-        let searcher = reader.searcher();
+        use std::collections::HashSet;
+        let searcher = self.reader.searcher(); // persistent reader; sees latest commit
 
         // 1) Ranked layer — Tantivy BM25 over path + body.
         let parser = QueryParser::for_index(&self.index, vec![self.fields.path, self.fields.body]);
@@ -309,7 +425,9 @@ impl Strike {
         let ql = query.to_lowercase();
         let mut seen_content: HashSet<String> = HashSet::new();
 
-        for cand in self.trigram.candidate_ids(query) {
+        // Snapshot candidates under a brief read lock (owned → lock released immediately).
+        let cands = self.trigram.read().unwrap().candidate_ids(query);
+        for cand in cands {
             // Filename band: verified by the trigram layer itself.
             if cand.name_matches {
                 let score = ranked.get(&cand.id).map(|(s, _)| *s).unwrap_or(0.0);
@@ -354,8 +472,8 @@ impl Strike {
             query: query.to_string(),
             filenames,
             contents,
-            files_indexed: self.files_indexed,
-            roots_indexed: self.roots_indexed,
+            files_indexed: self.files_indexed(),
+            roots_indexed: self.config.roots.len(),
         })
     }
 
@@ -367,7 +485,6 @@ impl Strike {
     ) -> anyhow::Result<Option<String>> {
         use tantivy::query::TermQuery;
         use tantivy::schema::IndexRecordOption;
-        use tantivy::Term;
         let term = Term::from_field_text(self.fields.id, id);
         let q = TermQuery::new(term, IndexRecordOption::Basic);
         let top = searcher.search(&q, &TopDocs::with_limit(1))?;
@@ -377,6 +494,51 @@ impl Strike {
         }
         Ok(None)
     }
+}
+
+/// Rebuild the trigram floor from Tantivy's stored docs — no filesystem walk. Used at startup
+/// when the persisted sidecar is missing (Tantivy is the durable source of truth).
+fn trigram_from_tantivy(
+    index: &Index,
+    fields: &Fields,
+    max_bytes: usize,
+) -> anyhow::Result<moonshot_index::TrigramIndex> {
+    let mut t = moonshot_index::TrigramIndex::with_max_content_bytes(max_bytes);
+    let searcher = index.reader()?.searcher();
+    for seg in searcher.segment_readers() {
+        let store = seg.get_store_reader(50)?;
+        for doc in store.iter::<TantivyDocument>(seg.alive_bitset()) {
+            let d = doc?;
+            let id = first_text(&d, fields.id);
+            let body = first_text(&d, fields.body);
+            t.upsert(id.clone(), id, &body);
+        }
+    }
+    Ok(t)
+}
+
+/// Read a file for indexing: `(content, Some((mtime,size)))`. Content is empty (filename-only,
+/// per the anti-Spotlight rule) if the file is over the size cap, not a regular file, or
+/// unreadable; `None` metadata means the path doesn't exist (treat as a delete upstream).
+fn read_capped(path: &Path, max: usize) -> (String, Option<(u64, u64)>) {
+    let meta = match std::fs::metadata(path) {
+        Ok(m) => m,
+        Err(_) => return (String::new(), None),
+    };
+    let mtime = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let watermark = Some((mtime, meta.len()));
+    if !meta.is_file() || meta.len() as usize > max {
+        return (String::new(), watermark); // filename indexed, body skipped
+    }
+    let content = std::fs::read(path)
+        .map(|b| String::from_utf8_lossy(&b).into_owned())
+        .unwrap_or_default();
+    (content, watermark)
 }
 
 fn first_text(d: &TantivyDocument, field: tantivy::schema::Field) -> String {
