@@ -17,14 +17,42 @@ from fastapi.middleware.cors import CORSMiddleware
 DATA_FILE = Path(os.environ.get("BREAD_DATA_FILE", "/var/lib/local-bread/loaves.json"))
 STATIC_DIR = Path(os.environ.get("BREAD_STATIC_DIR", Path(__file__).parent))
 
+# Same-origin app (tracker.html only ever calls /api/data as a relative path) —
+# no cross-origin consumer is documented, so this is scoped to the known
+# serving origins rather than left wide open.
+ALLOWED_ORIGINS = [
+    "https://foodservice.woodfinegroup.com",
+    "http://10.8.0.9:9099",
+    "http://127.0.0.1:9099",
+]
+
+CSP = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; "
+    "connect-src 'self'; "
+    "frame-ancestors 'none'"
+)
+
 app = FastAPI(docs_url=None, redoc_url=None)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = CSP
+    return response
 
 
 @app.get("/api/data")
