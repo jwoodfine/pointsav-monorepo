@@ -7,6 +7,35 @@ Last updated: 2026-07-15
 
 ---
 
+## 2026-07-18 session — VM-crash recovery + Stage 4 (content-OID dedup) shipped
+
+- [x] **VM crash recovery.** VM rebooted ~10:40 UTC. Systemd services (PROD/DEV workbench,
+      http-prototype) auto-recovered. Restarted the two bare-process casualties: DEV search
+      Strike (`:9310`, from the pre-crash Stage-3 binary) and the `:9119` chat canary (binary was
+      missing from its build cache entirely — rebuilt from source). Stale `session.lock`
+      (mismatched `boot_id`) replaced. [2026-07-18 totebox@claude-code]
+- [x] **🟢 Search Stage 4 — content-OID identity (BLAKE3 dedup + free rename) — SHIPPED.**
+      Found complete-but-uncommitted in the working tree post-crash (573-line diff, 2 new tests);
+      fixed 2 trivial borrow-checker errors, verified via `cargo test`, committed (`3d10918e`)
+      with explicit operator go-ahead, then ran the supervised re-forge and live-swapped DEV
+      `:9310` onto the new schema. **78,306 files → 16,304 distinct bodies (~4.8x dedup)**, one
+      shared body found referenced by up to 192 paths. Content-band path-expansion verified live.
+      Old Stage-3 index + binaries kept as `*-stage3-backup*` under
+      `/srv/foundry/cargo-target/jennifer/service-search{,-bin}/` for rollback. See
+      `~/.claude/plans/we-need-to-be-eager-iverson.md` COMPLETION STATUS. [2026-07-18 totebox@claude-code]
+- [ ] **🟡 Command scope — disk-threshold cleanup timer raced the Stage-4 rebuild.**
+      `foundry-cargo-target-cleanup.service` fires every ~10 min while `/` is ≥80% (currently
+      pinned right at 80%, 36GB free of 174GB) and `rm -rf`s any `release/` dir under
+      `cargo-target/` not referenced by a live systemd unit's `ExecStart`. It hit my ad hoc build
+      dirs twice this session — once mid-compile (corrupted the canary rebuild, `.rmeta` file
+      disappeared under `rustc`), once right after a 40-min forge finished (binary gone before I
+      could use it again). Worked around by nesting builds one level past the cleanup's
+      `-maxdepth 3` scan and copying binaries out immediately, but this will bite any future
+      ad hoc release build on this VM while disk stays this full. Worth Command's attention:
+      either raise the threshold's safety margin, exempt actively-being-written dirs (e.g. skip
+      release/ dirs modified in the last N minutes), or address the root disk pressure (138G/174G
+      used) directly. [2026-07-18 totebox@claude-code]
+
 ## 2026-07-17 session — search coverage + tree dates + parity
 
 - [x] **🔴 Search missed a real file → FIXED.** Operator searched a compliance PDF in
@@ -29,10 +58,9 @@ Last updated: 2026-07-15
       fails open to a near-full scan for <3-char / very common tokens. Add a bounded-scan cap or a
       min-query-length guard. Exact/longer queries are fast. Stage 4 OID-dedup would also cut the
       doc count. [2026-07-17 totebox@claude-code]
-- [ ] **🟢 Search Stage 4-5 (content-OID dedup + free rename; Merkle reconciliation) — needs
-      operator go-ahead.** The novel phase-2 layer. Stage 4 requires a supervised re-forge /
-      index-format migration (Tantivy re-keyed by BLAKE3 OID) — NOT a hot binary swap. See
-      `~/.claude/plans/we-need-to-be-eager-iverson.md` § COMPLETION STATUS. [2026-07-18 totebox@claude-code]
+- [x] ~~**Search Stage 4-5 (content-OID dedup + free rename; Merkle reconciliation) — needs
+      operator go-ahead.**~~ — **Stage 4 SHIPPED 2026-07-18** (see the 2026-07-18 session section
+      above). Stage 5 (Merkle reconciliation, O(changed subtrees)) still open — builds on Stage 4.
 - [x] **File date/time stamps in the tree** — each file/folder now shows its mtime
       (`YYYY-MM-DD HH:MM`, full on hover); pairs with the Date sort. [2026-07-17 totebox@claude-code]
 
