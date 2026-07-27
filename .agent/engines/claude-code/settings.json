@@ -12,7 +12,8 @@
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "/srv/foundry/bin/hooks/pretool-scope-check.sh" }
+          { "type": "command", "command": "/srv/foundry/bin/hooks/pretool-scope-check.sh" },
+          { "type": "command", "command": "/srv/foundry/bin/hooks/pretool-gis-journal-guard.sh" }
         ]
       }
     ],
