@@ -105,3 +105,11 @@ design, software, gis, bim, bread — none map to this archive.) Port 8020 is
 forwarded in the `foundry-workspace-preview` SSH tunnel (operator laptop
 `~/.ssh/config`) purely for operator visibility into the admin dashboard —
 it does not go live on any public domain.
+
+## pointsav-monorepo sub-clone
+
+Generic sub-clone conventions (fast gates, commit rules, layout) live at
+`@~/Foundry/conventions/pointsav-monorepo-subclone-guide.md` — that file is
+never archive-specific and is never touched by any archive's Stage-6
+promotion. This archive's own identity/mission content belongs only here,
+never in the sub-clone.
