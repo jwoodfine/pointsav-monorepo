@@ -114,3 +114,11 @@ inbox.md, outbox.md, NOTAM.md, session-context.md. Call it first.
 TOPIC = explains WHAT/WHY; public wiki; bilingual EN+ES.
 GUIDE = instructs HOW-NOW; woodfine-fleet-deployment/<name>/; English-only.
 CODE = runs our systems; no customer license; internal deploy only.
+
+## pointsav-monorepo sub-clone
+
+Generic sub-clone conventions (fast gates, commit rules, layout) live at
+`@~/Foundry/conventions/pointsav-monorepo-subclone-guide.md` — that file is
+never archive-specific and is never touched by any archive's Stage-6
+promotion. This archive's own identity/mission content belongs only here,
+never in the sub-clone.
