@@ -297,11 +297,7 @@ impl Tenant {
             // masthead and the button row, an unflagged duplication FABLE's
             // nav-priority audit caught 2026-07-02.
             nav_links: vec![
-                NavLink::external(
-                    "Design System",
-                    "Sistema de diseño",
-                    "https://design.pointsav.com/",
-                ),
+                NavLink::external("Design System", "Sistema de diseño", "https://design.pointsav.com/"),
                 // Restored 2026-07-02 — present on the retired production
                 // site's masthead nav, dropped when this chrome was rebuilt.
                 NavLink::external("Newsroom", "Sala de prensa", "https://pointsav.com/"),
@@ -317,17 +313,9 @@ impl Tenant {
             // combined), same rationale as Woodfine's — FABLE nav-priority
             // audit 2026-07-02.
             footer_network: vec![
-                NavLink::external(
-                    "Documentation",
-                    "Documentación",
-                    "https://documentation.pointsav.com/",
-                ),
+                NavLink::external("Documentation", "Documentación", "https://documentation.pointsav.com/"),
                 NavLink::external("Software", "Software", "https://software.pointsav.com/"),
-                NavLink::external(
-                    "Design System",
-                    "Sistema de diseño",
-                    "https://design.pointsav.com/",
-                ),
+                NavLink::external("Design System", "Sistema de diseño", "https://design.pointsav.com/"),
                 NavLink::external("Newsroom", "Sala de prensa", "https://pointsav.com/"),
                 NavLink::external("Source", "Código fuente", "https://github.com/pointsav"),
             ],
@@ -393,8 +381,7 @@ impl Tenant {
                 // before this is treated as final.
                 label: "Company and product disclosure",
                 label_es: "Divulgación de la empresa y del producto",
-                body:
-                    "**Corporate structure.** PointSav Digital Systems (\u{201c}PointSav\u{201d}) \
+                body: "**Corporate structure.** PointSav Digital Systems (\u{201c}PointSav\u{201d}) \
                     is a trade name of \
                     Woodfine Capital Projects Inc. (\u{201c}Woodfine\u{201d}). PointSav does not \
                     itself offer, sell, or solicit any security. Any securities offering \
@@ -491,11 +478,7 @@ impl Tenant {
 }
 
 fn render_nav(links: &[NavLink], class: &str, aria_label: &str, lang: &str) -> Markup {
-    let new_tab_suffix = t(
-        lang,
-        " (opens in new tab)",
-        " (se abre en una pestaña nueva)",
-    );
+    let new_tab_suffix = t(lang, " (opens in new tab)", " (se abre en una pestaña nueva)");
     html! {
         nav class=(class) aria-label=(aria_label) {
             @for link in links {
@@ -722,42 +705,16 @@ fn card_grid(columns: u8, cards: &[crate::content::Card], style: Option<&str>) -
     } else {
         "m-card-grid"
     };
-    // `--m-button-count` (the real card count, not the manifest's `columns`
-    // hint) drives the button row's own 1-col/N-col fix — see
-    // .m-card-grid--buttons in app.css. Only set for the buttons style;
-    // the plain informational grid doesn't need it (its fluid auto-fit
-    // columns were never the orphan-prone kind).
-    let grid_style = if is_buttons {
-        format!(
-            "--m-grid-cols: {columns}; --m-button-count: {}",
-            cards.len()
-        )
-    } else {
-        format!("--m-grid-cols: {columns}")
-    };
-    // Progressive disclosure (2026-07-07 mobile redesign): only the plain
-    // informational grid ever needs this — button rows are short
-    // navigation lists, never long enough to warrant collapsing. Ships
-    // fully visible with a `hidden` reveal button; app.js only activates
-    // it below 500px (round 11: the grid renders 2 columns from ~497px up,
-    // fitting all cards without collapse), and only ever hides cards
-    // beyond the first 4 that
-    // AREN'T a cross-site linked card (Digital Systems / Real Property
-    // Infrastructure stay visible unconditionally — they're navigation to
-    // the sibling site, not informational content to defer).
-    const VISIBLE_COUNT: usize = 4;
-    let collapsible = !is_buttons && cards.len() > VISIBLE_COUNT;
     html! {
-        section class=(grid_class) style=(grid_style) {
-            @for (i, card) in cards.iter().enumerate() {
+        section class=(grid_class) style={ "--m-grid-cols: " (columns) } {
+            @for card in cards {
                 @let linked = card.href.is_some();
                 @let card_class = match (is_buttons, linked) {
                     (true, _) => "m-card m-card--button",
                     (false, true) => "m-card m-card--linked",
                     (false, false) => "m-card",
                 };
-                @let is_extra = collapsible && i >= VISIBLE_COUNT && !linked;
-                div class=(card_class) data-m-card-extra[is_extra] {
+                div class=(card_class) {
                     @if linked && !is_buttons {
                         // Cross-site handoff kicker — see .m-card--linked in
                         // app.css for why this card is styled to stand out
@@ -782,24 +739,6 @@ fn card_grid(columns: u8, cards: &[crate::content::Card], style: Option<&str>) -
                     }
                 }
             }
-            @if collapsible {
-                // "View all" + inline down-chevron (round 11): institutional
-                // reference sites (Blackstone "Load More", Brookfield "See
-                // All News", Digital Realty "See More", Equinix "View all")
-                // use a short verb phrase with a directional glyph, not a
-                // "Show all N noun" construction. The chevron signals in-place
-                // expansion. Chevron matches the .m-card__kicker-icon stroke
-                // convention (viewBox 0 0 24 24, stroke-width 1.6, round caps).
-                // No rotation logic is needed: app.js removes the button
-                // outright once the cards are revealed, so the glyph is static.
-                button type="button" class="m-card-grid__more" data-m-card-grid-more hidden {
-                    "View all"
-                    svg.m-card-grid__more-icon viewBox="0 0 24 24" aria-hidden="true" {
-                        path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
-                            d="M6 9l6 6 6-6";
-                    }
-                }
-            }
         }
     }
 }
@@ -815,36 +754,8 @@ fn icon_strip(icons: &[crate::content::IconTile]) -> Markup {
             // icons has no clean 2-column split). See app.css for detail.
             div.m-icon-strip__inner style={ "--m-icon-count: " (icons.len()) } {
                 @for icon in icons {
-                    // 2026-07-07 mobile redesign, round 10 revision: caption
-                    // beside the icon on mobile (<700px), below it on
-                    // desktop/tablet (>=700px, see app.css). Either way the
-                    // title is real visible text, not just invisible alt
-                    // text, so the image itself is decorative (empty alt)
-                    // to avoid a screen reader announcing the label twice.
                     div.m-icon-strip__item {
-                        // No hardcoded width/height attributes: sizing is a
-                        // uniform fixed box + object-fit: contain in CSS
-                        // (.m-icon-strip__img, round 12) — the CSS box, not the
-                        // SVG's intrinsic viewBox, decides the rendered size, so
-                        // an inline square hint would be both inaccurate and
-                        // pointless. The SVGs carry their own intrinsic size via
-                        // viewBox; object-fit centers each one inside the box.
-                        // Optional `scale` (round 13): a plain CSS transform for
-                        // the rare icon whose native aspect ratio is far enough
-                        // from the shared box ratio that it visibly reads smaller
-                        // than its siblings — see IconTile::scale doc comment.
-                        img.m-icon-strip__img
-                            src=(icon.src)
-                            alt=""
-                            aria-hidden="true"
-                            loading="lazy"
-                            style=[icon.scale.map(|s| format!("transform: scale({s})"))];
-                        div.m-icon-strip__text {
-                            h3.m-icon-strip__title { (icon.alt) }
-                            @if let Some(body) = &icon.body {
-                                p.m-icon-strip__body { (body) }
-                            }
-                        }
+                        img src=(icon.src) alt=(icon.alt) loading="lazy" width="200" height="200";
                     }
                 }
             }
@@ -884,11 +795,9 @@ fn render_section(section: &Section, seen_h1: &mut bool) -> Markup {
             };
             markup
         }
-        Section::CardGrid {
-            columns,
-            cards,
-            style,
-        } => card_grid(*columns, cards, style.as_deref()),
+        Section::CardGrid { columns, cards, style } => {
+            card_grid(*columns, cards, style.as_deref())
+        }
         Section::Prose { body } => prose(body),
         Section::IconStrip { icons } => icon_strip(icons),
     }
@@ -1041,15 +950,7 @@ sections:
         )
         .unwrap();
         let page = load_page(dir.path(), "home", None).unwrap();
-        let html = page_shell(
-            &Tenant::woodfine(),
-            &page,
-            "woodfine",
-            "/",
-            Some("/es"),
-            None,
-        )
-        .into_string();
+        let html = page_shell(&Tenant::woodfine(), &page, "woodfine", "/", Some("/es"), None).into_string();
         assert_eq!(html.matches("<h1").count(), 1);
         assert!(html.contains("<h2"));
     }
@@ -1065,15 +966,7 @@ sections:
         )
         .unwrap();
         let page = load_page(dir.path(), "home", None).unwrap();
-        let html = page_shell(
-            &Tenant::woodfine(),
-            &page,
-            "woodfine",
-            "/",
-            Some("/es"),
-            None,
-        )
-        .into_string();
+        let html = page_shell(&Tenant::woodfine(), &page, "woodfine", "/", Some("/es"), None).into_string();
         assert!(!html.contains("__bundler"));
         assert!(html.contains("<!DOCTYPE html>"));
         assert!(html.contains(r#"lang="en""#));
@@ -1128,13 +1021,8 @@ sections:
 
     #[test]
     fn nav_link_labels_localize_to_spanish() {
-        let html = render_nav(
-            &Tenant::woodfine().nav_links,
-            "m-masthead__nav",
-            "Primary",
-            "es",
-        )
-        .into_string();
+        let html = render_nav(&Tenant::woodfine().nav_links, "m-masthead__nav", "Primary", "es")
+            .into_string();
         assert!(html.contains("Contáctenos"));
         assert!(!html.contains("Contact Us"));
     }
@@ -1151,59 +1039,6 @@ sections:
         let html = card_grid(4, &cards, None).into_string();
         assert!(html.contains("<h2"));
         assert!(!html.contains("<h3"));
-    }
-
-    #[test]
-    fn card_grid_collapses_beyond_four_but_never_the_linked_card() {
-        let mut cards: Vec<crate::content::Card> = (1..=7)
-            .map(|i| crate::content::Card {
-                title: format!("Term {i}"),
-                body: Some("Body.".to_string()),
-                href: None,
-            })
-            .collect();
-        cards.push(crate::content::Card {
-            title: "Digital Systems".to_string(),
-            body: Some("Cross-site.".to_string()),
-            href: Some("https://home.pointsav.com".to_string()),
-        });
-        let html = card_grid(4, &cards, None).into_string();
-        // Reveal button present, ships hidden (no-JS-safe default).
-        assert!(html.contains("data-m-card-grid-more"));
-        // Round 11: static "View all" wording (no count) + inline chevron.
-        assert!(html.contains("View all"));
-        assert!(html.contains("m-card-grid__more-icon"));
-        // Exactly 3 cards marked extra (Terms 5-7) — the linked 8th card,
-        // despite being past the visible-count threshold, is never marked.
-        assert_eq!(html.matches("data-m-card-extra").count(), 3);
-    }
-
-    #[test]
-    fn card_grid_does_not_collapse_at_or_under_four_cards() {
-        let cards: Vec<crate::content::Card> = (1..=4)
-            .map(|i| crate::content::Card {
-                title: format!("Term {i}"),
-                body: None,
-                href: None,
-            })
-            .collect();
-        let html = card_grid(4, &cards, None).into_string();
-        assert!(!html.contains("data-m-card-grid-more"));
-        assert!(!html.contains("data-m-card-extra"));
-    }
-
-    #[test]
-    fn button_style_cards_never_collapse_regardless_of_count() {
-        let cards: Vec<crate::content::Card> = (1..=6)
-            .map(|i| crate::content::Card {
-                title: format!("Button {i}"),
-                body: None,
-                href: Some("https://example.com".to_string()),
-            })
-            .collect();
-        let html = card_grid(6, &cards, Some("buttons")).into_string();
-        assert!(!html.contains("data-m-card-grid-more"));
-        assert!(html.contains("--m-button-count: 6"));
     }
 
     #[test]
@@ -1255,33 +1090,13 @@ sections:
     }
 
     #[test]
-    fn icon_strip_renders_visible_title_and_decorative_image() {
+    fn icon_strip_renders_alt_text_from_content() {
         let icons = vec![crate::content::IconTile {
             src: "/static/graphics/woodfine/class-1.svg".to_string(),
             alt: "Professional Centres".to_string(),
-            body: Some("Test descriptor.".to_string()),
-            scale: None,
         }];
         let html = icon_strip(&icons).into_string();
-        // Title is now visible text (h3), not just alt — image becomes
-        // decorative (empty alt) since the visible title carries the same
-        // information, avoiding a double screen-reader announcement.
-        assert!(html.contains("Professional Centres"));
-        assert!(html.contains("Test descriptor."));
-        assert!(html.contains(r#"alt="""#));
+        assert!(html.contains(r#"alt="Professional Centres""#));
         assert!(html.contains(r#"src="/static/graphics/woodfine/class-1.svg""#));
-    }
-
-    #[test]
-    fn icon_strip_renders_without_optional_body() {
-        let icons = vec![crate::content::IconTile {
-            src: "/static/graphics/woodfine/class-1.svg".to_string(),
-            alt: "Professional Centres".to_string(),
-            body: None,
-            scale: None,
-        }];
-        let html = icon_strip(&icons).into_string();
-        assert!(html.contains("Professional Centres"));
-        assert!(!html.contains("m-icon-strip__body"));
     }
 }

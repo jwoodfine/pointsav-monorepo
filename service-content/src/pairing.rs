@@ -295,6 +295,20 @@ impl PairingKeypair {
 // in PairingStore at `/v1/pair` time. Model B: os-totebox verifies independently
 // rather than trusting the forwarding instance's pairing alone (DOCTRINE: holds
 // no archive keys).
+//
+// Extended 2026-07-18 (BRIEF-datagraph-tenant-isolation.md's "grant-vs-forward"
+// carry-forward) with `forwarded_for`: `#[serde(default)]`, so existing senders
+// that predate this field remain valid (absent = direct grant, unchanged
+// behavior). `None` means the signing peer is asserting its OWN capability
+// (a direct grant from its own `/v1/pair` registration); `Some(origin_instance)`
+// means the peer is relaying a capability on behalf of a third instance it
+// talked to. `capability_gate` only honors a forward when the signing peer's
+// own `user_scope` is `"ADMIN"` — an ordinary paired peer cannot unilaterally
+// claim to forward on behalf of someone with broader access than itself. No
+// real sender uses this yet (`app-orchestration-graph`, the one place a real
+// forward would occur, sends no capability at all today) — this is the
+// receiver-side contract, validated with synthetic peers until a real sender
+// exists.
 
 /// Payload of a forwarded `X-Foundry-Capability` header.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -307,6 +321,11 @@ pub struct CapabilityPayload {
     pub expiry: String,
     #[serde(default)]
     pub peer_type: String,
+    /// `None` = direct grant (signing peer's own capability). `Some(origin)` =
+    /// forwarded on behalf of `origin` — only honored for `user_scope: "ADMIN"`
+    /// signers (see module doc comment above).
+    #[serde(default)]
+    pub forwarded_for: Option<String>,
 }
 
 impl CapabilityPayload {
@@ -420,6 +439,12 @@ impl InterfaceAuditLog {
 /// Not persisted — nonces are tied to short-lived tokens (24h default).
 /// After restart the window is narrow enough to be acceptable.
 pub struct NonceCache(pub Mutex<HashSet<String>>);
+
+impl Default for NonceCache {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl NonceCache {
     pub fn new() -> Self {
@@ -572,6 +597,7 @@ mod tests {
             nonce: "cap-nonce-1".into(),
             expiry: expiry.to_rfc3339(),
             peer_type: "orchestration".into(),
+            forwarded_for: None,
         };
         let pj = serde_json::to_string(&payload).unwrap();
         let pb64 = URL_SAFE_NO_PAD.encode(pj.as_bytes());
@@ -666,6 +692,7 @@ mod tests {
             nonce: "n1".into(),
             expiry: (Utc::now() + chrono::Duration::hours(1)).to_rfc3339(),
             peer_type: "orchestration".into(),
+            forwarded_for: None,
         };
         log.record("/v1/graph/mutate", &payload).expect("record");
         let content = std::fs::read_to_string(d.path().join("interface-audit.jsonl")).unwrap();

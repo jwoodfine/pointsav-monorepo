@@ -43,7 +43,7 @@ LadybugDB graph (2026-06-01).
 ## Build and test
 
 ```
-cargo test -p service-content       # 55 tests
+cargo test -p service-content       # 152 tests (122 unit + 30 integration, verified 2026-07-18)
 cargo clippy -p service-content --all-targets -- -D warnings
 ```
 

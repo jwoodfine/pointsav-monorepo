@@ -21,7 +21,7 @@ use crate::grammar_validation::LarkValidator;
 use crate::graph::GraphContextClient;
 use crate::ledger::{AuditEntry, AuditLedger, CompletionStatus, ENTRY_TYPE_CHAT_COMPLETION};
 use crate::mesh::MeshRegistry;
-use crate::tier::{ExternalTierClient, LocalTierClient, YoYoTierClient};
+use crate::tier::{ExternalTierClient, LocalTierClient, OrchestrationTierClient, YoYoTierClient};
 
 use serde::Serialize;
 use std::collections::HashMap;
@@ -50,7 +50,7 @@ pub struct TierBInfo {
 
 #[derive(Default)]
 pub struct DoormanConfig {
-    pub local: Option<LocalTierClient>,
+    pub local: Option<LocalBackend>,
     pub yoyo: HashMap<String, YoYoTierClient>,
     pub external: Option<ExternalTierClient>,
     /// Optional Lark grammar pre-validator (PS.3 step 5). When `Some`,
@@ -88,8 +88,55 @@ pub struct Orchestrator {
     pub registry: Box<dyn MeshRegistry>,
 }
 
+/// What backs the "Local" compute slot: either a real llama-server on this
+/// host (the default), or — Tier 0 Doorman mode, `SLM_TIER=0`
+/// (`BRIEF-os-totebox-platform.md` §6/§14 #17-18) — a thin client that
+/// routes what would normally be local inference through
+/// `app-orchestration-slm`'s `POST /v1/inference` instead. Not to be
+/// confused with `Orchestrator`/`MeshRegistry` above, an unrelated,
+/// unwired multi-node mesh-discovery scaffold — this is specifically the
+/// single-upstream Tier 0 compute source.
+pub enum LocalBackend {
+    Direct(LocalTierClient),
+    Orchestrated(OrchestrationTierClient),
+}
+
+impl From<LocalTierClient> for LocalBackend {
+    fn from(c: LocalTierClient) -> Self {
+        LocalBackend::Direct(c)
+    }
+}
+
+impl From<OrchestrationTierClient> for LocalBackend {
+    fn from(c: OrchestrationTierClient) -> Self {
+        LocalBackend::Orchestrated(c)
+    }
+}
+
+impl LocalBackend {
+    pub async fn complete(&self, req: &ComputeRequest) -> Result<ComputeResponse> {
+        match self {
+            LocalBackend::Direct(c) => c.complete(req).await,
+            LocalBackend::Orchestrated(c) => c.complete(req).await,
+        }
+    }
+
+    /// `LocalTierClient::complete_background` uses a dedicated semaphore so
+    /// background/batch callers (extraction fallback, drain dispatch) never
+    /// starve real-time Tier A slots. `OrchestrationTierClient` has no local
+    /// slot to protect — the remote chassis/Yo-Yo fleet manages its own
+    /// concurrency — so background calls route through the same `complete`
+    /// path as real-time ones in Tier 0 mode.
+    pub async fn complete_background(&self, req: &ComputeRequest) -> Result<ComputeResponse> {
+        match self {
+            LocalBackend::Direct(c) => c.complete_background(req).await,
+            LocalBackend::Orchestrated(c) => c.complete(req).await,
+        }
+    }
+}
+
 pub struct Doorman {
-    local: Option<LocalTierClient>,
+    local: Option<LocalBackend>,
     yoyo: HashMap<String, YoYoTierClient>,
     external: Option<ExternalTierClient>,
     ledger: AuditLedger,
@@ -177,7 +224,10 @@ impl Doorman {
     /// preventing Tier A fallback from saturating OLMo when the GPU node is
     /// unavailable (STOCKOUT, circuit open, or health probe failure).
     pub fn yoyo_node_ready(&self, label: &str) -> bool {
-        self.yoyo.get(label).map(|c| c.allow_request()).unwrap_or(false)
+        self.yoyo
+            .get(label)
+            .map(|c| c.allow_request())
+            .unwrap_or(false)
     }
 
     pub fn ledger(&self) -> &AuditLedger {
@@ -809,6 +859,63 @@ mod tests {
         AuditLedger::new(dir).unwrap()
     }
 
+    /// Regression: `LocalBackend::Orchestrated`'s `complete_background` must
+    /// route through the same `complete()` path as a real-time call — there is
+    /// no local slot to isolate background traffic from (the remote chassis/
+    /// Yo-Yo fleet manages its own concurrency), unlike `LocalBackend::Direct`
+    /// which uses a dedicated background semaphore. Both calls in this test hit
+    /// the same mocked `/v1/inference` endpoint and must both succeed.
+    #[tokio::test]
+    async fn orchestrated_backend_background_call_uses_same_path_as_complete() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/discovery/register"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "status": "registered",
+                "module_id": "test",
+                "chassis_version": "0.1.0",
+                "membership_token": "tok.sig"
+            })))
+            .mount(&server)
+            .await;
+        Mock::given(method("POST"))
+            .and(path("/v1/inference"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "choices": [{ "message": { "content": "pong" } }]
+            })))
+            .mount(&server)
+            .await;
+
+        let client =
+            crate::tier::OrchestrationTierClient::new(crate::tier::OrchestrationTierConfig {
+                endpoint: server.uri(),
+                module_id: "test".to_string(),
+                archive_id: "project-totebox".to_string(),
+                doorman_endpoint: "http://127.0.0.1:9080".to_string(),
+                registration_token: None,
+            });
+        client
+            .register()
+            .await
+            .expect("registration should succeed");
+        let backend = LocalBackend::from(client);
+
+        let resp = backend
+            .complete(&req(Complexity::Low, None, None))
+            .await
+            .expect("complete should succeed");
+        assert_eq!(resp.content, "pong");
+
+        let resp_bg = backend
+            .complete_background(&req(Complexity::Low, None, None))
+            .await
+            .expect("complete_background should succeed via the same path");
+        assert_eq!(resp_bg.content, "pong");
+    }
+
     #[tokio::test]
     async fn unconfigured_router_refuses_with_tier_unavailable() {
         let doorman = Doorman::new(DoormanConfig::default(), ledger());
@@ -1080,10 +1187,12 @@ mod tests {
 
         let doorman = Doorman::new(
             DoormanConfig {
-                local: Some(LocalTierClient::new(crate::tier::LocalTierConfig {
-                    endpoint: server.uri(),
-                    default_model: "OLMo-3-7B-Instruct".into(),
-                })),
+                local: Some(LocalBackend::Direct(LocalTierClient::new(
+                    crate::tier::LocalTierConfig {
+                        endpoint: server.uri(),
+                        default_model: "OLMo-3-7B-Instruct".into(),
+                    },
+                ))),
                 yoyo: HashMap::new(),
                 external: None,
                 lark_validator: None,
@@ -1193,10 +1302,12 @@ mod tests {
 
         let doorman = Doorman::new(
             DoormanConfig {
-                local: Some(LocalTierClient::new(crate::tier::LocalTierConfig {
-                    endpoint: server.uri(),
-                    default_model: "OLMo-3-7B-Instruct".into(),
-                })),
+                local: Some(LocalBackend::Direct(LocalTierClient::new(
+                    crate::tier::LocalTierConfig {
+                        endpoint: server.uri(),
+                        default_model: "OLMo-3-7B-Instruct".into(),
+                    },
+                ))),
                 yoyo: HashMap::new(),
                 external: None,
                 lark_validator: None,
@@ -1237,5 +1348,112 @@ mod tests {
             "the short, common-word spurious match must not win over the more \
              specific candidate, got: {content}"
         );
+    }
+
+    // -----------------------------------------------------------------------
+    // Sovereignty invariant freeze (BRIEF-os-totebox-platform.md §14 #14,
+    // 2026-07-14): the automatic/circuit-breaker path must never select
+    // Tier::External, only an explicit caller hint may. This was verified
+    // true of the code as a fact-check during that BRIEF's decision-
+    // resolution session; these tests freeze it against future refactor
+    // drift rather than leaving it as an unenforced assumption.
+    // -----------------------------------------------------------------------
+
+    fn external_client() -> ExternalTierClient {
+        ExternalTierClient::new(crate::tier::ExternalTierConfig {
+            allowlist: crate::tier::ExternalAllowlist::EMPTY,
+            provider_endpoints: HashMap::new(),
+            provider_api_keys: HashMap::new(),
+            pricing: crate::tier::TierCPricing::default(),
+        })
+    }
+
+    /// Default tier-selection policy (no explicit `tier_hint`) must never
+    /// produce `Tier::External`, for any complexity, even when an external
+    /// client IS configured and available. Only an explicit hint may select
+    /// it — see `select_tier`'s own comment: "Tier C is never a default —
+    /// callers must hint it explicitly."
+    #[test]
+    fn select_tier_default_policy_never_produces_external() {
+        let mut yoyo_map = HashMap::new();
+        yoyo_map.insert("default".to_string(), make_yoyo(None));
+        let doorman = Doorman::new(
+            DoormanConfig {
+                local: Some(LocalBackend::Direct(LocalTierClient::new(
+                    crate::tier::LocalTierConfig {
+                        endpoint: "http://invalid.example".into(),
+                        default_model: "test-model".into(),
+                    },
+                ))),
+                yoyo: yoyo_map,
+                external: Some(external_client()),
+                lark_validator: None,
+                graph_context_client: None,
+                tier_a_first: false,
+                daily_yoyo_cap_usd: None,
+                cost_ledger: None,
+            },
+            ledger(),
+        );
+        for complexity in [Complexity::Low, Complexity::Medium, Complexity::High] {
+            let picked = doorman
+                .select_tier(&req(complexity, None, None))
+                .expect("local + yoyo configured — selection should succeed");
+            assert_ne!(
+                picked,
+                Tier::External,
+                "default policy (no explicit tier_hint) must never select \
+                 Tier::External, got it for complexity {complexity:?}"
+            );
+        }
+    }
+
+    /// `try_local_fallback` — the path `dispatch` takes on a Tier B
+    /// unavailable/transient-failure — only ever considers Tier A (local).
+    /// With `local: None` it must fail `TierUnavailable(Local)`, never
+    /// succeed via or even attempt External, despite External being
+    /// configured and available.
+    #[tokio::test]
+    async fn try_local_fallback_never_reaches_external() {
+        let doorman = Doorman::new(
+            DoormanConfig {
+                local: None,
+                yoyo: HashMap::new(),
+                external: Some(external_client()),
+                lark_validator: None,
+                graph_context_client: None,
+                tier_a_first: false,
+                daily_yoyo_cap_usd: None,
+                cost_ledger: None,
+            },
+            ledger(),
+        );
+        let result = doorman
+            .try_local_fallback(&req(Complexity::High, None, None))
+            .await;
+        match result {
+            Err(DoormanError::TierUnavailable(Tier::Local)) => {}
+            other => panic!(
+                "try_local_fallback must only ever resolve to Local or \
+                 TierUnavailable(Local), never touch External — got {other:?}"
+            ),
+        }
+    }
+
+    /// `is_transient_tier_b_failure` classifies only Tier-B-shaped errors.
+    /// It must never itself be satisfied by, or be used to justify routing
+    /// toward, External — this pins its match arms so a future edit can't
+    /// silently widen it to cover (and thus implicitly permit escalating
+    /// through) an external-tier error variant.
+    #[test]
+    fn is_transient_tier_b_failure_does_not_cover_external_errors() {
+        assert!(!is_transient_tier_b_failure(
+            &DoormanError::TierUnavailable(Tier::External)
+        ));
+        assert!(!is_transient_tier_b_failure(
+            &DoormanError::ExternalNotAllowlisted {
+                label: "some-label".to_string(),
+            }
+        ));
     }
 }

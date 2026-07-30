@@ -57,35 +57,18 @@ pub enum Section {
     /// the retired production sites' `.classes` band, ported here as a real
     /// content section rather than a per-tenant chrome fixture, since the
     /// set of icons is page content (currently only used on `home`).
-    IconStrip { icons: Vec<IconTile> },
+    IconStrip {
+        icons: Vec<IconTile>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IconTile {
     pub src: String,
-    /// Also rendered as the tile's visible title (2026-07-07 mobile
-    /// redesign — the icon strip previously had no visible text at all,
-    /// `alt` was the only place this label existed). The `<img>` itself is
-    /// now `alt=""`/`aria-hidden` since the visible title already carries
-    /// the same information — screen readers would otherwise announce it
-    /// twice.
+    /// The label is rendered as vector text baked into the SVG itself (it's
+    /// a graphic, not semantic HTML) — `alt` must repeat it verbatim so
+    /// screen readers get the same information sighted users do.
     pub alt: String,
-    /// Optional one-line descriptor shown beneath the visible title.
-    /// Absent means the tile renders title-only (no layout requirement to
-    /// supply one for every icon).
-    #[serde(default)]
-    pub body: Option<String>,
-    /// Optional per-icon visual scale multiplier (round 13, 2026-07-07).
-    /// Every icon shares one fixed `object-fit: contain` box (see
-    /// `.m-icon-strip__img` in app.css), so an icon whose native aspect
-    /// ratio is far from the box's own ratio renders visibly smaller than
-    /// its siblings (more letterboxed). This is a targeted escape hatch for
-    /// that specific case — a plain CSS `transform: scale()` on just this
-    /// icon — rather than a global box-ratio change that would affect every
-    /// icon on both tenants' sites. Absent means no transform (default,
-    /// unaffected rendering).
-    #[serde(default)]
-    pub scale: Option<f32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,18 +82,15 @@ pub struct Card {
 
 /// Load a page manifest. `lang` selects the file: `None`/`"en"` loads
 /// `page.yaml`; any other value loads `page.<lang>.yaml` (e.g. `page.es.yaml`).
-pub fn load_page(
-    content_dir: &Path,
-    slug: &str,
-    lang: Option<&str>,
-) -> Result<Page, MarketingError> {
+pub fn load_page(content_dir: &Path, slug: &str, lang: Option<&str>) -> Result<Page, MarketingError> {
     let filename = match lang {
         None | Some("en") => "page.yaml".to_string(),
         Some(code) => format!("page.{code}.yaml"),
     };
     let path: PathBuf = content_dir.join(slug).join(&filename);
-    let raw = std::fs::read_to_string(&path)
-        .map_err(|_| MarketingError::PageNotFound(format!("{slug} ({filename})")))?;
+    let raw = std::fs::read_to_string(&path).map_err(|_| {
+        MarketingError::PageNotFound(format!("{slug} ({filename})"))
+    })?;
     serde_yaml::from_str(&raw).map_err(|source| MarketingError::Manifest {
         slug: slug.to_string(),
         source,
@@ -237,11 +217,7 @@ sections:
         );
         let page = load_page(dir.path(), "home", None).unwrap();
         match &page.sections[0] {
-            Section::CardGrid {
-                columns,
-                cards,
-                style,
-            } => {
+            Section::CardGrid { columns, cards, style } => {
                 assert_eq!(*columns, 3);
                 assert_eq!(cards.len(), 2);
                 assert!(cards[0].body.is_none());
@@ -321,18 +297,8 @@ sections:
     #[test]
     fn list_slugs_finds_only_dirs_with_page_yaml() {
         let dir = tempfile::tempdir().unwrap();
-        write_page(
-            dir.path(),
-            "home",
-            "page.yaml",
-            "title: Home\nslug: home\ndescription: d\nsections: []\n",
-        );
-        write_page(
-            dir.path(),
-            "contact",
-            "page.yaml",
-            "title: Contact\nslug: contact\ndescription: d\nsections: []\n",
-        );
+        write_page(dir.path(), "home", "page.yaml", "title: Home\nslug: home\ndescription: d\nsections: []\n");
+        write_page(dir.path(), "contact", "page.yaml", "title: Contact\nslug: contact\ndescription: d\nsections: []\n");
         std::fs::create_dir_all(dir.path().join("empty")).unwrap();
         let slugs = list_slugs(dir.path());
         assert_eq!(slugs, vec!["contact".to_string(), "home".to_string()]);

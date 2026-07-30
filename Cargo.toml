@@ -1,21 +1,23 @@
 [workspace]
 resolver = "2"
+# system-core and system-ledger declare their own [workspace] (standalone-extractable pattern;
+# see .agent/rules/cleanup-log.md open question). Exclude prevents multi-workspace-root error
+# when they are used as path dependencies from within this workspace.
+# service-slm declares its own [workspace] too (5-crate nested workspace: slm-core,
+# slm-doorman, slm-doorman-server, adapter-hub, slm-mcp-server). Excluded for the same
+# reason, so os-totebox can path-depend on slm-doorman-server
+# (BRIEF-os-totebox-platform.md §8/§10, Phase 2 dogfood bundle).
+exclude = ["system-core", "system-ledger", "service-slm"]
 members = [
     "service-people",
     "service-content",
-    "service-email",
     "app-console-content",
     "tool-acs-miner",
     "tool-buildingwidth",
     "tool-floorplate",
     "app-console-input",
     "system-gateway-mba",
-    # "service-fs" — Tokio MCP-server skeleton compiles clean inside
-    # its own directory (cargo check + 3 ledger unit tests pass,
-    # 2026-04-26). Re-add to members blocked on workspace-tier
-    # openssl-sys breakage in an existing member (pre-existing Layer
-    # 1 audit finding; not the Tokio rewrite's fault). Tracked as a
-    # NEXT.md item in service-fs/ pending repo-tier cleanup.
+    "service-fs",
     "system-security",
     "xtask",
     "console-core",
@@ -32,6 +34,7 @@ members = [
     "os-privategit",
     "tool-wallet",
     "app-privategit-workbench",
+    "tool-proforma-engine",
     "app-orchestration-bim",
     "tool-keyplan",
     # PPN focus crates
@@ -61,8 +64,6 @@ members = [
     "app-orchestration-graph",
     # Marketing platform rewrite (parallel crate; swaps in at plan P8)
     "app-mediakit-marketing-2",
-    # Food-service platform engine (foodservice.woodfinegroup.com)
-    "app-mediakit-foodservice",
     # Design system browser (port 9094)
     "app-privategit-design",
     # Sovereign replacement stubs (wired into app-privategit-design)
@@ -72,21 +73,12 @@ members = [
     "app-console-search",
     # mTLS Phase A public ingress
     "service-ingress",
-]
-exclude = [
-    # system-core and system-ledger declare their own [workspace] (standalone-extractable
-    # pattern; see .agent/rules/cleanup-log.md open question). Exclude prevents
-    # multi-workspace-root error when used as path dependencies from within this workspace.
-    "system-core",
-    "system-ledger",
-    # Held-out crates that physically nest under the workspace root
-    # but are deliberately not workspace members.
-    # - service-fs: see members comment above
-    # - vendor-sel4-fs: Reserved-folder bare-metal crate; different
-    #   runtime model (its .cargo/config.toml targets
-    #   x86_64-unknown-none)
-    "service-fs",
-    "vendor-sel4-fs",
+    # Tier X — isolated external-LLM research/code-assist bridge (BRIEF-os-totebox-platform.md §7)
+    "tool-llm-bridge",
+    # os-totebox product bundle — dogfood on foundry-workspace (BRIEF-os-totebox-platform.md §10, Phase 2)
+    "os-totebox",
+    # Ring 1 email ingest — one mailbox folder into the DataGraph (BRIEF-os-totebox-platform.md §14 #21, Phase 3)
+    "service-email",
 ]
 
 [profile.dev]
@@ -114,11 +106,6 @@ strip = "symbols"
 
 # app-mediakit-marketing-2 (rewrite) — same rationale as the crate it replaces.
 [profile.release.package.app-mediakit-marketing-2]
-opt-level = 3
-strip = "symbols"
-
-# app-mediakit-foodservice is a runtime HTTP server — same speed-optimised profile.
-[profile.release.package.app-mediakit-foodservice]
 opt-level = 3
 strip = "symbols"
 
