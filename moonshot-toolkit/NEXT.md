@@ -1,7 +1,6 @@
 # NEXT.md — moonshot-toolkit
 
 > Last updated: 2026-05-29
-> Last updated: 2026-06-30
 > Read at session start. Update before session end.
 
 ---
@@ -18,49 +17,6 @@
 - **Configurable kernel/elfloader paths** — `vendor-sel4-kernel/build/aarch64-qemu`
   and `vendor-sel4-tools/elfloader-tool` are well-known hardcoded paths. Consider
   a `[build]` section in system-spec.toml for per-spec overrides.
-- Nothing in progress. Phase 1C.c complete (`d550217`): seL4 qemu-arm-virt
-  AArch64 QEMU boot confirmed — "hello from seL4 rootserver" output observed.
-  Phase 1C.d still blocked — see Blocked section below.
-- **Task #14 IMPLEMENTED** (commit `916e918b`, 2026-06-30) — `build` subcommand is real.
-- **BLOCKED: disk full** — `/srv/foundry/cargo-target/mathew/debug/` ENOSPC.
-  `cargo check` passed (exit 0). `cargo test` and first `build` run blocked until disk freed.
-  Command fix: `rm -rf /srv/foundry/cargo-target/mathew/debug/incremental/`
-- **First build run**: `moonshot-toolkit build os-infrastructure/system-spec.toml`
-  → should produce `os-infrastructure/build/loader.img` via Microkit 2.2.0.
-
-## Queue
-
-- `[ ]` First real build run: `moonshot-toolkit build os-infrastructure/system-spec.toml` [2026-06-30 totebox@claude-code]
-- `[ ]` Run `cargo test` to confirm all 4 new spec tests + updated plan test pass [2026-06-30 totebox@claude-code]
-- `[ ]` Ed25519-sign output images using identity/id_pointsav-administrator key
-- `[ ]` Remove `build-totebox.sh` legacy shell sketch once `moonshot-toolkit build` produces a bootable image
-- `[ ]` AArch64 path: add `qemu_virt_aarch64/debug` variant to os-infrastructure system-spec.toml once x86 path confirmed
-
-## Queue
-
-- **Sigstore Cosign + customer-apex cosignature** — `plan_hash` field is in place; cosignature emission deferred until `moonshot-toolkit build` produces a full bootable image (post-#14 + post-Phase 1C.d).
-- **`build-totebox.sh` removal** — still present; remove once moonshot-toolkit build produces a real bootable image end-to-end (Phase 1C.d complete).
-
-## Blocked
-
-- ~~**Phase 1C.c — QEMU boot**~~ COMPLETE (`d550217`, 2026-05-28).
-  Boot: elfloader → seL4 kernel → hello-rootserver → "hello from seL4 rootserver".
-  Three root causes resolved: KernelVerificationBuild=ON disabled CONFIG_PRINTING;
-  GNU cpio padding mismatch (replaced with Python CPIO writer); QEMU -m 512M <
-  kernel DTB range (boot with -m 1G). Elfloader entry 0x40400000, kernel at
-  0xffffff8040000000, rootserver at 0x400000.
-
-- **Phase 1C.d — Image assembly** — `AssembleImage` step returns an actionable
-  error. Requires either:
-  1. Microkit SDK tarball — available from `github.com/seL4/microkit/releases`
-     as a pre-built release (e.g. `microkit-sdk-1.4.0-linux-x86-64.tar.gz`).
-     Provides `bin/microkit` CLI: `microkit <system.xml> --board qemu-arm-virt
-     --config debug --search-path build/ --output build/system.img`.
-     Note: the `microkit` PyPI package is an unrelated Flask helper — do not install.
-  2. Rust image assembler — `moonshot-toolkit/src/assemble.rs` implementing the
-     Microkit image format (ELF packing + manifest). Preferred path per MEMO §7
-     Rust-Only mandate; requires documenting the Microkit image format spec first.
-  Unblocked by: either option above. Rust path is preferred long-term.
 
 ## Deferred
 
@@ -99,7 +55,3 @@
 - 2026-04-27 (Phase 1B): `src/spec.rs` (445 lines, 12 tests) + `src/plan.rs`
   (310 lines, 10 tests) + `src/main.rs` CLI rewrite (241 lines, 8 tests).
   30 tests total (`cargo test --all-targets`). v0.1.3.
-3. **Reproducible-build harness:** BuildPlan content-addressed `plan_hash`
-   already implemented in `src/plan.rs`. Ed25519-sign output images with
-   `identity/id_pointsav-administrator` key (same key used for software.pointsav.com
-   distribution).
