@@ -22,7 +22,8 @@ service-content — see `ARCHITECTURE.md` Ring 3a.
 ## Current state
 
 **Active.** Doorman in production on workspace VM (`local-doorman.service`).
-Tier A (llama-server, OLMo 2 1B Q4) live and verified. **177/177 tests.**
+Tier A (llama-server, OLMo 2 1B Q4) live and verified. **282/282 tests** (full workspace,
+verified 2026-07-18 — the 177/262 figures previously here were stale/conflicting).
 Tier A upgrade to OLMo 2 1124 7B Instruct pending (see NEXT.md).
 
 D4 image pipeline code complete as of 2026-05-07 (commit `0140176`): Packer template,
@@ -80,7 +81,7 @@ As of 2026-05-07 (commit `0140176`):
 
 ```
 cargo check --workspace                # seconds incremental
-cargo test  --workspace                # 262 tests
+cargo test  --workspace                # 282 tests (verified 2026-07-18)
 cargo clippy --workspace --all-targets -- -D warnings
 cargo fmt   --all -- --check
 ```

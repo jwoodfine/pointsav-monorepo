@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
-
 //! Order status/entitlement page — `GET /order/:tx_hash`.
 //!
 //! Phase 2 (paid-flow UI rework): renders the three states the payment state
@@ -13,7 +10,7 @@ use maud::{html, Markup, PreEscaped};
 
 fn order_style() -> Markup {
     let css = r#".sw-or-wrap{max-width:640px;margin:0 auto;padding:40px 24px 64px;box-sizing:border-box;}
-.sw-or-title{margin:0 0 24px;font-family:Georgia,"Times New Roman",serif;font-size:26px;color:#111827;}
+.sw-or-title{margin:0 0 24px;font-family:"Playfair Display",Georgia,serif;font-size:26px;color:#111;}
 .sw-or-card{border:1px solid #e4e7ec;border-radius:10px;padding:24px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.04);}
 .sw-or-status{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:4px 10px;border-radius:999px;margin:0 0 16px;}
 .sw-or-status--pending{background:#fef3c7;color:#92400e;}
@@ -21,12 +18,12 @@ fn order_style() -> Markup {
 .sw-or-status--notfound{background:#fee4e2;color:#912018;}
 .sw-or-receipt{margin:16px 0;padding:14px;border:1px dashed #d0d5dd;border-radius:8px;background:#fcfcfd;}
 .sw-or-receipt__label{display:block;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:#667085;margin:0 0 6px;}
-.sw-or-receipt__key{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;color:#234ed8;word-break:break-all;}
+.sw-or-receipt__key{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;color:#164679;word-break:break-all;}
 .sw-or-receipt__note{margin:10px 0 0;font-size:12px;color:#667085;line-height:1.5;}
-.sw-or-download{display:inline-block;margin-top:8px;padding:12px 20px;border-radius:8px;background:#234ed8;color:#fff;font-size:14px;font-weight:600;text-decoration:none;}
-.sw-or-download:hover{background:#0c2785;}
+.sw-or-download{display:inline-block;margin-top:8px;padding:12px 20px;border-radius:8px;background:#164679;color:#fff;font-size:14px;font-weight:600;text-decoration:none;}
+.sw-or-download:hover{background:#0e3055;}
 .sw-or-hint{font-size:13px;line-height:1.55;color:#475467;margin:16px 0 0;}
-.sw-or-back{display:inline-block;margin-top:16px;font-size:13px;color:#234ed8;}"#;
+.sw-or-back{display:inline-block;margin-top:16px;font-size:13px;color:#164679;}"#;
     html! { style { (PreEscaped(css)) } }
 }
 

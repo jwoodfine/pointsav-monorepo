@@ -7,6 +7,10 @@ name = "service-content"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "service_content"
+path = "src/lib.rs"
+
 [[bin]]
 name = "service-content"
 path = "src/main.rs"
@@ -15,7 +19,7 @@ path = "src/main.rs"
 notify = "6.1.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-reqwest = { version = "0.11", features = ["blocking", "json"] }
+reqwest = { version = "0.11", default-features = false, features = ["blocking", "json", "rustls-tls"] }
 lbug = "0.16"
 axum = { version = "0.7", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
@@ -28,6 +32,8 @@ base64 = "0.22"
 
 [dev-dependencies]
 tempfile = "3"
+tower = { version = "0.4", features = ["util"] }
+wiremock = "0.6"
 
 [features]
 # Optional embedding-based entity resolution (bge-small-en-v1.5 via fastembed, CPU).

@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
-
 //! Sovereign Editorial chrome: dark navy masthead (wordmark left / search centre /
 //! utility right) and near-black institutional footer with the verbatim WCP Inc.
 //! trademark line.
@@ -20,9 +17,11 @@ use super::tokens;
 
 // ── Inline SVG glyphs (currentColor → inherit the container's ink token) ────────
 
+const GLYPH_SVG: &str = r##"<svg viewBox="0 0 24 24" width="26" height="26" fill="currentColor" aria-hidden="true" focusable="false"><path d="M6 2h7.5L19 7.5V22H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1zm7 1.6V8h4.4L13 3.6zM8 12h8v1.5H8V12zm0 3.5h8V17H8v-1.5z"/></svg>"##;
+
 const SEARCH_ICON: &str = r##"<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>"##;
 
-const BADGE_GLYPH: &str = r##"<svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false"><path fill="currentColor" d="M3 5.5A1.5 1.5 0 0 1 4.5 4h15A1.5 1.5 0 0 1 21 5.5v13A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5v-13zM6 8v8l3.2-2.4L6 8zm7 6.5h5V13h-5v1.5zm0-3h5V10h-5v1.5z"/></svg>"##;
+const BURGER_ICON: &str = r##"<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true" focusable="false"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>"##;
 
 // ── Scoped chrome stylesheet ────────────────────────────────────────────────────
 //
@@ -35,38 +34,53 @@ fn chrome_style() -> Markup {
     let css = format!(
         r#":root{{
 --sw-topnav-bg:{topnav};
---sw-on-chrome:{on_chrome};
---sw-on-chrome-muted:{on_chrome_muted};
 --sw-accent:{accent};
---sw-accent-hover:{accent_hover};
 --sw-footer-bg:{footer_bg};
 --sw-footer-fg:{footer_fg};
---sw-footer-fg-muted:{footer_fg_muted};
 --sw-footer-divider:{footer_div};
---sw-ink:{ink};
 --sw-wordmark:{wordmark};
 }}
-.sw-masthead{{background:var(--sw-topnav-bg);color:var(--sw-on-chrome);width:100%;}}
+.sw-nav-toggle{{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;}}
+.sw-masthead{{background:var(--sw-topnav-bg);color:var(--sw-wordmark);width:100%;}}
 .sw-masthead__inner{{display:flex;align-items:center;gap:24px;height:64px;max-width:1280px;margin:0 auto;padding:0 24px;box-sizing:border-box;}}
-.sw-wordmark{{color:var(--sw-on-chrome);text-decoration:none;font-weight:700;font-size:17px;letter-spacing:.005em;flex:0 0 auto;}}
-.sw-search{{flex:1 1 auto;display:flex;justify-content:flex-end;}}
-.sw-search__form{{display:flex;width:100%;max-width:320px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);border-radius:6px;overflow:hidden;}}
+.sw-brand{{display:flex;align-items:center;gap:10px;color:var(--sw-wordmark);text-decoration:none;flex:0 0 auto;}}
+.sw-brand__glyph{{display:inline-flex;color:var(--sw-accent);}}
+.sw-brand__lockup{{display:flex;flex-direction:column;line-height:1.05;}}
+.sw-brand__name{{font-family:"Playfair Display",Georgia,serif;font-weight:700;font-size:18px;letter-spacing:.01em;}}
+.sw-brand__desc{{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--sw-accent);}}
+.sw-search{{flex:1 1 auto;display:flex;justify-content:center;}}
+.sw-search__form{{display:flex;width:100%;max-width:420px;background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.18);border-radius:6px;overflow:hidden;}}
 .sw-search__input{{flex:1;background:transparent;border:0;color:#fff;padding:8px 12px;font-size:13px;outline:none;}}
 .sw-search__input::placeholder{{color:rgba(255,255,255,.6);}}
 .sw-search__btn{{background:transparent;border:0;color:rgba(255,255,255,.85);padding:0 12px;cursor:pointer;display:inline-flex;align-items:center;}}
+.sw-utility{{display:flex;align-items:center;gap:18px;flex:0 0 auto;}}
+.sw-utility__link{{color:rgba(255,255,255,.9);text-decoration:none;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}}
+.sw-utility__link:hover{{color:var(--sw-accent);}}
+.sw-lang{{display:flex;gap:4px;font-size:12px;font-weight:600;color:rgba(255,255,255,.55);}}
+.sw-lang__active{{color:var(--sw-wordmark);}}
+.sw-burger{{display:none;flex:0 0 auto;cursor:pointer;color:#fff;padding:6px;border-radius:4px;align-items:center;}}
+.sw-subnav{{background:color-mix(in oklab,var(--sw-topnav-bg) 86%,#000);width:100%;}}
+.sw-subnav__inner{{display:flex;gap:28px;height:48px;align-items:center;max-width:1280px;margin:0 auto;padding:0 24px;box-sizing:border-box;overflow-x:auto;}}
+.sw-subnav__link{{color:rgba(255,255,255,.82);text-decoration:none;font-size:13px;font-weight:600;letter-spacing:.04em;white-space:nowrap;}}
+.sw-subnav__link:hover{{color:var(--sw-accent);}}
+.sw-drawer{{position:fixed;top:0;left:0;bottom:0;width:82%;max-width:320px;background:var(--sw-topnav-bg);color:#fff;transform:translateX(-100%);transition:transform .25s ease;z-index:60;padding:20px;box-sizing:border-box;overflow-y:auto;}}
+.sw-drawer__close{{display:block;text-align:right;color:var(--sw-accent);cursor:pointer;font-size:24px;line-height:1;margin-bottom:12px;}}
+.sw-drawer__link{{display:block;padding:12px 4px;color:#fff;text-decoration:none;font-size:15px;border-bottom:1px solid rgba(255,255,255,.12);}}
+.sw-scrim{{position:fixed;inset:0;background:rgba(0,0,0,.5);opacity:0;visibility:hidden;transition:opacity .25s ease;z-index:55;}}
+.sw-nav-toggle:checked ~ .sw-drawer{{transform:translateX(0);}}
+.sw-nav-toggle:checked ~ .sw-scrim{{opacity:1;visibility:visible;}}
 .sw-footer{{background:var(--sw-footer-bg);color:var(--sw-footer-fg);width:100%;}}
 .sw-footer__inner{{max-width:1280px;margin:0 auto;padding:48px 24px 28px;box-sizing:border-box;}}
 .sw-footer__top{{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:32px;}}
-.sw-footer__brand-name{{color:var(--sw-ink);font-family:Georgia,"Times New Roman",serif;font-weight:700;font-size:18px;}}
-.sw-footer__tagline{{margin-top:8px;font-size:13px;max-width:30ch;color:var(--sw-footer-fg-muted);}}
-.sw-footer__col h2{{color:var(--sw-ink);font-size:12px;letter-spacing:.12em;text-transform:uppercase;margin:0 0 12px;}}
+.sw-footer__brand-name{{color:#fff;font-family:"Playfair Display",Georgia,serif;font-weight:700;font-size:18px;}}
+.sw-footer__tagline{{margin-top:8px;font-size:13px;max-width:30ch;}}
+.sw-footer__col h2{{color:#fff;font-size:12px;letter-spacing:.12em;text-transform:uppercase;margin:0 0 12px;}}
 .sw-footer__col ul{{list-style:none;margin:0;padding:0;}}
 .sw-footer__col li{{margin-bottom:8px;}}
-.sw-footer__col a{{color:var(--sw-accent);text-decoration:none;font-size:13px;}}
-.sw-footer__col a:hover{{color:var(--sw-accent-hover);text-decoration:underline;}}
-.sw-footer__ext{{font-size:11px;margin-left:2px;}}
+.sw-footer__col a{{color:var(--sw-footer-fg);text-decoration:none;font-size:13px;}}
+.sw-footer__col a:hover{{color:var(--sw-accent);}}
 .sw-footer__disclosure{{margin-top:32px;border:1px solid var(--sw-footer-divider);border-radius:6px;}}
-.sw-footer__disclosure-summary{{cursor:pointer;padding:14px 18px;color:var(--sw-ink);font-size:12px;letter-spacing:.06em;text-transform:uppercase;list-style:none;}}
+.sw-footer__disclosure-summary{{cursor:pointer;padding:14px 18px;color:#fff;font-size:12px;letter-spacing:.06em;text-transform:uppercase;list-style:none;}}
 .sw-footer__disclosure-summary::-webkit-details-marker{{display:none;}}
 .sw-footer__disclosure-summary::after{{content:"\25be";margin-left:8px;display:inline-block;}}
 .sw-footer__disclosure[open] .sw-footer__disclosure-summary::after{{transform:rotate(180deg);}}
@@ -76,45 +90,36 @@ fn chrome_style() -> Markup {
 .sw-footer__slot-body p{{margin:0 0 10px;}}
 .sw-footer__slot-body p:last-child{{margin-bottom:0;}}
 .sw-footer__slot-body a{{color:var(--sw-accent);}}
-.sw-footer__slot-body strong{{color:var(--sw-ink);}}
-.sw-footer__persistent-disclaimer{{margin-top:12px;font-size:11px;line-height:1.5;color:var(--sw-footer-fg-muted);}}
+.sw-footer__slot-body strong{{color:#fff;}}
+.sw-footer__persistent-disclaimer{{margin-top:12px;font-size:11px;line-height:1.5;color:var(--sw-footer-fg);}}
 .sw-footer__persistent-disclaimer a{{color:var(--sw-accent);}}
 @media print{{
 .sw-footer__disclosure:not([open]) .sw-footer__slot{{display:block!important;}}
 }}
-.sw-footer__cities{{margin-top:20px;padding-top:20px;border-top:1px solid var(--sw-footer-divider);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--sw-footer-fg-muted);}}
-.sw-footer__badge{{display:inline-flex;align-items:center;gap:6px;margin-top:14px;padding:5px 10px;background:#fff;border:1px solid var(--sw-footer-divider);border-radius:3px;text-decoration:none;color:var(--sw-footer-fg);}}
-.sw-footer__badge-glyph{{display:inline-flex;color:var(--sw-accent);}}
-.sw-footer__badge-text{{display:flex;flex-direction:column;line-height:1.1;}}
-.sw-footer__badge-label{{font-size:9px;letter-spacing:.06em;text-transform:uppercase;color:var(--sw-footer-fg-muted);}}
-.sw-footer__badge-name{{font-size:12px;font-weight:700;color:var(--sw-footer-fg);}}
+.sw-footer__cities{{margin-top:20px;padding-top:20px;border-top:1px solid var(--sw-footer-divider);font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#fff;}}
 .sw-footer__meta{{margin-top:10px;font-size:12px;}}
-.sw-footer__meta a{{color:var(--sw-footer-fg-muted);text-decoration:none;}}
+.sw-footer__meta a{{color:var(--sw-footer-fg);text-decoration:none;}}
 .sw-footer__meta a:hover{{color:var(--sw-accent);}}
 .sw-footer__legal{{margin-top:20px;padding-top:18px;border-top:1px solid var(--sw-footer-divider);font-size:11.5px;line-height:1.6;}}
-.sw-footer__copyright{{color:var(--sw-footer-fg-muted);margin:0 0 8px;}}
-.sw-footer__trademark{{margin:0;color:var(--sw-footer-fg-muted);max-width:80ch;}}
+.sw-footer__copyright{{color:#fff;margin:0 0 8px;}}
+.sw-footer__trademark{{margin:0;color:var(--sw-footer-fg);max-width:80ch;}}
 .sw-legal{{max-width:70ch;margin:0 auto;padding:40px 24px 64px;line-height:1.65;}}
-.sw-legal h1{{font-family:Georgia,"Times New Roman",serif;font-size:32px;margin:0 0 8px;}}
+.sw-legal h1{{font-family:"Playfair Display",Georgia,serif;font-size:32px;margin:0 0 8px;}}
 .sw-legal h2{{font-size:16px;margin:28px 0 8px;}}
 .sw-legal__lede{{color:#555;margin:0 0 20px;}}
 .sw-legal hr{{border:none;border-top:1px solid #ddd;margin:32px 0 20px;}}
 .sw-legal__copyright,.sw-legal__trademark{{font-size:12px;color:#666;max-width:80ch;}}
 @media (max-width:768px){{
-.sw-search{{display:none;}}
+.sw-search,.sw-utility,.sw-subnav{{display:none;}}
+.sw-burger{{display:inline-flex;}}
 .sw-masthead__inner{{gap:12px;}}
 .sw-footer__top{{grid-template-columns:1fr;gap:24px;}}
 }}"#,
         topnav = tokens::TOPNAV_BG,
-        on_chrome = tokens::ON_CHROME,
-        on_chrome_muted = tokens::ON_CHROME_MUTED,
         accent = tokens::ACCENT,
-        accent_hover = tokens::ACCENT_HOVER,
         footer_bg = tokens::FOOTER_BG,
         footer_fg = tokens::FOOTER_FG,
-        footer_fg_muted = tokens::FOOTER_FG_MUTED,
         footer_div = tokens::FOOTER_DIVIDER,
-        ink = tokens::INK,
         wordmark = tokens::WORDMARK,
     );
     html! { style { (PreEscaped(css)) } }
@@ -122,33 +127,21 @@ fn chrome_style() -> Markup {
 
 // ── Masthead + off-canvas drawer ────────────────────────────────────────────────
 
-/// The navy masthead: a single flat-text wordmark (left) and product search
-/// (right) — no icon, no stacked descriptor, no account/language controls, no
-/// off-canvas drawer.
-///
-/// **Redesigned 2026-07-07 (second pass, same day)** — the prior icon + two-line
-/// "PointSav / Software" lockup was, byte-for-byte, the same structural pattern as
-/// `documentation.pointsav.com`'s own masthead: verified directly against its
-/// served HTML, its `<svg>` glyph path is character-for-character identical to
-/// this crate's `GLYPH_SVG`, and its lockup is the same "brand name + small-caps
-/// descriptor stacked below it" shape. That's the concrete, verified reason this
-/// site kept reading as the wiki. `home.pointsav.com`'s real masthead is
-/// structurally simpler and distinct from the wiki's: a single flat-text wordmark
-/// link, no icon at all (`<a class="m-masthead__wordmark">PointSav Digital
-/// Systems</a>`) — checked directly against its served HTML, not assumed. This
-/// follows that verified precedent: one flat wordmark naming the site's actual
-/// identity, no icon. Also drops Account and the EN/ES language toggle (operator
-/// instruction) and, since the wordmark already links to `/` (which redirects to
-/// `/software` — see `main.rs`'s `root()`), the separate one-item nav row from the
-/// prior pass is now itself redundant with the wordmark and is removed along with
-/// the drawer/burger system that existed only to hold it and the now-removed
-/// Account link on mobile.
+/// The dark navy masthead: wordmark (left) · product search (centre) · utility
+/// controls (right) · 48px sub-nav. Also emits the pure-CSS off-canvas drawer and
+/// its scrim — all rendered as siblings so the `#sw-nav-toggle` checkbox drives
+/// them via the general-sibling selector once spliced under `<body>`.
 pub fn masthead(surface: SoftwareSurface) -> Markup {
     html! {
+        input."sw-nav-toggle" #"sw-nav-toggle" type="checkbox" aria-hidden="true";
         header."sw-masthead" role="banner" {
             div."sw-masthead__inner" {
-                a."sw-wordmark" href="/" aria-label=(surface.home_label()) {
-                    (surface.home_label())
+                a."sw-brand" href="/" aria-label=(surface.home_label()) {
+                    span."sw-brand__glyph" { (PreEscaped(GLYPH_SVG)) }
+                    span."sw-brand__lockup" {
+                        span."sw-brand__name" { "PointSav" }
+                        span."sw-brand__desc" { "Software" }
+                    }
                 }
                 div."sw-search" {
                     form."sw-search__form" role="search" action="/software" method="get" {
@@ -161,23 +154,46 @@ pub fn masthead(surface: SoftwareSurface) -> Markup {
                         }
                     }
                 }
+                div."sw-utility" {
+                    @if surface.show_account_nav() {
+                        a."sw-utility__link" href="/licensing" { "Account" }
+                    }
+                    span."sw-lang" aria-label="Language" {
+                        span."sw-lang__active" { "EN" }
+                        span aria-hidden="true" { " | " }
+                        span { "ES" }
+                    }
+                }
+                label."sw-burger" for="sw-nav-toggle" aria-label="Open menu" {
+                    (PreEscaped(BURGER_ICON))
+                }
             }
         }
+        nav."sw-subnav" aria-label="Primary" {
+            div."sw-subnav__inner" {
+                @for l in surface.nav_links() {
+                    a."sw-subnav__link" href=(l.href) { (l.label) }
+                }
+            }
+        }
+        // Off-canvas drawer + scrim — opened by the #sw-nav-toggle checkbox (no JS).
+        aside."sw-drawer" aria-label="Menu" {
+            label."sw-drawer__close" for="sw-nav-toggle" aria-label="Close menu" { "\u{00d7}" }
+            @for l in surface.nav_links() {
+                a."sw-drawer__link" href=(l.href) { (l.label) }
+            }
+            @if surface.show_account_nav() {
+                a."sw-drawer__link" href="/licensing" { "Account" }
+            }
+        }
+        label."sw-scrim" for="sw-nav-toggle" aria-hidden="true" {}
     }
 }
 
 // ── Footer ──────────────────────────────────────────────────────────────────────
 
-/// Light institutional footer: Site / Network link columns, cities line, meta row,
-/// and the legal block (copyright + verbatim WCP Inc. trademark line).
-///
-/// **Corrected 2026-07-07**: restructured from the ad-hoc "Catalog" / "Legal &
-/// Policy" columns to the exact two-column **Site / Network** pattern verified
-/// live on `home.pointsav.com` (`m-footer__columns`, `Site` + `Network` nav) —
-/// operator-confirmed. Site = this site's own pages; Network = links out to the
-/// other PointSav/Woodfine properties. External links carry `target="_blank"`,
-/// `rel="noopener"`, an `↗` glyph, and an `"(opens in new tab)"` aria-label
-/// suffix, matching `home.pointsav.com`'s exact external-link pattern verbatim.
+/// Near-black institutional footer: link columns, cities line, meta row, and the
+/// legal block (copyright + verbatim WCP Inc. trademark line).
 ///
 /// Note: the brand lockup reads "PointSav Software" WITHOUT a ™ — that exact string
 /// is not one of the enumerated marks in TRADEMARK.md v1.1, so asserting a mark on
@@ -194,48 +210,20 @@ pub fn footer(surface: SoftwareSurface) -> Markup {
                         }
                     }
                     div."sw-footer__col" {
-                        h2 { "Site" }
+                        h2 { "Catalog" }
                         ul {
                             li { a href="/software" { "Products" } }
-                            li { a href="/pricing" { "Pricing" } }
-                            li { a href="/licensing" { "Licensing" } }
-                            li { a href="/page/contact" { "Contact Us" } }
-                            li { a href="/page/disclaimer" { "Disclaimer" } }
+                            li { a href="/licensing" { "Pricing" } }
+                            li { a href="/licensing" { "Support" } }
                         }
                     }
                     div."sw-footer__col" {
-                        h2 { "Network" }
+                        h2 { "Legal & Policy" }
                         ul {
-                            li {
-                                a href="https://home.pointsav.com/" target="_blank" rel="noopener"
-                                    aria-label="PointSav Digital Systems (opens in new tab)" {
-                                    "PointSav Digital Systems" span."sw-footer__ext" aria-hidden="true" { "\u{2197}" }
-                                }
-                            }
-                            li {
-                                a href="https://documentation.pointsav.com/" target="_blank" rel="noopener"
-                                    aria-label="Documentation (opens in new tab)" {
-                                    "Documentation" span."sw-footer__ext" aria-hidden="true" { "\u{2197}" }
-                                }
-                            }
-                            li {
-                                a href="https://design.pointsav.com/" target="_blank" rel="noopener"
-                                    aria-label="Design System (opens in new tab)" {
-                                    "Design System" span."sw-footer__ext" aria-hidden="true" { "\u{2197}" }
-                                }
-                            }
-                            li {
-                                a href="https://pointsav.com/" target="_blank" rel="noopener"
-                                    aria-label="Newsroom (opens in new tab)" {
-                                    "Newsroom" span."sw-footer__ext" aria-hidden="true" { "\u{2197}" }
-                                }
-                            }
-                            li {
-                                a href="https://home.woodfinegroup.com/" target="_blank" rel="noopener"
-                                    aria-label="Woodfine Capital Projects (opens in new tab)" {
-                                    "Woodfine Capital Projects" span."sw-footer__ext" aria-hidden="true" { "\u{2197}" }
-                                }
-                            }
+                            li { a href="/page/privacy" { "Privacy" } }
+                            li { a href="/page/disclaimer" { "Disclaimer" } }
+                            li { a href="/page/accessibility" { "Accessibility" } }
+                            li { a href="/page/contact" { "Contact us" } }
                         }
                     }
                 }
@@ -269,25 +257,6 @@ pub fn footer(surface: SoftwareSurface) -> Markup {
                     @for (i, c) in surface.cities().iter().enumerate() {
                         @if i > 0 { span aria-hidden="true" { " | " } }
                         span { (c) }
-                    }
-                }
-                // "Powered by" badge — the family's own attribution-mark pattern
-                // (`home.pointsav.com`'s "Powered by MediaKit" / `documentation.
-                // pointsav.com`'s equivalent, verified against their served HTML:
-                // `<a class="m-badge"><span class="m-badge__glyph">…</span>
-                // <span class="m-badge__label">Powered by</span><span
-                // class="m-badge__name">…</span></a>`). This site is credited to
-                // the engine that actually built it, `PrivateGit`
-                // (`app-privategit-source-2` + `app-privategit-marketplace-2`),
-                // linking to its public source the same way the Network column's
-                // own `Source` link does — no dedicated marketing page exists for
-                // it yet, so this reuses the one real, live destination.
-                a."sw-footer__badge" href="https://github.com/pointsav" target="_blank" rel="noopener"
-                    aria-label="Powered by PrivateGit (opens in new tab)" {
-                    span."sw-footer__badge-glyph" aria-hidden="true" { (PreEscaped(BADGE_GLYPH)) }
-                    span."sw-footer__badge-text" {
-                        span."sw-footer__badge-label" { "Powered by" }
-                        span."sw-footer__badge-name" { "PrivateGit" }
                     }
                 }
                 p."sw-footer__meta" {
@@ -428,7 +397,10 @@ mod tests {
 
         // Masthead markers.
         assert!(page.contains("sw-masthead"));
-        assert!(page.contains(SURFACE.home_label()));
+        assert!(page.contains("PointSav"));
+        for l in SURFACE.nav_links() {
+            assert!(page.contains(l.href), "missing nav link {}", l.href);
+        }
 
         // Footer markers: verbatim trademark line, copyright holder, cities.
         assert!(page.contains(SURFACE.trademark_line()));
@@ -437,19 +409,17 @@ mod tests {
             assert!(page.contains(c), "missing footer city {c}");
         }
 
-        // All six canonical TRADEMARK.md §13 marks present (regression guard,
-        // corrected 2026-07-07 — the prior version of this test asserted seven
-        // fabricated marks that have never appeared in TRADEMARK.md at any point in
-        // its history, introduced by a 2026-07-04 "correction" that itself
-        // mis-checked git log. Verified against the current file directly, and
-        // against home.pointsav.com's real live trademark line, not assumed.
+        // All seven canonical TRADEMARK.md marks present (regression guard,
+        // corrected 2026-07-04 — the prior version of this test asserted six
+        // fabricated marks that TRADEMARK.md never actually contained).
         for mark in [
-            "Woodfine Capital Projects\u{2122}",
-            "MCorp\u{2122}",
-            "PointSav Digital Systems\u{2122}",
-            "Totebox Orchestration\u{2122}",
-            "Totebox Archive\u{2122}",
-            "Capability Geometry\u{2122}",
+            "PointSav\u{2122}",
+            "Foundry\u{2122}",
+            "ToteboxOS\u{2122}",
+            "ConsoleOS\u{2122}",
+            "OrchestrationOS\u{2122}",
+            "WorkplaceOS\u{2122}",
+            "WoodfineGroup\u{2122}",
         ] {
             assert!(page.contains(mark), "missing canonical mark {mark}");
         }

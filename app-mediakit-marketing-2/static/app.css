@@ -333,56 +333,6 @@ html:not(.js) .m-drawer-scrim {
   margin: 0;
 }
 
-/* Progressive disclosure for long content-card grids (2026-07-07 mobile
-   redesign) — the "show all N" reveal button. Ships `hidden` in the
-   server-rendered HTML (see card_grid() in ui.rs) and stays that way with
-   no JS: nothing is ever hidden and this dead button never appears, so the
-   page degrades to "everything visible," never to "content missing."
-   app.js un-hides it only on narrow viewports (<500px, where this grid's
-   fluid auto-fit columns are still a single column; at ~497px+ they become
-   2 columns and every card fits) and wires the reveal click. Wider
-   viewports keep every card visible via the grid's existing fluid
-   columns — nothing here ever runs there. */
-.m-card-grid__more {
-  grid-column: 1 / -1;
-  justify-self: center;
-  margin-top: var(--m-space-2);
-  padding: 0.7em 1.6em;
-  border: 1px solid var(--m-border-strong);
-  border-radius: var(--m-radius-control);
-  background: var(--m-card-bg);
-  color: var(--m-ink);
-  font-family: var(--m-font-sans);
-  font-size: var(--m-text-sm);
-  font-weight: var(--m-weight-bold);
-  text-transform: uppercase;
-  letter-spacing: var(--m-label-tracking);
-  cursor: pointer;
-  /* Inline down-chevron (round 11) sits after the "View all" label with a
-     small flex gap, sized to the button's own font via the icon's 1em box
-     below. */
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5em;
-}
-/* `inline-flex` above overrides the browser's default `[hidden] { display:
-   none }` rule, so the server-rendered `hidden` attribute (see comment above)
-   would otherwise stop suppressing the button. Restore the suppression
-   explicitly. */
-.m-card-grid__more[hidden] {
-  display: none;
-}
-.m-card-grid__more:hover,
-.m-card-grid__more:focus-visible {
-  background: var(--m-surface-section);
-}
-.m-card-grid__more-icon {
-  display: block;
-  width: 1em;
-  height: 1em;
-  flex: none;
-}
-
 /* Cross-site handoff card (e.g. Woodfine's "Digital Systems" card pointing
    at home.pointsav.com, or PointSav's "Real Property Infrastructure" card
    pointing at home.woodfinegroup.com) — deliberately NOT styled like the
@@ -445,23 +395,10 @@ html:not(.js) .m-drawer-scrim {
 
 /* Button-style card row (pure-navigation grids — Manifest / BIM Library /
    Location Intelligence, Source / Documentation / Software). Compact,
-   accent-filled, centered — visually distinct from the content cards above.
-
-   Column count fixed 2026-07-07 (operator-approved): `auto-fit,
-   minmax(160px,1fr)` produced a 2-and-1 orphan wrap across the entire
-   375-547px band (measured live) — the exact same failure class already
-   fixed for the icon strip. Same fix: only ever 1 column (mobile) or
-   --m-button-count columns (desktop, the real card count, set inline per-
-   render in ui.rs) — no in-between count, so no algorithmic orphan is
-   possible. */
+   accent-filled, centered — visually distinct from the content cards above. */
 .m-card-grid--buttons {
-  grid-template-columns: repeat(var(--m-button-cols, 1), 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: var(--m-space-3);
-}
-@media (min-width: 700px) {
-  .m-card-grid--buttons {
-    --m-button-cols: var(--m-button-count);
-  }
 }
 .m-card--button {
   background: var(--m-button-card-bg);
@@ -469,11 +406,9 @@ html:not(.js) .m-drawer-scrim {
   border-radius: var(--m-button-card-radius);
   padding: var(--m-button-card-pad);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  gap: var(--m-space-1);
   transition: background var(--m-dur-base) var(--m-ease-standard);
 }
 .m-card--button:hover,
@@ -492,16 +427,6 @@ html:not(.js) .m-drawer-scrim {
 }
 .m-card--button .m-card__link-glyph {
   color: var(--m-button-card-ink);
-}
-/* Editorial caption (2026-07-07, operator-selected over no-caption) — one
-   short line under the label. Body text already renders for any card via
-   card_grid()'s shared body rendering; this just styles it for the
-   filled-accent button context (needs its own contrast, not the plain-card
-   --m-ink-secondary). */
-.m-card--button .m-card__body {
-  font-size: var(--m-text-2xs, 0.6875rem);
-  color: var(--m-button-card-ink);
-  opacity: 0.85;
 }
 .m-card__github-icon {
   display: block;
@@ -545,142 +470,16 @@ html:not(.js) .m-drawer-scrim {
     --m-icon-strip-cols: var(--m-icon-count);
   }
 }
-/* Mobile (<700px): icon-beside-caption, row layout (2026-07-07 mobile
-   redesign). Desktop/tablet (>=700px, round 10 reversal 2026-07-07):
-   icon-on-top, caption-below — the operator reviewed icon-beside-caption
-   live on desktop and asked for the pre-round-7 stacked treatment there
-   while keeping beside-caption for mobile. Same item markup at every
-   breakpoint (icon then caption in DOM order works for both row and
-   column flex-direction) — only this rule's flex-direction/alignment
-   changes; see the >=700px override below. */
 .m-icon-strip__item {
   display: flex;
-  align-items: center;
-  gap: var(--m-icon-strip-text-gap);
-  text-align: left;
-  /* Grid items default to `min-width: auto`, which floors their size at
-     their content's intrinsic min size (here, the widest icon's natural
-     width at the fixed strip height) even when the grid track itself is
-     narrower. At >=700px this item is also a grid cell of
-     `.m-icon-strip__inner`'s `repeat(--m-icon-count, 1fr)` track — without
-     this override, a wide-ratio icon (e.g. ~2:1) can force its track past
-     1fr and overflow the viewport (observed ~700-915px with 4 icons).
-     `min-width: 0` lets the track — and this item — shrink to fit; the
-     icon's own `max-width: 100%` (below) then caps it proportionally. */
-  min-width: 0;
+  justify-content: center;
 }
-@media (min-width: 700px) {
-  .m-icon-strip__item {
-    /* Deliberate layout change at this breakpoint (not just a size change)
-       — unlike the reverted 2026-07-02 two-tier size hack, a visual
-       discontinuity here is expected and correct: row vs. column is a
-       different layout, not a size jump at fixed layout. */
-    flex-direction: column;
-    align-items: center;
-    /* Round 12: anchor the icon to the TOP of the grid cell, not the middle.
-       Grid stretches every cell in the row to the tallest sibling's height;
-       with `justify-content: center` a shorter item (1-line caption) centered
-       its icon+caption block within that stretched cell, pushing its icon DOWN
-       relative to a taller sibling (2-line caption) — an 11px icon-top / title-
-       top Y offset at 1440px even with a now-uniform icon box. flex-start pins
-       the icon to the cell top so row alignment holds regardless of how many
-       lines each caption wraps to. */
-    justify-content: flex-start;
-    text-align: center;
-  }
-  .m-icon-strip__text {
-    /* Un-stretch from the item's new column cross-axis so the caption
-       block shrinks to its own content width instead of spanning the
-       full grid column — matches the reference icon-on-top look instead
-       of a full-width left-edge-to-right-edge text block. */
-    align-items: center;
-    max-width: 32ch;
-  }
-}
-.m-icon-strip__img {
+.m-icon-strip__item img {
   display: block;
-  flex-shrink: 0;
-  /* Round 12 (2026-07-07): UNIFORM fixed box + object-fit: contain.
-     Round 10 retrimmed each of the 7 SVGs to its own tight bounding box, so
-     native aspect ratios now span ~0.81:1 to ~2.02:1. Round 11 sized by a
-     fixed HEIGHT with native-ratio (auto) WIDTH — which preserved each icon's
-     ratio but gave each a DIFFERENT footprint, and that is exactly what the
-     operator flagged as misaligned: different rendered widths make the stacked
-     mobile list ragged (captions start at different X), and different rendered
-     heights make the desktop row uneven (icon tops / caption tops at different
-     Y). The fix, operator-approved to render some icons slightly smaller: give
-     every icon the SAME box — explicit width AND height (both from tokens) —
-     and center the artwork inside it with `object-fit: contain`, which scales
-     the SVG to fit without distortion and letterboxes the leftover space. Now
-     every icon's box is identical at a given breakpoint, so desktop rows align
-     (equal height) and mobile columns align (equal width) by construction.
-     `max-width: 100%` is the overflow guard: in the narrowest desktop grid
-     cells (Woodfine's 4-icon row in the ~700px band) the box width is capped to
-     the 1fr cell width instead of forcing the track wider than the viewport.
-     Because every cell in a `repeat(N, 1fr)` row is equal width, the cap hits
-     all icons identically — the box stays uniform and the row stays aligned;
-     height is never capped, so row-level top/height alignment is unconditional.
-     `min-width: 0` on the item (below) lets the track shrink so the cap can
-     apply. Box ratio (1.3:1) and rationale: see tokens.css --m-icon-strip-width. */
-  width: var(--m-icon-strip-width);
-  height: var(--m-icon-strip-size);
-  max-width: 100%;
-  object-fit: contain;
-  object-position: center;
-  /* Round 15 (2026-07-07): the optional per-icon `scale()` transform (see
-     IconTile::scale, round 13) defaults to scaling from the element's
-     CENTER, which pushes the bottom edge DOWN as well as the top edge up —
-     directly fighting round 14's bottom-anchoring fix. Measured on
-     PointSav's scaled Building Connectivity icon: its actual bottom edge
-     landed ~14-15px lower on the page than its unscaled siblings, despite
-     round 14's alignment fix being otherwise correct. Anchoring the
-     transform origin to the bottom means any scale grows the icon upward
-     from a fixed bottom edge instead, preserving alignment. Harmless when
-     no scale is set (transform-origin has no visible effect without a
-     transform to apply it to). */
-  transform-origin: center bottom;
-}
-@media (min-width: 700px) {
-  .m-icon-strip__img {
-    /* Round 14 (2026-07-07): CASCADE FIX. Round 13 added this exact
-       override but placed it inside the EARLIER `@media (min-width:700px)`
-       block above (the one with `.m-icon-strip__item`/`.m-icon-strip__text`)
-       — since that block appears BEFORE this file's base `.m-icon-strip__img`
-       rule, and both have equal specificity (single class selector), the
-       base rule's unconditional `object-position: center` (just above) won
-       the cascade at every width, silently no-opping the round-13 fix.
-       Confirmed via real pixel measurement (Pillow, not just bounding-box
-       arithmetic) that the ground line was NOT actually aligned live despite
-       round 13's own numeric self-check passing — that check only verified
-       the CSS *should* work per its declared values, not what the browser
-       actually rendered. This rule is placed AFTER the base rule specifically
-       so it wins the cascade at >=700px. See the base rule's comment above
-       for the actual alignment rationale (every Woodfine icon's ground line
-       sits at its own crop's bottom edge; bottom-anchoring here makes every
-       icon's rendered content touch the shared box's bottom edge too,
-       regardless of how much each one letterboxes). Mobile (<700px) keeps
-       the base rule's `center` — no cross-item baseline to align there. */
-    object-position: center bottom;
-  }
-}
-.m-icon-strip__text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--m-space-1);
-  min-width: 0;
-}
-.m-icon-strip__title {
-  margin: 0;
-  font-family: var(--m-font-sans);
-  font-weight: var(--m-weight-bold);
-  font-size: 1rem;
-  color: var(--m-ink);
-}
-.m-icon-strip__body {
-  margin: 0;
-  font-size: var(--m-text-sm);
-  line-height: var(--m-lh-body);
-  color: var(--m-ink-secondary);
+  width: 100%;
+  max-width: var(--m-icon-strip-size);
+  height: auto;
+  aspect-ratio: 1;
 }
 /* Hairline rhythm between stacked mobile items (FABLE audit 2026-07-02) —
    gives the 1-column stack visual separation without new layout logic;
@@ -776,12 +575,6 @@ html:not(.js) .m-drawer-scrim {
   max-width: var(--m-container-max);
   margin-inline: auto;
   display: flex;
-  /* Operator-confirmed fix, 2026-07-07: Site and Network were already
-     side-by-side at every width (contrary to an initial assumption they
-     stacked on mobile) — the real problem was both columns clustering at
-     the left edge with unused space on the right, at mobile AND desktop.
-     One rule serves both breakpoints; no wrap/stacking logic needed. */
-  justify-content: space-between;
   gap: var(--m-footer-col-gap);
   padding-bottom: var(--m-space-8);
 }

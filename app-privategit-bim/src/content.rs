@@ -100,23 +100,13 @@ impl Section {
     /// yet (covers the 4 files added 2026-07-03, before this field existed).
     fn fallback_for_slug(slug: &str) -> Section {
         match slug {
-            "spatial"
-            | "elements"
-            | "systems"
-            | "materials"
-            | "assemblies"
-            | "performance"
-            | "identity-codes"
-            | "relationships"
-            | "professional-office-subtypes"
+            "spatial" | "elements" | "systems" | "materials" | "assemblies" | "performance"
+            | "identity-codes" | "relationships" | "professional-office-subtypes"
             | "building-width-calculator" => Section::Taxonomy,
             "key-plans" | "amenity-key-plan" | "retail-select" | "tech-industrial" | "interior"
             | "furniture" => Section::Objects,
-            "tile-system"
-            | "floor-plate-standards"
-            | "floor-plate-assembly-rules"
-            | "building-grid"
-            | "tenant-mix" => Section::Compositions,
+            "tile-system" | "floor-plate-standards" | "floor-plate-assembly-rules"
+            | "building-grid" | "tenant-mix" => Section::Compositions,
             "climate-zones" | "landscape-parking" | "water-management" => Section::Context,
             _ => Section::Taxonomy,
         }
@@ -183,10 +173,7 @@ fn title_case_slug(slug: &str) -> String {
 /// `$description` as fallback card/intro text and a title-cased slug as
 /// display name — rather than being silently omitted from nav, cards, and
 /// search the way it previously was.
-pub fn load_categories(
-    tokens: &HashMap<String, Value>,
-    site_content_dir: &Path,
-) -> Vec<CategoryMeta> {
+pub fn load_categories(tokens: &HashMap<String, Value>, site_content_dir: &Path) -> Vec<CategoryMeta> {
     let dir = site_content_dir.join("categories");
     let mut sidecars: HashMap<String, (u32, HashMap<String, String>, String)> = HashMap::new();
     match fs::read_dir(&dir) {
@@ -293,18 +280,6 @@ pub struct PageContent {
     pub sections: Vec<PageSection>,
 }
 
-/// Load a `site-content/pages/<name>.md` file as one rendered HTML blob —
-/// no `## ` section splitting, unlike `load_page`. Used for short,
-/// single-paragraph counsel-owned content (the Important Information band)
-/// where the caller supplies its own safe default if the file is absent,
-/// so `None` is a normal case, not an error to eprintln about.
-pub fn load_simple_page(site_content_dir: &Path, name: &str) -> Option<String> {
-    let path = site_content_dir.join("pages").join(format!("{name}.md"));
-    let raw = fs::read_to_string(&path).ok()?;
-    let (_fields, body) = parse_frontmatter(&raw);
-    Some(render_markdown(body.trim()))
-}
-
 /// Load a `site-content/pages/<name>.md` file: a body split on `## `
 /// headings into (heading, rendered-html) sections. Any frontmatter
 /// scalars are parsed and discarded — the last reader of per-field
@@ -345,3 +320,4 @@ pub fn load_page(site_content_dir: &Path, name: &str) -> Option<PageContent> {
 
     Some(PageContent { sections })
 }
+

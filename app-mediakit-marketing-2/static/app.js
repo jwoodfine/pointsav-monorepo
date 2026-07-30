@@ -83,38 +83,3 @@
     reopenAfterPrint = [];
   });
 })();
-
-// Progressive disclosure for long content-card grids (2026-07-07 mobile
-// redesign) -- collapses cards beyond the first 4 on narrow viewports,
-// revealed by the "View all" button. Separate IIFE from the drawer above
-// so it never depends on drawer/scrim elements existing. Only ever runs
-// below 500px: the .m-card-grid's `repeat(auto-fit, minmax(220px, 1fr))`
-// with its fixed gap transitions from 1 column to 2 columns at ~497px
-// viewport width (round 11 measurement), so at 500px+ the grid already
-// renders 2 columns and shows all 8 cards comfortably without collapsing.
-// Below 500px it's a single column, where the collapse earns its keep.
-// (This is independent of the icon strip's own 700px breakpoint — that
-// governs a different band of the page and is intentionally not shared.)
-// Progressive enhancement -- the button ships `hidden` in the server HTML
-// and stays that way if this never runs, so without JS every card is
-// simply visible, never missing.
-(function () {
-  if (!window.matchMedia("(max-width: 499px)").matches) return;
-
-  document.querySelectorAll("[data-m-card-grid-more]").forEach(function (button) {
-    var grid = button.closest(".m-card-grid");
-    if (!grid) return;
-    var extras = grid.querySelectorAll("[data-m-card-extra]");
-    if (!extras.length) return;
-    extras.forEach(function (card) {
-      card.hidden = true;
-    });
-    button.hidden = false;
-    button.addEventListener("click", function () {
-      extras.forEach(function (card) {
-        card.hidden = false;
-      });
-      button.remove();
-    });
-  });
-})();

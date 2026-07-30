@@ -1,6 +1,3 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
-// SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
-
 //! Product detail page — `GET /software/:product_id` (S136, requested by
 //! Command 2026-06-30). One page per catalog entry: BETA badge, tier badge,
 //! platform table, curl install command, version, SHA256, and an optional
@@ -59,23 +56,23 @@ fn product_detail_style() -> Markup {
     let css = r#".sw-pd-wrap{max-width:760px;margin:0 auto;padding:40px 24px 64px;box-sizing:border-box;}
 .sw-pd-card{border:1px solid #e4e7ec;border-radius:10px;padding:28px;background:#fff;box-shadow:0 1px 2px rgba(16,24,40,.04);}
 .sw-pd-id{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;color:#667085;letter-spacing:.02em;}
-.sw-pd-name{font-family:Georgia,"Times New Roman",serif;font-size:28px;line-height:1.2;color:#111827;margin:6px 0 10px;}
+.sw-pd-name{font-family:"Playfair Display",Georgia,serif;font-size:28px;line-height:1.2;color:#111;margin:6px 0 10px;}
 .sw-pd-desc{font-size:14px;line-height:1.6;color:#475467;margin:0 0 20px;max-width:64ch;}
 .sw-pd-badges{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 28px;}
-.sw-pd-h2{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#234ed8;margin:0 0 12px;padding-bottom:6px;border-bottom:1px solid #e4e7ec;}
+.sw-pd-h2{font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:#164679;margin:0 0 12px;padding-bottom:6px;border-bottom:1px solid #e4e7ec;}
 .sw-pd-table{width:100%;border-collapse:collapse;margin:0 0 28px;font-size:13.5px;}
 .sw-pd-table th{text-align:left;color:#667085;font-size:11px;letter-spacing:.06em;text-transform:uppercase;padding:0 0 8px;}
 .sw-pd-table td{padding:8px 0;border-top:1px solid #e4e7ec;color:#344054;}
-.sw-pd-table a{color:#234ed8;font-weight:600;text-decoration:none;}
-.sw-pd-table a:hover{color:#173ab1;}
+.sw-pd-table a{color:#164679;font-weight:600;text-decoration:none;}
+.sw-pd-table a:hover{color:#C7A961;}
 .sw-pd-version{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:13px;color:#344054;margin:0 0 10px;}
 .sw-pd-sha{font-size:12.5px;color:#475467;line-height:1.6;margin:0 0 28px;word-break:break-all;}
 .sw-pd-sha__label{font-weight:600;color:#344054;}
 .sw-pd-sha__value{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
-.sw-pd-sha__fallback{color:#234ed8;}
+.sw-pd-sha__fallback{color:#164679;}
 .sw-pd-back{margin-top:28px;font-size:13px;}
-.sw-pd-back a{color:#234ed8;text-decoration:none;}
-.sw-pd-back a:hover{color:#173ab1;}"#;
+.sw-pd-back a{color:#164679;text-decoration:none;}
+.sw-pd-back a:hover{color:#C7A961;}"#;
     html! { style { (PreEscaped(css)) } }
 }
 

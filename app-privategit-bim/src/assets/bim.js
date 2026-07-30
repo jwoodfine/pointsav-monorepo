@@ -15,15 +15,7 @@ async function navigate(path) {
     const res = await fetch('/fragment' + path, {
       headers: { 'X-Fragment': '1' },
     });
-    if (!res.ok) {
-      // Not every route has a /fragment/* counterpart (e.g. home, /about,
-      // /disclaimers, /search — only tokens/tokens-detail/research do).
-      // A missing fragment used to silently do nothing on click; fall back
-      // to a real navigation instead, same as the network-failure path
-      // below.
-      window.location.href = path;
-      return;
-    }
+    if (!res.ok) return;
     const html = await res.text();
     const main = getMain();
     if (main) {
@@ -117,27 +109,6 @@ document.addEventListener('click', (e) => {
 });
 
 syncThemeControls(document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
-
-// ── Force Important Information open when printing ─────────────────────────
-// A CSS-only `display: block !important` on the closed <details> body is not
-// reliable across Chromium's print-to-PDF path (verified: getComputedStyle
-// reports the body as visible/non-zero-height under print media, but the
-// actual PDF output omits it) — so open the element for real via the DOM
-// attribute, which every engine honors, and restore whatever state the
-// reader had it in afterward.
-let disclosureWasOpen = null;
-window.addEventListener('beforeprint', () => {
-  const details = document.querySelector('.bim-disclosure__details');
-  if (!details) return;
-  disclosureWasOpen = details.open;
-  details.open = true;
-});
-window.addEventListener('afterprint', () => {
-  const details = document.querySelector('.bim-disclosure__details');
-  if (!details || disclosureWasOpen === null) return;
-  details.open = disclosureWasOpen;
-  disclosureWasOpen = null;
-});
 
 // ── SSE hot-reload ──────────────────────────────────────────────────────────
 

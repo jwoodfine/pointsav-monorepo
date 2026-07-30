@@ -3,18 +3,30 @@
 
 use axum::{
     extract::{Path, State},
-    response::{IntoResponse, Redirect, Response},
+    http::HeaderMap,
+    response::{Html, IntoResponse, Response},
 };
 use std::io::Write;
 use zip::{write::FileOptions, CompressionMethod, ZipWriter};
 
-use crate::state::AppState;
+use crate::{render, state::AppState};
 
-/// `/furniture` is now folded into the unified home catalog's Objects tab.
-/// Redirect legacy links/bookmarks to `/` (302). The download and bundle
-/// sub-routes below are unchanged.
-pub async fn furniture_handler() -> Redirect {
-    Redirect::to("/")
+pub async fn furniture_handler(headers: HeaderMap, State(state): State<AppState>) -> Html<String> {
+    let content = render::card::render_furniture(&state);
+    if is_fragment(&headers) {
+        Html(content)
+    } else {
+        Html(render::shell::page_shell(
+            "Furniture Library",
+            "/furniture",
+            &content,
+            &state,
+        ))
+    }
+}
+
+pub async fn furniture_fragment(State(state): State<AppState>) -> Html<String> {
+    Html(render::card::render_furniture(&state))
 }
 
 pub async fn bundle_handler(State(state): State<AppState>) -> Response {
@@ -96,4 +108,8 @@ fn build_zip_bundle(dir: &std::path::Path) -> Result<Vec<u8>, Box<dyn std::error
 
     let cursor = zip.finish()?;
     Ok(cursor.into_inner())
+}
+
+fn is_fragment(headers: &HeaderMap) -> bool {
+    headers.get("x-fragment").is_some()
 }

@@ -364,8 +364,34 @@ impl<'a> ApprenticeshipDispatcher<'a> {
             "dispatching shadow brief"
         );
 
-        // Background work: use background slot (respects background_sem cap).
-        let resp = self.doorman.route_local_background(&req).await?;
+        // Background work, isolated from real-time Tier A traffic either way:
+        // Tier::Yoyo goes through route_yoyo_only (no automatic Tier A fallback —
+        // same reasoning as extraction's use of it: a background enrichment pass
+        // must not silently substitute a smaller model when the GPU node is
+        // unavailable; the drain worker's own yoyo_node_ready hold-check already
+        // gates dispatch on Tier B being ready, so reaching here with Tier B down
+        // is a narrow race, not the common case — it surfaces as a normal
+        // TierUnavailable retry, not a LocalSaturated one). Tier::Local keeps using
+        // route_local_background's dedicated background slot (respects
+        // background_sem cap) exactly as before.
+        //
+        // Fixed 2026-07-15 (BRIEF-os-totebox-platform.md, NEXT.md): this used to
+        // call route_local_background unconditionally regardless of tier_hint, so
+        // the drain worker's yoyo_dispatch_label override had no effect — every
+        // shadow-capture dispatch went through Tier A, never Tier B, despite the
+        // surrounding entrypoint.rs comments documenting Tier B enrichment as the
+        // intent.
+        let resp = match tier_hint {
+            Tier::Yoyo => {
+                let label = self
+                    .config
+                    .yoyo_dispatch_label
+                    .as_deref()
+                    .unwrap_or("default");
+                self.doorman.route_yoyo_only(&req, label).await?
+            }
+            _ => self.doorman.route_local_background(&req).await?,
+        };
         let full_content = if resp.content.trim_start().starts_with("---") {
             resp.content.clone()
         } else {
@@ -942,7 +968,7 @@ Bumping MANIFEST.md per ni-51-102 forward-looking marker.
         });
         let doorman = Doorman::new(
             DoormanConfig {
-                local: Some(local),
+                local: Some(local.into()),
                 yoyo: std::collections::HashMap::new(),
                 external: None,
                 lark_validator: None,
@@ -1014,7 +1040,7 @@ I'm not sure how to apply this safely.
         });
         let doorman = Doorman::new(
             DoormanConfig {
-                local: Some(local),
+                local: Some(local.into()),
                 yoyo: std::collections::HashMap::new(),
                 external: None,
                 lark_validator: None,
@@ -1107,10 +1133,11 @@ OK.
         );
         // health_up initialises false (pessimistic); simulate the first
         // successful /health probe so dispatch will route to Tier B.
-        yoyo.health_up.store(true, std::sync::atomic::Ordering::Relaxed);
+        yoyo.health_up
+            .store(true, std::sync::atomic::Ordering::Relaxed);
         let doorman = Doorman::new(
             DoormanConfig {
-                local: Some(local),
+                local: Some(local.into()),
                 yoyo: {
                     let mut m = std::collections::HashMap::new();
                     m.insert("default".to_string(), yoyo);
@@ -1198,7 +1225,7 @@ ok
         });
         let doorman = Doorman::new(
             DoormanConfig {
-                local: Some(local),
+                local: Some(local.into()),
                 yoyo: std::collections::HashMap::new(),
                 external: None,
                 lark_validator: None,
@@ -1288,8 +1315,13 @@ Shadow attempt for the apprentice.
         Mock::given(method("POST"))
             .and(path("/v1/chat/completions"))
             .respond_with(
-                // dispatch_shadow uses route_local_background → complete_inner_streaming
-                // (stream:true), so the mock must return SSE format.
+                // Small body → pick_tier_for_brief returns Tier::Local (see
+                // dispatcher_config's 100-char threshold) → dispatch_shadow's
+                // Tier::Local branch uses route_local_background →
+                // complete_inner_streaming (stream:true), so the mock must return
+                // SSE format. The Tier::Yoyo branch is covered separately by
+                // shadow_large_body_routes_to_tier_b_not_tier_a below, which uses
+                // plain JSON — route_yoyo_only's client.complete() is non-streaming.
                 ResponseTemplate::new(200)
                     .insert_header("content-type", "text/event-stream")
                     .set_body_string(ok_completion_sse(apprentice_response)),
@@ -1304,7 +1336,7 @@ Shadow attempt for the apprentice.
         });
         let doorman = Doorman::new(
             DoormanConfig {
-                local: Some(local),
+                local: Some(local.into()),
                 yoyo: std::collections::HashMap::new(),
                 external: None,
                 lark_validator: None,
@@ -1354,6 +1386,107 @@ Shadow attempt for the apprentice.
         assert!((sc - 0.7).abs() < 1e-3, "got {sc}");
     }
 
+    /// Regression 2026-07-15: dispatch_shadow used to call route_local_background
+    /// unconditionally, ignoring tier_hint entirely — so the drain worker's Tier B
+    /// override (yoyo_dispatch_label + brief_tier_b_threshold_chars=0) had no
+    /// effect and every shadow-capture dispatch went through Tier A. Mirrors
+    /// dispatch_brief's own big_body_routes_to_tier_b test above: a body over the
+    /// (test) 100-char threshold with a yoyo label configured must reach the
+    /// mocked Tier B server, and Tier A must receive zero requests.
+    #[tokio::test]
+    async fn shadow_large_body_routes_to_tier_b_not_tier_a() {
+        let server_a = MockServer::start().await;
+        let server_b = MockServer::start().await;
+
+        let apprentice_response = "\
+---
+self_confidence: 0.6
+escalate: false
+---
+
+## Reasoning
+
+Shadow attempt via Tier B.
+
+## Diff
+
+```diff
+--- a/foo
++++ b/foo
+@@ -1 +1 @@
+-a
++b
+```
+";
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .respond_with(
+                ResponseTemplate::new(200).set_body_json(ok_completion(apprentice_response)),
+            )
+            .expect(1) // Tier B receives the only call
+            .mount(&server_b)
+            .await;
+        // Tier A: not mounted; received_requests asserted to 0 below.
+
+        let local = LocalTierClient::new(LocalTierConfig {
+            endpoint: server_a.uri(),
+            default_model: "olmo-3-1125-7b-q4".into(),
+        });
+        let bearer: Arc<dyn BearerTokenProvider> = Arc::new(StaticBearer::new("test"));
+        let yoyo = YoYoTierClient::new(
+            YoYoTierConfig {
+                endpoint: server_b.uri(),
+                default_model: "Olmo-3-1125-32B-Think".into(),
+                contract_version: crate::YOYO_CONTRACT_VERSION.into(),
+                pricing: PricingConfig::default(),
+                zone: None,
+                health_path: "/health".to_string(),
+            },
+            bearer,
+        );
+        // health_up initialises false (pessimistic); simulate the first
+        // successful /health probe so route_yoyo_only's allow_request() passes.
+        yoyo.health_up
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+        let doorman = Doorman::new(
+            DoormanConfig {
+                local: Some(local.into()),
+                yoyo: {
+                    let mut m = std::collections::HashMap::new();
+                    m.insert("trainer".to_string(), yoyo);
+                    m
+                },
+                external: None,
+                lark_validator: None,
+                graph_context_client: None,
+                tier_a_first: false,
+                daily_yoyo_cap_usd: None,
+                cost_ledger: None,
+            },
+            ledger(),
+        );
+
+        let dir = tmp_dir("shadow-tier-b");
+        let mut cfg = dispatcher_config(dir); // threshold = 100 chars
+        cfg.yoyo_dispatch_label = Some("trainer".to_string());
+
+        let big_body = "x".repeat(150); // 150 + len("TEST") > 100
+        let outcome = ApprenticeshipDispatcher::new(&doorman, cfg)
+            .dispatch_shadow(&brief_for(&big_body), "diff --git a/foo b/foo\n+b\n")
+            .await
+            .expect("shadow tier-B dispatch ok");
+        assert!(!outcome.already_captured);
+
+        let received_a = server_a.received_requests().await.unwrap_or_default();
+        assert_eq!(
+            received_a.len(),
+            0,
+            "dispatch_shadow MUST route the large brief to Tier B, not Tier A"
+        );
+        let received_b = server_b.received_requests().await.unwrap_or_default();
+        assert_eq!(received_b.len(), 1);
+    }
+
     /// Idempotency on retry — same brief_id submitted twice writes
     /// exactly one tuple. The second POST is a no-op (apprentice is
     /// NOT redispatched).
@@ -1379,7 +1512,7 @@ Shadow attempt for the apprentice.
         });
         let doorman = Doorman::new(
             DoormanConfig {
-                local: Some(local),
+                local: Some(local.into()),
                 yoyo: std::collections::HashMap::new(),
                 external: None,
                 lark_validator: None,

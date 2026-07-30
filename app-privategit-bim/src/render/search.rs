@@ -20,10 +20,7 @@ struct Hit {
 /// card.rs::collect_kp_leaves, duplicated rather than shared since search
 /// wants every category file, not just key-plans, and the two callers'
 /// filtering needs are different enough not to force a shared abstraction).
-fn collect_entities<'a>(
-    obj: &'a serde_json::Map<String, Value>,
-    out: &mut Vec<(&'a str, &'a Value)>,
-) {
+fn collect_entities<'a>(obj: &'a serde_json::Map<String, Value>, out: &mut Vec<(&'a str, &'a Value)>) {
     for (key, val) in obj {
         if key == "$description" {
             continue;
@@ -86,9 +83,7 @@ fn highlight_snippet(text: &str, tokens: &[String]) -> String {
     let start = pos.saturating_sub(window);
     let end = (pos + window).min(text.len());
     // Snap to char boundaries.
-    let start = (start..=pos)
-        .find(|i| text.is_char_boundary(*i))
-        .unwrap_or(0);
+    let start = (start..=pos).find(|i| text.is_char_boundary(*i)).unwrap_or(0);
     let end = (end..text.len().min(end + 4))
         .find(|i| text.is_char_boundary(*i))
         .unwrap_or(text.len());
@@ -125,10 +120,7 @@ pub fn render_search_results(query: &str, state: &AppState) -> String {
     let trimmed = query.trim();
     if trimmed.is_empty() {
         return r#"<div class="bim-search-page">
-  <header class="bim-cat-pagehead">
-    <span class="bim-cat-kicker">Catalog search</span>
-    <h1>Search</h1>
-  </header>
+  <h1>Search</h1>
   <p class="bim-empty">Enter a search term above — categories, entity slugs, IFC classes, and research articles are all searched.</p>
 </div>"#
             .to_string();
@@ -252,11 +244,7 @@ pub fn render_search_results(query: &str, state: &AppState) -> String {
         }
     }
 
-    hits.sort_by(|a, b| {
-        b.score
-            .cmp(&a.score)
-            .then_with(|| a.tiebreak.cmp(&b.tiebreak))
-    });
+    hits.sort_by(|a, b| b.score.cmp(&a.score).then_with(|| a.tiebreak.cmp(&b.tiebreak)));
 
     let count = hits.len();
     let mut results_html = String::new();
@@ -282,11 +270,8 @@ pub fn render_search_results(query: &str, state: &AppState) -> String {
 
     format!(
         r#"<div class="bim-search-page">
-  <header class="bim-cat-pagehead">
-    <span class="bim-cat-kicker">Catalog search</span>
-    <h1>Search results</h1>
-    <p class="bim-cat-pagehead__lede">{count} {result_word} for &ldquo;{q}&rdquo;</p>
-  </header>
+  <h1>Search results</h1>
+  <p class="bim-search-page__meta">{count} {result_word} for &ldquo;{q}&rdquo;</p>
   <div class="bim-search-results">{results_html}</div>
 </div>"#,
         count = count,
