@@ -12,6 +12,8 @@ sections:
       PointSav Digital Systems builds customer-controlled software for independent
       property operators. Runs on hardware you control. No per-seat fees.
       No vendor lock-in.
+    cta_label: Explore the Documentation
+    cta_href: https://documentation.pointsav.com/
 
   # Descriptor lines below are DRAFT — the wiki glossary entries for these
   # three terms are mostly placeholder stubs (see round-2 audit); these are
@@ -35,10 +37,6 @@ sections:
         body: >-
           Connects a building's physical systems and sensors so they work
           together.
-        # Round 13 (2026-07-07): this icon's native aspect ratio (~0.81:1,
-        # the narrowest of the 3 PointSav icons) renders it visibly smaller
-        # than its siblings under the shared object-fit:contain box (see
-        # IconTile::scale). A modest scale bump closes that visual gap.
         scale: 1.18
 
   - type: card-grid
@@ -108,13 +106,13 @@ sections:
   # 2026-07-07), not verified against the actual destination pages' own
   # content — see DESIGN-RESEARCH-icon-strip-mobile.draft.md "Round 7"/"8"
   # for the full trail. Review before treating as final.
+  # Documentation removed 2026-07-12: promoted to the hero CTA instead
+  # (operator call) -- having it in both places duplicated the same
+  # destination twice on one page.
   - type: card-grid
-    columns: 3
+    columns: 2
     style: buttons
     cards:
-      - title: Documentation
-        href: https://documentation.pointsav.com/
-        body: Guides and technical references
       - title: Software
         href: https://software.pointsav.com/
         body: Our tools and platforms

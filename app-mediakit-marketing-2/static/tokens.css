@@ -56,7 +56,12 @@
      part of the original locked direction, in favor of full family
      consistency with the wiki. Navy masthead remains the one differentiator
      between marketing's dark-topped chrome and the wiki's all-light chrome. */
-  --m-surface-footer:  #f8f9fa;
+  /* Opus audit 2026-07-13: was #f8f9fa, one RGB count off from
+     --m-surface-page (#f7f9fa) -- the footer had no visible surface
+     separation from the page above it at all. #e6e7e8 (--m-grey-200,
+     already used for the icon-strip section band) gives the footer a
+     real, defined zone. Operator-confirmed over border-only. */
+  --m-surface-footer:  #e6e7e8;
   --m-surface-scrim:   rgba(14, 17, 23, 0.5);
 
   /* ---------------------------------------------------------- semantic: ink
@@ -69,10 +74,16 @@
   --m-ink-muted:            var(--m-ink-500);  /* page/raised ONLY */
   --m-ink-on-chrome:        var(--m-white);        /* 9.6:1 on navy-700 */
   --m-ink-on-chrome-muted:  var(--m-slate-300);    /* 5.4:1 on navy-700 */
-  /* Footer ink — dark text on the light #f8f9fa surface, matching the
-     wiki's own footer ink colors (#54595d workhorse, #646a70 muted). */
-  --m-ink-on-footer:        var(--m-ink-550);   /* 8.1:1 on #f8f9fa */
-  --m-ink-on-footer-muted:  var(--m-ink-525);   /* 6.4:1 on #f8f9fa */
+  /* Footer ink — dark text on the footer surface (--m-surface-footer,
+     #e6e7e8 as of 2026-07-13). --m-ink-on-footer (#54595d) was originally
+     tuned for #f8f9fa (6.72:1 there) and still clears AA on the new
+     surface (5.72:1, precisely computed). --m-ink-on-footer-muted was
+     #646a70 (--m-ink-525, 5.19:1 on the old surface) -- that would drop
+     to 4.42:1 on the new darker surface, FAILING the 4.5:1 AA floor, so
+     it's bumped to --m-ink-600 (#4b5563, 6.1:1 on the new surface)
+     instead of carrying the old value forward unchecked. */
+  --m-ink-on-footer:        var(--m-ink-550);   /* 5.72:1 on #e6e7e8 */
+  --m-ink-on-footer-muted:  var(--m-ink-600);   /* 6.1:1 on #e6e7e8 */
 
   /* ---------------------------------------------------------- semantic: interactive */
   --m-link:            var(--m-navy-700);
@@ -87,6 +98,12 @@
   --m-focus-ring-offset: 2px;
   --m-focus-ring:         var(--m-navy-600);
   --m-focus-ring-on-dark: var(--m-white);
+
+  /* Language switcher — a bordered pill so it reads as a utility control,
+     distinct from plain nav links. Two variants: on dark chrome (masthead)
+     vs. on light surfaces (drawer/footer). */
+  --m-lang-switch-border:       1px solid rgba(255, 255, 255, 0.35);
+  --m-lang-switch-border-light: 1px solid var(--m-border-strong);
 
   /* ---------------------------------------------------------- semantic: border */
   --m-border:        var(--m-grey-200);

@@ -44,14 +44,16 @@ pub fn build_state(cfg: &Config) -> Result<AppState, MarketingError> {
 }
 
 pub fn router(state: AppState, enable_mcp: bool) -> Router {
-    // No /es route for the home page — operator call 2026-07-02 (English
-    // only on the home pages for now). `page.es.yaml` files for `home` stay
-    // on disk, just unrouted, so this is reversible. Other pages
-    // (/page/{slug}) keep their /es/page/{slug} variant where content exists.
+    // /es route for the home page (2026-07-12, reverses the 2026-07-02
+    // "English only on home for now" decision) — the page.es.yaml content
+    // was kept in sync the whole time, just unrouted; this turns it on.
+    // Other pages (/page/{slug}) keep their existing /es/page/{slug}
+    // pattern.
     let mut router = Router::new()
         .route("/healthz", get(healthz))
         .route("/static/{*path}", get(crate::assets::serve))
         .route("/", get(home))
+        .route("/es", get(home_es))
         .route("/page/{slug}", get(page))
         .route("/es/page/{slug}", get(page_es))
         .route("/robots.txt", get(robots_txt))
@@ -74,6 +76,10 @@ async fn healthz() -> &'static str {
 
 async fn home(State(state): State<AppState>) -> Result<Markup, MarketingError> {
     render_slug(&state, "home", None)
+}
+
+async fn home_es(State(state): State<AppState>) -> Result<Markup, MarketingError> {
+    render_slug(&state, "home", Some("es"))
 }
 
 async fn page(
@@ -108,11 +114,12 @@ fn render_slug(
     ))
 }
 
-/// `home` has no `/es` route (operator call 2026-07-02) — every other slug
-/// keeps its `/es/page/{slug}` variant.
+/// `home`'s ES variant lives at `/es` (not `/es/page/home`, since home
+/// itself lives at `/` not `/page/home`) — every other slug uses
+/// `/es/page/{slug}`.
 fn slug_paths(slug: &str) -> (String, Option<String>) {
     if slug == "home" {
-        ("/".to_string(), None)
+        ("/".to_string(), Some("/es".to_string()))
     } else {
         (format!("/page/{slug}"), Some(format!("/es/page/{slug}")))
     }
@@ -134,11 +141,22 @@ async fn sitemap_xml(State(state): State<AppState>) -> Response {
     let mut body = String::from(r#"<?xml version="1.0" encoding="UTF-8"?>"#);
     body.push_str(r#"<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">"#);
     for slug in &slugs {
-        let (en_path, _) = slug_paths(slug);
+        let (en_path, es_path) = slug_paths(slug);
         body.push_str(&format!(
             "<url><loc>{}{}</loc></url>",
             tenant.canonical_base, en_path
         ));
+        // `home` gained its own `/es` route 2026-07-12, so it's included
+        // here like every other slug now (previously excluded because
+        // `es_path` was `None` for it).
+        if let Some(es_path) = es_path {
+            if state.content_dir.join(slug).join("page.es.yaml").is_file() {
+                body.push_str(&format!(
+                    "<url><loc>{}{}</loc></url>",
+                    tenant.canonical_base, es_path
+                ));
+            }
+        }
     }
     body.push_str("</urlset>");
     (

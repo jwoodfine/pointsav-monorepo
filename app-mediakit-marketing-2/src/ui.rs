@@ -121,8 +121,13 @@ pub struct Tenant {
     pub og_site_name: &'static str,
     /// schema.org `@type` for the root LD+JSON block.
     pub ld_json_type: &'static str,
-    /// Site-level description used in LD+JSON when a page has none.
+    /// Site-level description used in LD+JSON when a page has none, and
+    /// (2026-07-13) the footer brand-tagline. English.
     pub ld_json_description: &'static str,
+    /// Spanish counterpart of `ld_json_description` — same canonical
+    /// source as the home page's own `description:` field (2026-07-13,
+    /// fixes the footer tagline rendering English text on /es pages).
+    pub ld_json_description_es: &'static str,
 }
 
 impl Tenant {
@@ -137,13 +142,25 @@ impl Tenant {
             // instead, which is the actual 1-tap mobile fast path — FABLE
             // nav-priority audit 2026-07-02. "Projects" moved OUT of here
             // (into the button row) to avoid re-creating a duplication.
+            // Product destinations promoted into primary nav 2026-07-11 —
+            // reverses the 2026-07-02 "credibility layer" decision after a
+            // Fable review of the actual live screenshots found the button
+            // row (the thing that decision relied on as "the real 1-tap
+            // fast path") sits below the hero, icon strip, and 8 feature
+            // cards — several scrolls down, not 1-tap at all — and the
+            // mobile drawer was left holding only 3 items floating in a
+            // mostly-empty panel. Corporate demoted to footer-only (lowest-
+            // intent destination, already reachable via footer_network).
             nav_links: vec![
-                NavLink::external("Corporate", "Corporativo", "https://corporate.woodfinegroup.com/"),
-                // Restored 2026-07-02 — present on the retired production
-                // site's masthead nav, dropped when this chrome was rebuilt.
+                NavLink::external("Projects", "Proyectos", "https://projects.woodfinegroup.com/"),
+                NavLink::external("BIM Library", "Biblioteca BIM", "https://bim.woodfinegroup.com/"),
+                NavLink::external("Location Intelligence", "Inteligencia de Localización", "https://gis.woodfinegroup.com/"),
                 NavLink::external("Newsroom", "Sala de prensa", "https://woodfinegroup.com/"),
                 NavLink::internal("Contact Us", "Contáctenos", "/page/contact"),
-                NavLink::internal("Disclaimer", "Aviso legal", "/page/disclaimer"),
+                // Disclaimer removed from primary nav 2026-07-11 (audit
+                // finding) — legal pages conventionally live in the footer
+                // only, and it already does (see footer_nav below); giving
+                // it a primary-nav slot over product links was unusual IA.
             ],
             footer_nav: vec![
                 NavLink::internal("Contact Us", "Contáctenos", "/page/contact"),
@@ -156,11 +173,15 @@ impl Tenant {
             // FABLE nav-priority audit 2026-07-02. Hrefs duplicated from
             // content/home/page.yaml's button-row cards by necessity (footer
             // nav is tenant-wide Rust config, not per-page content).
+            // Projects/BIM Library removed 2026-07-13 (Opus audit) -- both
+            // duplicated the button-row cards ~200px away on the home
+            // page, undercutting the buttons' role as primary CTAs.
+            // Location Intelligence stays: it graduated to the hero CTA
+            // (a different UI slot, not the button row), so it's not the
+            // same class of duplication the audit flagged.
             footer_network: vec![
                 NavLink::external("Corporate", "Corporativo", "https://corporate.woodfinegroup.com/"),
                 NavLink::external("Newsroom", "Sala de prensa", "https://woodfinegroup.com/"),
-                NavLink::external("Projects", "Proyectos", "https://projects.woodfinegroup.com/"),
-                NavLink::external("BIM Library", "Biblioteca BIM", "https://bim.woodfinegroup.com/"),
                 NavLink::external("Location Intelligence", "Inteligencia de Localización", "https://gis.woodfinegroup.com/"),
                 NavLink::external("Manifest", "Manifiesto", "https://github.com/woodfine/woodfine-fleet-deployment"),
             ],
@@ -283,6 +304,11 @@ impl Tenant {
             ld_json_type: "Organization",
             ld_json_description: "A real property developer with more than 35 years\u{2019} \
                 experience in the procurement, development, and management of real property.",
+            // Same canonical translation as content/home/page.es.yaml's
+            // own `description:` field.
+            ld_json_description_es: "Una empresa de desarrollo inmobiliario con m\u{e1}s de 35 \
+                a\u{f1}os de experiencia en la adquisici\u{f3}n, desarrollo y gesti\u{f3}n de \
+                inmuebles.",
         }
     }
 
@@ -291,22 +317,24 @@ impl Tenant {
             module_id: "pointsav",
             site_title: "PointSav Digital Systems",
             wordmark_label: "PointSav Digital Systems",
-            // Masthead/drawer nav = credibility layer. Documentation and
-            // Software moved OUT of here (into the button row, the real
-            // 1-tap mobile fast path) — they used to appear in BOTH the
-            // masthead and the button row, an unflagged duplication FABLE's
-            // nav-priority audit caught 2026-07-02.
+            // Product destinations promoted into primary nav 2026-07-11 —
+            // reverses the 2026-07-02 "credibility layer" decision after a
+            // Fable review of the actual live screenshots found the button
+            // row (the thing that decision relied on as "the real 1-tap
+            // fast path") sits below the hero, icon strip, and 8 feature
+            // cards — several scrolls down, not 1-tap at all — and the
+            // mobile drawer was left holding only 3 items floating in a
+            // mostly-empty panel.
             nav_links: vec![
-                NavLink::external(
-                    "Design System",
-                    "Sistema de diseño",
-                    "https://design.pointsav.com/",
-                ),
-                // Restored 2026-07-02 — present on the retired production
-                // site's masthead nav, dropped when this chrome was rebuilt.
+                NavLink::external("Documentation", "Documentación", "https://documentation.pointsav.com/"),
+                NavLink::external("Software", "Software", "https://software.pointsav.com/"),
+                NavLink::external("Design System", "Sistema de diseño", "https://design.pointsav.com/"),
                 NavLink::external("Newsroom", "Sala de prensa", "https://pointsav.com/"),
                 NavLink::internal("Contact Us", "Contáctenos", "/page/contact"),
-                NavLink::internal("Disclaimer", "Aviso legal", "/page/disclaimer"),
+                // Disclaimer removed from primary nav 2026-07-11 (audit
+                // finding) — legal pages conventionally live in the footer
+                // only, and it already does (see footer_nav below); giving
+                // it a primary-nav slot over product links was unusual IA.
             ],
             footer_nav: vec![
                 NavLink::internal("Contact Us", "Contáctenos", "/page/contact"),
@@ -316,20 +344,24 @@ impl Tenant {
             // Full external-destination list (masthead + button-row items
             // combined), same rationale as Woodfine's — FABLE nav-priority
             // audit 2026-07-02.
+            // Software/Source removed 2026-07-13 (Opus audit) -- both
+            // duplicated the button-row cards ~200px away on the home
+            // page, undercutting the buttons' role as primary CTAs.
+            // Documentation stays: it graduated to the hero CTA (a
+            // different UI slot, not the button row), so it's not the
+            // same class of duplication the audit flagged.
             footer_network: vec![
                 NavLink::external(
                     "Documentation",
                     "Documentación",
                     "https://documentation.pointsav.com/",
                 ),
-                NavLink::external("Software", "Software", "https://software.pointsav.com/"),
                 NavLink::external(
                     "Design System",
                     "Sistema de diseño",
                     "https://design.pointsav.com/",
                 ),
                 NavLink::external("Newsroom", "Sala de prensa", "https://pointsav.com/"),
-                NavLink::external("Source", "Código fuente", "https://github.com/pointsav"),
             ],
             // Berlin dropped 2026-07-02 per operator call (production has it,
             // but the operator wants it off both sites going forward).
@@ -479,6 +511,10 @@ impl Tenant {
             ld_json_type: "SoftwareApplication",
             ld_json_description: "A fully transferable data management platform for the \
                 procurement, development, and management of real properties.",
+            // Same canonical translation as content-pointsav/home/page.es.yaml's
+            // own `description:` field.
+            ld_json_description_es: "Una plataforma de gesti\u{f3}n de datos totalmente \
+                transferible para la adquisici\u{f3}n, desarrollo y gesti\u{f3}n de inmuebles.",
         }
     }
 
@@ -518,7 +554,39 @@ fn render_nav(links: &[NavLink], class: &str, aria_label: &str, lang: &str) -> M
     }
 }
 
-fn masthead(tenant: &Tenant, lang: &str) -> Markup {
+/// EN/ES switcher — a single link labeled in the *destination* language's
+/// own name ("Español" on an English page, "English" on a Spanish page),
+/// not "EN | ES" codes or flags. Flags name countries, not languages (the
+/// most common failure mode); native-language labeling is what a stranded
+/// reader actually recognizes. `None` when `es_path` is `None` (home has no
+/// `/es` route by design) — the switcher is simply absent there, not
+/// disabled or greyed out. `lang`/`hreflang` on the link (not just visible
+/// text) so a screen reader pronounces the label in its own language and
+/// announces the destination language per WCAG 3.1.2.
+fn lang_switch(lang: &str, en_path: &str, es_path: Option<&str>) -> Option<Markup> {
+    let es = es_path?;
+    let (href, target_lang, label) = if lang == "es" {
+        (en_path, "en", "English")
+    } else {
+        (es, "es", "Español")
+    };
+    // aria-label carries the accessible name unconditionally (2026-07-13):
+    // the masthead variant hides .m-lang-switch__label's text below the
+    // 60rem nav breakpoint (crowded the hamburger out of the viewport
+    // otherwise -- see app.css), so the visible text can no longer be
+    // relied on as the anchor's accessible name at every width.
+    Some(html! {
+        a.m-lang-switch href=(href) lang=(target_lang) hreflang=(target_lang) rel="alternate" aria-label=(label) {
+            svg.m-lang-switch__glyph viewBox="0 0 24 24" aria-hidden="true" {
+                path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+                    d="M12 3a9 9 0 100 18 9 9 0 000-18zM3 12h18M12 3c2.5 2.6 3.75 5.6 3.75 9S14.5 18.4 12 21c-2.5-2.6-3.75-5.6-3.75-9S9.5 5.6 12 3z";
+            }
+            span.m-lang-switch__label { (label) }
+        }
+    })
+}
+
+fn masthead(tenant: &Tenant, lang: &str, en_path: &str, es_path: Option<&str>) -> Markup {
     let nav_landmark = t(lang, "Primary", "Principal");
     let open_menu = t(lang, "Open menu", "Abrir menú");
     html! {
@@ -527,21 +595,33 @@ fn masthead(tenant: &Tenant, lang: &str) -> Markup {
                 (tenant.site_title)
             }
             (render_nav(&tenant.nav_links, "m-masthead__nav", nav_landmark, lang))
-            button.m-masthead__burger
-                type="button"
-                aria-label=(open_menu)
-                aria-expanded="false"
-                aria-controls="m-drawer"
-                data-m-drawer-toggle {
-                span.m-masthead__burger-bar {}
-                span.m-masthead__burger-bar {}
-                span.m-masthead__burger-bar {}
+            // Switch + burger grouped in one wrapper (2026-07-13) so they
+            // always move and right-align together as a unit, whether
+            // they land on the same line as the wordmark or wrap to their
+            // own line below it -- two independently-auto-margined
+            // siblings could end up visually separated (burger stranded
+            // at the far left alone) depending on exactly how the row
+            // wrapped. See .m-masthead__controls in app.css.
+            div.m-masthead__controls {
+                @if let Some(switch) = lang_switch(lang, en_path, es_path) {
+                    (switch)
+                }
+                button.m-masthead__burger
+                    type="button"
+                    aria-label=(open_menu)
+                    aria-expanded="false"
+                    aria-controls="m-drawer"
+                    data-m-drawer-toggle {
+                    span.m-masthead__burger-bar {}
+                    span.m-masthead__burger-bar {}
+                    span.m-masthead__burger-bar {}
+                }
             }
         }
     }
 }
 
-fn drawer(tenant: &Tenant, lang: &str) -> Markup {
+fn drawer(tenant: &Tenant, lang: &str, en_path: &str, es_path: Option<&str>) -> Markup {
     let dialog_label = t(lang, "Site navigation", "Navegación del sitio");
     let close_menu = t(lang, "Close menu", "Cerrar menú");
     let nav_landmark = t(lang, "Mobile", "Móvil");
@@ -555,6 +635,9 @@ fn drawer(tenant: &Tenant, lang: &str) -> Markup {
                 }
             }
             (render_nav(&tenant.nav_links, "m-drawer__nav", nav_landmark, lang))
+            @if let Some(switch) = lang_switch(lang, en_path, es_path) {
+                (switch)
+            }
         }
     }
 }
@@ -566,6 +649,17 @@ fn footer(tenant: &Tenant, lang: &str) -> Markup {
     let network_landmark = t(lang, "Network", "Red");
     html! {
         footer.m-footer {
+            // Brand re-anchor (2026-07-12, operator reference: software.
+            // pointsav.com marketplace footer) — repeats the site name +
+            // a stable one-line description at the top of the footer, so
+            // brand identity doesn't just vanish once the masthead has
+            // scrolled off-screen. Reuses ld_json_description rather than
+            // inventing separate footer copy — it's already the canonical
+            // site-level tagline sentence (also used in the JSON-LD block).
+            div.m-footer__brand {
+                p.m-footer__brand-name { (tenant.wordmark_label) }
+                p.m-footer__brand-tagline { (t(lang, tenant.ld_json_description, tenant.ld_json_description_es)) }
+            }
             div.m-footer__columns {
                 div.m-footer__col {
                     p.m-footer__col-title { (site_col_title) }
@@ -598,12 +692,52 @@ fn footer(tenant: &Tenant, lang: &str) -> Markup {
                     }
                 }
             }
+            // Persistent one-line disclaimer — moved 2026-07-12 (operator
+            // reference: software.pointsav.com marketplace footer) to sit
+            // directly under the accordion, not down between copyright and
+            // trademark. Always visible regardless of whether the
+            // accordion above is open or collapsed, so a screenshot or
+            // print is never bare of any disclosure at all. Same wording
+            // register the sibling knowledge wikis already ship
+            // (project-knowledge relay, 2026-07-02, "Apollo Academy"
+            // pattern) — one legal voice across the site family. Only
+            // rendered if there's an accordion above to point to.
+            @if !tenant.disclosure_slots.is_empty() {
+                p.m-footer__notice {
+                    (t(
+                        lang,
+                        "Provided for information only — not an offer, solicitation, or advice. See Important information above.",
+                        "Proporcionado únicamente con fines informativos — no constituye una oferta, solicitud ni asesoramiento. Consulte Información importante arriba.",
+                    ))
+                }
+            }
             div.m-footer__base {
                 div.m-footer__meta {
                     div.m-footer__cities {
                         @for (i, city) in tenant.cities.iter().enumerate() {
                             @if i > 0 { span aria-hidden="true" { " | " } }
                             span { (city) }
+                        }
+                    }
+                    // Badge moved here 2026-07-12 (operator reference:
+                    // software.pointsav.com marketplace footer) — was a
+                    // sibling of .m-footer__meta at the very end of the
+                    // footer, which meant it wrapped to its own left-
+                    // aligned row below all the legal text on mobile.
+                    // Right after cities, right-aligned, matches the
+                    // reference footer's order exactly.
+                    div.m-footer__badges {
+                        a.m-badge href="/page/mediakit" {
+                            span.m-badge__glyph aria-hidden="true" {
+                                svg viewBox="0 0 24 24" width="15" height="15" {
+                                    path fill="currentColor"
+                                        d="M3 5.5A1.5 1.5 0 0 1 4.5 4h15A1.5 1.5 0 0 1 21 5.5v13A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5v-13zM6 8v8l3.2-2.4L6 8zm7 6.5h5V13h-5v1.5zm0-3h5V10h-5v1.5z" {}
+                                }
+                            }
+                            span.m-badge__text {
+                                span.m-badge__label { (t(lang, "Powered by", "Desarrollado con")) }
+                                span.m-badge__name { "MediaKit" }
+                            }
                         }
                     }
                     p.m-footer__copyright {
@@ -615,47 +749,16 @@ fn footer(tenant: &Tenant, lang: &str) -> Markup {
                         // (flagged 2026-07-02, reconciled in favor of TRADEMARK.md).
                         "\u{00a9} 2026 " (tenant.copyright_holder) " " (t(lang, "All rights reserved.", "Todos los derechos reservados."))
                     }
-                    // Persistent one-line disclaimer — always visible regardless of
-                    // whether the "Important information" accordion above is open or
-                    // collapsed, so a screenshot or print of the page is never bare
-                    // of any disclosure at all. Same wording register the sibling
-                    // knowledge wikis already ship (project-knowledge relay,
-                    // 2026-07-02, "Apollo Academy" pattern) — one legal voice across
-                    // the site family. Only rendered if there's an accordion above to
-                    // point to.
-                    @if !tenant.disclosure_slots.is_empty() {
-                        p.m-footer__notice {
-                            (t(
-                                lang,
-                                "Provided for information only — not an offer, solicitation, or advice. See Important information above.",
-                                "Proporcionado únicamente con fines informativos — no constituye una oferta, solicitud ni asesoramiento. Consulte Información importante arriba.",
-                            ))
-                        }
-                    }
                     // Trademark line: same pending-professional-translation note as the
                     // disclosure slots above — verbatim legal text, not machine-localized.
                     p.m-footer__trademark { (tenant.trademark_line) }
-                }
-                div.m-footer__badges {
-                    a.m-badge href="/page/mediakit" {
-                        span.m-badge__glyph aria-hidden="true" {
-                            svg viewBox="0 0 24 24" width="15" height="15" {
-                                path fill="currentColor"
-                                    d="M3 5.5A1.5 1.5 0 0 1 4.5 4h15A1.5 1.5 0 0 1 21 5.5v13A1.5 1.5 0 0 1 19.5 20h-15A1.5 1.5 0 0 1 3 18.5v-13zM6 8v8l3.2-2.4L6 8zm7 6.5h5V13h-5v1.5zm0-3h5V10h-5v1.5z" {}
-                            }
-                        }
-                        span.m-badge__text {
-                            span.m-badge__label { (t(lang, "Powered by", "Desarrollado con")) }
-                            span.m-badge__name { "MediaKit" }
-                        }
-                    }
                 }
             }
         }
     }
 }
 
-fn hero(section_headline: &str, section_subhead: Option<&str>) -> Markup {
+fn hero(section_headline: &str, section_subhead: Option<&str>, cta: Option<(&str, &str)>) -> Markup {
     html! {
         section.m-hero {
             div.m-hero__inner {
@@ -663,7 +766,32 @@ fn hero(section_headline: &str, section_subhead: Option<&str>) -> Markup {
                 @if let Some(sub) = section_subhead {
                     p.m-hero__subhead { (sub) }
                 }
+                @if let Some((label, href)) = cta {
+                    (hero_cta(label, href))
+                }
             }
+        }
+    }
+}
+
+/// Primary hero CTA — audit finding 2026-07-11: neither home page had any
+/// CTA in the hero, so the visitor's obvious next step was missing exactly
+/// where intent is highest. Reuses `is_external`/`is_github` (the same
+/// external-link detection `card_link` uses) since PointSav's destination
+/// is off-site (software.pointsav.com) while Woodfine's is internal
+/// (/page/contact).
+fn hero_cta(label: &str, href: &str) -> Markup {
+    html! {
+        @if is_external(href) {
+            a.m-hero__cta href=(href) target="_blank" rel="noopener" aria-label={ (label) " (opens in new tab)" } {
+                @if is_github(href) {
+                    (github_icon())
+                }
+                (label)
+                span.m-card__link-glyph aria-hidden="true" { "\u{2197}" }
+            }
+        } @else {
+            a.m-hero__cta href=(href) { (label) }
         }
     }
 }
@@ -863,7 +991,11 @@ fn prose(body: &str) -> Markup {
 
 fn render_section(section: &Section, seen_h1: &mut bool) -> Markup {
     match section {
-        Section::Hero { headline, subhead } => {
+        Section::Hero { headline, subhead, cta_label, cta_href } => {
+            let cta = match (cta_label, cta_href) {
+                (Some(label), Some(href)) => Some((label.as_str(), href.as_str())),
+                _ => None,
+            };
             let markup = if *seen_h1 {
                 // WCAG: exactly one <h1> per page. A second hero section
                 // (none currently exist, but content is data — guard anyway)
@@ -875,12 +1007,15 @@ fn render_section(section: &Section, seen_h1: &mut bool) -> Markup {
                             @if let Some(sub) = subhead {
                                 p.m-hero__subhead { (sub) }
                             }
+                            @if let Some((label, href)) = cta {
+                                (hero_cta(label, href))
+                            }
                         }
                     }
                 }
             } else {
                 *seen_h1 = true;
-                hero(headline, subhead.as_deref())
+                hero(headline, subhead.as_deref(), cta)
             };
             markup
         }
@@ -899,9 +1034,11 @@ fn render_section(section: &Section, seen_h1: &mut bool) -> Markup {
 ///
 /// `en_path` is the page's English path (e.g. `/page/contact`). `es_path` is
 /// its Spanish variant path if one is actually routed (`None` means this
-/// page has no `/es` route — e.g. `home`, operator call 2026-07-02 — and no
-/// `hreflang="es"`/`x-default` alternate is emitted for it). `google_verify`
-/// comes from `SERVICE_MARKETING_GOOGLE_VERIFY` at startup, per-instance.
+/// page has no `/es` route and no `hreflang="es"`/`x-default` alternate is
+/// emitted for it — every current slug, including `home` as of 2026-07-12,
+/// has one; `None` stays supported for any future page that genuinely
+/// lacks Spanish content). `google_verify` comes from
+/// `SERVICE_MARKETING_GOOGLE_VERIFY` at startup, per-instance.
 pub fn page_shell(
     tenant: &Tenant,
     page: &Page,
@@ -917,6 +1054,14 @@ pub fn page_shell(
     // once the favicon already carries tenant identity). Same
     // empty-means-fall-back-to-tenant-default pattern already used for
     // page.description a few lines below.
+    // Reverted 2026-07-12: a same-day pipe-format experiment ("PointSav |
+    // Home") was tried and then superseded by Command's ratified cross-
+    // family tab-title standard (ratified off this same footer audit,
+    // already sent to project-software/newsroom/design/bim/knowledge/gis
+    // using this exact em-dash pattern as the reference) -- operator chose
+    // to follow Command's standard rather than keep the one-off pipe
+    // variant. Back to the original: bare site name on the home page, "
+    // {Page} — {Site}" em dash on sub-pages.
     let page_title = if page.title.is_empty() {
         tenant.site_title.to_string()
     } else {
@@ -931,7 +1076,7 @@ pub fn page_shell(
     let en_url = format!("{}{}", tenant.canonical_base, en_path);
     let es_url = es_path.map(|p| format!("{}{}", tenant.canonical_base, p));
     let ld_description = if page.description.is_empty() {
-        tenant.ld_json_description
+        t(&page.lang, tenant.ld_json_description, tenant.ld_json_description_es)
     } else {
         page.description.as_str()
     };
@@ -974,14 +1119,14 @@ pub fn page_shell(
             }
             body {
                 a.m-skiplink href="#m-main" { (t(&page.lang, "Skip to content", "Saltar al contenido")) }
-                (masthead(tenant, &page.lang))
+                (masthead(tenant, &page.lang, en_path, es_path))
                 main #m-main {
                     @for section in &page.sections {
                         (render_section(section, &mut seen_h1))
                     }
                 }
                 (footer(tenant, &page.lang))
-                (drawer(tenant, &page.lang))
+                (drawer(tenant, &page.lang, en_path, es_path))
                 script src="/static/app.js" {}
             }
         }
@@ -1055,6 +1200,71 @@ sections:
     }
 
     #[test]
+    fn hero_renders_cta_when_both_label_and_href_present() {
+        let dir = tempfile::tempdir().unwrap();
+        let page_dir = dir.path().join("home");
+        std::fs::create_dir_all(&page_dir).unwrap();
+        std::fs::write(
+            page_dir.join("page.yaml"),
+            r#"
+title: Home
+slug: home
+description: Test.
+sections:
+  - type: hero
+    headline: Headline
+    cta_label: Contact Us
+    cta_href: /page/contact
+"#,
+        )
+        .unwrap();
+        let page = load_page(dir.path(), "home", None).unwrap();
+        let html = page_shell(&Tenant::woodfine(), &page, "woodfine", "/", Some("/es"), None).into_string();
+        assert!(html.contains(r#"class="m-hero__cta" href="/page/contact""#));
+        assert!(html.contains("Contact Us"));
+    }
+
+    #[test]
+    fn hero_cta_gets_external_link_affordance() {
+        let dir = tempfile::tempdir().unwrap();
+        let page_dir = dir.path().join("home");
+        std::fs::create_dir_all(&page_dir).unwrap();
+        std::fs::write(
+            page_dir.join("page.yaml"),
+            r#"
+title: Home
+slug: home
+description: Test.
+sections:
+  - type: hero
+    headline: Headline
+    cta_label: Explore the Software
+    cta_href: https://software.pointsav.com/
+"#,
+        )
+        .unwrap();
+        let page = load_page(dir.path(), "home", None).unwrap();
+        let html = page_shell(&Tenant::pointsav(), &page, "pointsav", "/", Some("/es"), None).into_string();
+        assert!(html.contains(r#"target="_blank""#));
+        assert!(html.contains("m-card__link-glyph"));
+    }
+
+    #[test]
+    fn hero_omits_cta_when_label_or_href_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let page_dir = dir.path().join("home");
+        std::fs::create_dir_all(&page_dir).unwrap();
+        std::fs::write(
+            page_dir.join("page.yaml"),
+            "title: Home\nslug: home\ndescription: Test.\nsections:\n  - type: hero\n    headline: Headline\n",
+        )
+        .unwrap();
+        let page = load_page(dir.path(), "home", None).unwrap();
+        let html = page_shell(&Tenant::woodfine(), &page, "woodfine", "/", Some("/es"), None).into_string();
+        assert!(!html.contains("m-hero__cta"));
+    }
+
+    #[test]
     fn page_shell_has_no_bundler_dom_swap_pattern() {
         let dir = tempfile::tempdir().unwrap();
         let page_dir = dir.path().join("home");
@@ -1081,10 +1291,56 @@ sections:
     }
 
     #[test]
+    fn lang_switch_absent_when_no_es_route_exists() {
+        // home has no /es route by design — the switcher must not render at
+        // all, not render disabled/greyed out.
+        assert!(lang_switch("en", "/", None).is_none());
+    }
+
+    #[test]
+    fn lang_switch_on_english_page_links_to_spanish_with_native_label() {
+        let html = lang_switch("en", "/page/contact", Some("/es/page/contact"))
+            .unwrap()
+            .into_string();
+        assert!(html.contains(r#"href="/es/page/contact""#));
+        assert!(html.contains(r#"lang="es""#));
+        assert!(html.contains(r#"hreflang="es""#));
+        assert!(html.contains("Español"));
+        // Not "EN | ES" codes, not a flag — native-language labeling only.
+        assert!(!html.contains("EN"));
+    }
+
+    #[test]
+    fn lang_switch_on_spanish_page_links_back_to_english_preserving_slug() {
+        let html = lang_switch("es", "/page/contact", Some("/es/page/contact"))
+            .unwrap()
+            .into_string();
+        assert!(html.contains(r#"href="/page/contact""#));
+        assert!(html.contains(r#"lang="en""#));
+        assert!(html.contains("English"));
+    }
+
+    #[test]
+    fn masthead_and_drawer_include_lang_switch_when_es_route_exists() {
+        let masthead_html = masthead(&Tenant::woodfine(), "en", "/page/contact", Some("/es/page/contact")).into_string();
+        assert!(masthead_html.contains("m-lang-switch"));
+        let drawer_html = drawer(&Tenant::woodfine(), "en", "/page/contact", Some("/es/page/contact")).into_string();
+        assert!(drawer_html.contains("m-lang-switch"));
+    }
+
+    #[test]
+    fn masthead_and_drawer_omit_lang_switch_on_home() {
+        let masthead_html = masthead(&Tenant::woodfine(), "en", "/", None).into_string();
+        assert!(!masthead_html.contains("m-lang-switch"));
+        let drawer_html = drawer(&Tenant::woodfine(), "en", "/", None).into_string();
+        assert!(!drawer_html.contains("m-lang-switch"));
+    }
+
+    #[test]
     fn masthead_has_no_search_bar() {
         // Per DESIGN-SYSTEM.md: marketing has no search corpus, so unlike
         // the wiki masthead there is deliberately no search input here.
-        let html = masthead(&Tenant::woodfine(), "en").into_string();
+        let html = masthead(&Tenant::woodfine(), "en", "/page/contact", Some("/es/page/contact")).into_string();
         assert!(!html.contains(r#"type="search""#));
         assert!(!html.contains("role=\"search\""));
     }
@@ -1120,7 +1376,7 @@ sections:
     fn drawer_root_is_not_a_nav_element() {
         // axe-core aria-allowed-role: role="dialog" is not permitted on a
         // <nav> (a navigation landmark can't also be a dialog widget).
-        let html = drawer(&Tenant::woodfine(), "en").into_string();
+        let html = drawer(&Tenant::woodfine(), "en", "/page/contact", Some("/es/page/contact")).into_string();
         assert!(html.contains(r#"role="dialog""#));
         assert!(!html.contains(r#"<nav id="m-drawer""#));
         assert!(!html.contains(r#"<nav #m-drawer"#));

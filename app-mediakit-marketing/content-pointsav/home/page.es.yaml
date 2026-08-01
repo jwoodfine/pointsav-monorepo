@@ -12,15 +12,30 @@ sections:
       PointSav Digital Systems desarrolla software controlado por el cliente para operadores
       inmobiliarios independientes. Se ejecuta en hardware de su propiedad. Sin
       tarifas por usuario. Sin dependencia del proveedor.
+    cta_label: Explorar la Documentación
+    cta_href: https://documentation.pointsav.com/
 
+  # Titles (alt) kept in English (operator call 2026-07-13) -- these are
+  # product-taxonomy names, not general prose. Captions (body) translated
+  # -- were missing entirely until now.
   - type: icon-strip
     icons:
       - src: /static/graphics/pointsav/class-1.svg
         alt: Business Administration
+        body: >-
+          Herramientas de software cotidianas que mantienen las operaciones
+          comerciales organizadas y funcionando sin problemas.
       - src: /static/graphics/pointsav/class-2.svg
         alt: Record Keeping
+        body: >-
+          Registro seguro que protege la única versión oficial de cada
+          documento.
       - src: /static/graphics/pointsav/class-3.svg
         alt: Building Connectivity
+        body: >-
+          Conecta los sistemas físicos de un edificio mediante protocolos
+          abiertos como BACnet y MQTT, de modo que interoperan sin una capa
+          de integración propietaria.
 
   - type: card-grid
     columns: 4
@@ -84,12 +99,12 @@ sections:
           localización y sistemas operativos integrados a lo largo del ciclo de
           vida del proyecto.
 
+  # Documentación removed 2026-07-12: promoted to the hero CTA instead,
+  # mirroring page.yaml.
   - type: card-grid
-    columns: 3
+    columns: 2
     style: buttons
     cards:
-      - title: Documentación
-        href: https://documentation.pointsav.com/
       - title: Software
         href: https://software.pointsav.com/
       - title: Código Fuente

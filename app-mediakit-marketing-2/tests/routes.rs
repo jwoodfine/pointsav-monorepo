@@ -79,11 +79,15 @@ async fn home_renders_with_no_bundler_dom_swap_pattern() {
 }
 
 #[tokio::test]
-async fn home_has_no_spanish_route() {
-    // Operator call 2026-07-02: home is English-only, no /es route.
+async fn home_has_a_spanish_route() {
+    // Reverses the 2026-07-02 "English only on home" decision (2026-07-12,
+    // operator call) — the Spanish content was kept in sync the whole
+    // time, just unrouted; now live at /es.
     let (_c, _s, app) = fixture("woodfine", false);
-    let (status, _) = get(&app, "/es").await;
-    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (status, body) = get(&app, "/es").await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(body.contains("Hola"));
+    assert!(body.contains(r#"lang="es""#));
 }
 
 #[tokio::test]
@@ -94,6 +98,29 @@ async fn spanish_subpage_route_still_serves_spanish_content() {
     assert_eq!(status, StatusCode::OK);
     assert!(body.contains("Contáctenos"));
     assert!(body.contains(r#"lang="es""#));
+}
+
+#[tokio::test]
+async fn language_switcher_present_on_contact_and_home() {
+    // Home gained its own /es route 2026-07-12 (operator call, reverses
+    // the earlier "absent on home" decision) — the switcher now shows
+    // everywhere a Spanish counterpart exists, home included.
+    let (_c, _s, app) = fixture("woodfine", false);
+    let (_status, contact_body) = get(&app, "/page/contact").await;
+    assert!(contact_body.contains(r#"href="/es/page/contact""#));
+    assert!(contact_body.contains("Español"));
+
+    let (_status, home_body) = get(&app, "/").await;
+    assert!(home_body.contains(r#"href="/es""#));
+    assert!(home_body.contains("Español"));
+}
+
+#[tokio::test]
+async fn language_switcher_on_spanish_page_links_back_to_english() {
+    let (_c, _s, app) = fixture("woodfine", false);
+    let (_status, body) = get(&app, "/es/page/contact").await;
+    assert!(body.contains(r#"href="/page/contact""#));
+    assert!(body.contains("English"));
 }
 
 #[tokio::test]
@@ -138,6 +165,19 @@ async fn robots_and_sitemap_are_served() {
     assert_eq!(status, StatusCode::OK);
     assert!(body.contains("<urlset"));
     assert!(body.contains("home.woodfinegroup.com"));
+}
+
+#[tokio::test]
+async fn sitemap_includes_es_routes() {
+    // fixture() writes both contact/page.yaml and contact/page.es.yaml —
+    // the ES route is live and indexable, so it belongs in the sitemap.
+    // home gained its own /es route 2026-07-12 (operator call, reverses
+    // the earlier "no ES route" decision) and now gets an entry too.
+    let (_c, _s, app) = fixture("woodfine", false);
+    let (_status, body) = get(&app, "/sitemap.xml").await;
+    assert!(body.contains("<loc>https://home.woodfinegroup.com/page/contact</loc>"));
+    assert!(body.contains("<loc>https://home.woodfinegroup.com/es/page/contact</loc>"));
+    assert!(body.contains("<loc>https://home.woodfinegroup.com/es</loc>"));
 }
 
 #[tokio::test]

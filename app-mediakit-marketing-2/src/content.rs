@@ -34,6 +34,15 @@ pub enum Section {
         headline: String,
         #[serde(default)]
         subhead: Option<String>,
+        /// Optional primary CTA — both fields required together (a label
+        /// with no destination, or vice versa, is a content error, not a
+        /// valid partial state). Audit finding 2026-07-11: neither home
+        /// page had any CTA in the hero at all; the first actionable link
+        /// was buried in a card grid further down.
+        #[serde(default)]
+        cta_label: Option<String>,
+        #[serde(default)]
+        cta_href: Option<String>,
     },
     CardGrid {
         columns: u8,
@@ -177,7 +186,7 @@ sections:
         assert_eq!(page.title, "Home");
         assert_eq!(page.sections.len(), 2);
         match &page.sections[0] {
-            Section::Hero { headline, subhead } => {
+            Section::Hero { headline, subhead, .. } => {
                 assert_eq!(headline, "Hello");
                 assert_eq!(subhead.as_deref(), Some("World"));
             }

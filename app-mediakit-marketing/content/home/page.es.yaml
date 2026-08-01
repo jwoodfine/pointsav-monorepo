@@ -13,17 +13,36 @@ sections:
       Clases de Desarrollo de propiedades con certificación ambiental ubicadas
       en o cerca de Centros Comerciales de Poder en mercados seleccionados de
       América del Norte y Europa.
+    cta_label: Explorar Inteligencia de Localización
+    cta_href: https://gis.woodfinegroup.com/
 
+  # Titles (alt) kept in English (operator call 2026-07-13) -- these are
+  # product-taxonomy names (Development Classes), not general prose.
+  # Captions (body) translated -- were missing entirely until now.
   - type: icon-strip
     icons:
       - src: /static/graphics/woodfine/class-1.svg
         alt: Professional Centres
+        body: >-
+          Edificios de oficinas de tres a cinco plantas para proveedores de
+          servicios como bufetes de abogados, contadores, consultorios
+          dentales y clínicas médicas.
       - src: /static/graphics/woodfine/class-2.svg
         alt: Tech Industrial
+        body: >-
+          Edificios de local comercial y taller para entrega de última milla
+          y oficios manuales.
       - src: /static/graphics/woodfine/class-3.svg
         alt: Retail Select
+        body: >-
+          Edificios comerciales de una sola planta para bancos, farmacias y
+          servicios cotidianos similares.
       - src: /static/graphics/woodfine/class-4.svg
         alt: Suburban Office
+        body: >-
+          Edificios de oficinas de seis a nueve plantas para inquilinos
+          académicos, empresariales, cívicos, médicos y de laboratorio que
+          necesitan más espacio.
 
   - type: card-grid
     columns: 4
@@ -79,18 +98,18 @@ sections:
           inteligencia de localización y sistemas operativos integrados a lo
           largo del ciclo de vida de la solución de tenencia directa.
 
-  # Unrouted (no /es for home, operator call 2026-07-02) but kept in sync
-  # with page.yaml for when/if re-enabled — see that file for rationale.
+  # Routed 2026-07-12 (was unrouted since 2026-07-02) -- home's /es route
+  # is now live; this content is served, not just kept in sync in reserve.
+  # Inteligencia de Localización removed 2026-07-12: promoted to the hero
+  # CTA instead, mirroring page.yaml.
   - type: card-grid
-    columns: 3
+    columns: 2
     style: buttons
     cards:
       - title: Proyectos
         href: https://projects.woodfinegroup.com/
       - title: Biblioteca BIM
         href: https://bim.woodfinegroup.com/
-      - title: Inteligencia de Localización
-        href: https://gis.woodfinegroup.com/
 
   # Texto legal completo movido 2026-07-02 al acordeón "Información
   # importante" del pie de página (Tenant::woodfine().disclosure_slots,
