@@ -46,6 +46,16 @@ a:hover {
   outline-offset: var(--m-focus-ring-offset);
 }
 
+/* New in this commit: the language-switch pill sits on the dark masthead,
+   same low-contrast-focus-ring problem the (out-of-range) accessibility
+   audit found for the other masthead controls -- `--m-focus-ring-on-dark`
+   already exists in tokens.css for this. Scoped to just the new element;
+   the masthead's other controls keep whatever focus treatment they
+   already have on canonical. */
+.m-masthead .m-lang-switch:focus-visible {
+  outline-color: var(--m-focus-ring-on-dark);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;
@@ -83,10 +93,27 @@ a:hover {
   top: 0;
   z-index: var(--m-z-masthead);
   display: flex;
+  /* 2026-07-13: full brand names ("Woodfine Capital Projects", "PointSav
+     Digital Systems") must never truncate -- a hard requirement, not a
+     preference. Measured: the longer wordmark alone needs ~266px, but a
+     390px phone only has ~354px left after gutters/gaps once the
+     lang-switch pill and 44px hamburger are also accounted for -- there
+     is no single-row layout at realistic phone widths that fits all
+     three without shrinking something. flex-wrap:wrap + flex-shrink:0 on
+     every child (see .m-masthead__wordmark/.m-lang-switch/
+     .m-masthead__burger) means nothing ever shrinks or truncates --
+     wordmark gets its own full-width row instead, switch+burger wrap
+     together onto a second row via .m-lang-switch's existing
+     margin-left:auto (which anchors to its own wrapped line, not just
+     the container). Reflows back to one row automatically wherever
+     everything actually fits (tablet width and up) -- no hard breakpoint
+     needed, pure content-driven wrap. */
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--m-space-6);
+  gap: var(--m-space-2) var(--m-space-6);
   min-height: var(--m-masthead-h);
   padding-inline: var(--m-gutter);
+  padding-block: var(--m-space-2);
   background: var(--m-masthead-bg);
   color: var(--m-masthead-ink);
   border-bottom: var(--m-masthead-border-b);
@@ -99,6 +126,27 @@ a:hover {
   color: var(--m-masthead-ink);
   text-decoration: none;
   white-space: nowrap;
+  /* 2026-07-13: the full brand name must never truncate (operator hard
+     requirement) -- an earlier ellipsis-truncation attempt violated
+     that. flex-shrink:0 means this item is never compressed; when it
+     doesn't fit alongside the switch/burger, .m-masthead's flex-wrap:wrap
+     gives it its own full-width row instead (see that rule's comment). */
+  flex-shrink: 0;
+}
+@media (max-width: 59.9375rem) {
+  .m-masthead {
+    /* Tightened from --m-space-6 (24px) to reclaim room for a bigger
+       wordmark below without pushing the controls to a second line --
+       desktop keeps the wider 24px gap (nav has plenty of room there). */
+    column-gap: var(--m-space-4);
+  }
+  .m-masthead__wordmark {
+    /* Bumped from --m-text-base (16px) -- 17px, combined with the
+       tightened gaps here and on .m-masthead__controls, still fits one
+       row at 375px+ with measured margin (17px natural width 214px vs
+       ~224px available at 375px after the gap reductions). */
+    font-size: 17px;
+  }
 }
 
 .m-masthead__nav {
@@ -118,6 +166,83 @@ a:hover {
   color: var(--m-masthead-ink);
 }
 
+/* Language switcher — bordered pill so it reads as a utility control
+   distinct from plain nav links. Visible at every viewport (never buried
+   behind the hamburger — a stranded reader must see "Español"/"English"
+   without opening a menu they may not be able to read). */
+.m-lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-space-2);
+  font-size: var(--m-nav-size);
+  letter-spacing: var(--m-nav-tracking);
+  padding: var(--m-space-1) var(--m-space-3);
+  border: var(--m-lang-switch-border);
+  border-radius: var(--m-radius-control);
+  color: var(--m-masthead-ink-muted);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: color var(--m-dur-base) var(--m-ease-standard),
+              border-color var(--m-dur-base) var(--m-ease-standard);
+}
+.m-lang-switch:hover,
+.m-lang-switch:focus-visible {
+  color: var(--m-masthead-ink);
+  border-color: var(--m-masthead-ink);
+}
+.m-lang-switch__glyph {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+/* 2026-07-13, second pass: a width-sweep browser-in-the-loop check (320
+   through 430px) caught a real bug in the first fix -- .m-lang-switch and
+   .m-masthead__burger each had their own margin-left, coordinated via an
+   adjacent-sibling CSS rule that assumed DOM-adjacency implies same
+   VISUAL row. flex-wrap breaks that assumption: at some widths the burger
+   wrapped alone onto its own line (switch stayed on the wordmark's line),
+   landing stranded at the far LEFT edge instead of grouped with the
+   switch at the right. Fixed by wrapping both in one
+   .m-masthead__controls div (see masthead() in ui.rs) that carries the
+   ONLY margin-left:auto -- the pair now always moves and right-aligns as
+   a single unit, on whichever line it ends up. */
+.m-masthead__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--m-space-3);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+@media (min-width: 60rem) {
+  .m-masthead__nav + .m-masthead__controls {
+    margin-left: 0;
+  }
+}
+.m-masthead .m-lang-switch__label {
+  display: none;
+}
+@media (min-width: 60rem) {
+  .m-masthead .m-lang-switch__label {
+    display: inline;
+  }
+}
+/* Drawer variant: light surface, brand-link color, full 44px tap height
+   (the drawer's other nav links are already 54px — see render_nav — this
+   matches that touch-target discipline rather than the masthead's tighter
+   pill). */
+.m-drawer .m-lang-switch {
+  border: var(--m-lang-switch-border-light);
+  color: var(--m-link);
+  min-height: 44px;
+  margin: var(--m-space-4);
+  align-self: flex-start;
+}
+.m-drawer .m-lang-switch:hover,
+.m-drawer .m-lang-switch:focus-visible {
+  color: var(--m-link-hover);
+  border-color: var(--m-link-hover);
+}
+
 .m-masthead__burger {
   display: inline-flex;
   flex-direction: column;
@@ -126,11 +251,25 @@ a:hover {
   gap: 5px;
   width: 44px;
   height: 44px;
+  /* margin-left:auto by default -- pushes itself right when nothing else
+     in the row already did (e.g. a hypothetical page with no ES route,
+     so no .m-lang-switch is rendered at all). When .m-lang-switch IS
+     present (every current page), it sits immediately before the burger
+     in the DOM and already claims that same auto-margin on the group --
+     see the adjacent-sibling override just below, part of the 2026-07-13
+     margin fix documented on .m-lang-switch above. */
   margin-left: auto;
+  /* Tap target must never shrink -- same reasoning as .m-lang-switch's
+     flex-shrink:0 above; .m-masthead__wordmark absorbs a too-narrow row
+     instead. */
+  flex-shrink: 0;
   background: none;
   border: none;
   cursor: pointer;
   padding: 0;
+}
+.m-lang-switch + .m-masthead__burger {
+  margin-left: 0;
 }
 .m-masthead__burger-bar {
   display: block;
@@ -271,6 +410,39 @@ html:not(.js) .m-drawer-scrim {
   max-width: var(--m-prose-max);
   margin: 0;
 }
+/* Primary hero CTA — audit finding. The general --m-cta-bg token (navy-700)
+   is meant for CTAs sitting on light card backgrounds; it would be
+   invisible here since the hero band itself is now full navy-700 for both
+   tenants. Inverse treatment instead: solid white fill, brand-navy ink —
+   the confident, high-contrast pattern for a CTA on a dark hero. */
+.m-hero__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--m-space-2);
+  margin-top: var(--m-space-6);
+  padding: var(--m-space-3) var(--m-space-6);
+  background: var(--m-white);
+  color: var(--m-hero-band-bg);
+  font-weight: var(--m-weight-bold);
+  font-size: var(--m-nav-size);
+  letter-spacing: var(--m-nav-tracking);
+  text-decoration: none;
+  border-radius: var(--m-radius-control);
+  transition: background var(--m-dur-base) var(--m-ease-standard);
+}
+.m-hero__cta:hover {
+  background: var(--m-navy-100);
+}
+/* `--m-focus-ring-hero` was already defined in tokens.css (both tenants)
+   but never wired to anything — same class of bug the earlier
+   --m-focus-ring-on-dark fix addressed. With outline-offset the ring
+   renders just outside the button, over the navy hero band itself, so the
+   default navy-600 ring would have the same low-contrast problem fixed
+   there; this token already resolves to white for both tenants. */
+.m-hero__cta:focus-visible {
+  outline-color: var(--m-focus-ring-hero);
+  background: var(--m-navy-100);
+}
 
 /* ==========================================================================
    Card grid — the keep-list signature: flat, navy top-rule, no shadow.
@@ -285,6 +457,16 @@ html:not(.js) .m-drawer-scrim {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: var(--m-card-gap);
+}
+/* Tablet band (discuss-item 9, operator-approved 2026-07-11): auto-fit's
+   220px floor produces 3-4 sparse/stretched columns in the 700-1000px band
+   on wide-card content. Pin to exactly 2 columns there; auto-fit resumes
+   below 700px (1-2 cols, content-driven) and above 1000px (full desktop
+   row) unchanged. */
+@media (min-width: 700px) and (max-width: 1000px) {
+  .m-card-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 .m-card {
@@ -457,6 +639,13 @@ html:not(.js) .m-drawer-scrim {
 .m-card-grid--buttons {
   grid-template-columns: repeat(var(--m-button-cols, 1), 1fr);
   gap: var(--m-space-3);
+  /* Opus audit 2026-07-13: this row inherited .m-card-grid's
+     padding-block: var(--m-space-band) (~90px desktop, sized for large
+     content sections) on both sides -- stacked against the card grid's
+     own bottom band above and the footer's padding below, that left the
+     2-button strip floating in ~340px of dead whitespace, reading as
+     accidental rather than a deliberate CTA row. */
+  padding-block: var(--m-space-8);
 }
 @media (min-width: 700px) {
   .m-card-grid--buttons {
@@ -540,6 +729,15 @@ html:not(.js) .m-drawer-scrim {
   grid-template-columns: repeat(var(--m-icon-strip-cols), 1fr);
   gap: var(--m-icon-strip-gap);
 }
+/* Reverted 2026-07-12 (operator rule): a fixed 2-column tablet band was
+   tried here (discuss-item 9) but it reintroduces exactly the orphan-row
+   problem the comment above already warns against -- 2 columns doesn't
+   divide 3 evenly, so PointSav's icons split 2-then-1 at tablet widths.
+   Operator: icons must be all-in-one-row or all-stacked, never a partial
+   split. Back to the original two-state rule: 1 column below 700px, full
+   item-count columns at 700px and up (matches the card grid above, which
+   keeps its own tablet-only 2-col band since it doesn't have this
+   constraint). */
 @media (min-width: 700px) {
   .m-icon-strip__inner {
     --m-icon-strip-cols: var(--m-icon-count);
@@ -770,6 +968,32 @@ html:not(.js) .m-drawer-scrim {
   background: var(--m-footer-bg);
   color: var(--m-footer-ink);
   padding: var(--m-footer-pad-y) var(--m-gutter);
+  /* Opus audit 2026-07-13: no edge at all previously -- the footer's own
+     background alone (now darkened, see --m-surface-footer) isn't enough
+     to read as a defined zone without a line marking where the page ends
+     and the footer begins. */
+  border-top: var(--m-footer-rule);
+}
+
+/* Brand re-anchor (2026-07-12, operator reference: software.pointsav.com
+   marketplace footer). */
+.m-footer__brand {
+  max-width: var(--m-container-max);
+  margin-inline: auto;
+  margin-bottom: var(--m-space-6);
+}
+.m-footer__brand-name {
+  font-family: var(--m-font-serif);
+  font-weight: var(--m-weight-bold);
+  font-size: var(--m-text-lg);
+  color: var(--m-ink-900);
+  margin: 0 0 var(--m-space-2);
+}
+.m-footer__brand-tagline {
+  font-size: var(--m-text-sm);
+  color: var(--m-footer-ink-muted);
+  max-width: 30ch;
+  margin: 0;
 }
 
 .m-footer__columns {
@@ -779,14 +1003,33 @@ html:not(.js) .m-drawer-scrim {
   /* Operator-confirmed fix, 2026-07-07: Site and Network were already
      side-by-side at every width (contrary to an initial assumption they
      stacked on mobile) — the real problem was both columns clustering at
-     the left edge with unused space on the right, at mobile AND desktop.
-     One rule serves both breakpoints; no wrap/stacking logic needed. */
-  justify-content: space-between;
-  gap: var(--m-footer-col-gap);
+     the left edge with NO gap between them, at mobile AND desktop.
+     space-between solved that but overcorrected on wide desktop
+     containers -- Opus audit 2026-07-13 found it stranding the two short
+     columns at opposite edges of the full 1140px measure, ~700px apart,
+     disconnected from the brand block above and from each other.
+     flex-start + a generous fixed gap keeps them grouped as one cohesive
+     block anchored under the brand (left-aligned, matching it) without
+     recreating the original no-gap clustering bug. */
+  justify-content: flex-start;
+  gap: var(--m-space-16);
   padding-bottom: var(--m-space-8);
+}
+/* Mobile stack (2026-07-12, operator reference: software.pointsav.com's
+   marketplace footer) -- extends, not reverts, the 2026-07-07 fix above.
+   That fix stops the two columns clustering at the left edge; this adds a
+   narrow-viewport-only override so each column gets the full row width
+   instead of splitting it, matching the reference footer's mobile
+   behaviour. Desktop/tablet keep the unchanged side-by-side rule. */
+@media (max-width: 699px) {
+  .m-footer__columns {
+    flex-direction: column;
+    gap: var(--m-space-6);
+  }
 }
 .m-footer__col-title {
   font-size: var(--m-footer-heading-size);
+  font-weight: var(--m-weight-bold);
   text-transform: var(--m-label-transform);
   letter-spacing: var(--m-label-tracking);
   color: var(--m-footer-ink-muted);
@@ -826,6 +1069,12 @@ html:not(.js) .m-drawer-scrim {
   font-size: var(--m-disclosure-summary-size);
   font-weight: var(--m-disclosure-summary-weight);
   list-style: none;
+  /* Uppercase + tracking (2026-07-12, operator reference: software.
+     pointsav.com marketplace footer) -- matches the SITE/NETWORK column
+     labels' existing treatment (--m-label-transform/--m-label-tracking)
+     instead of sitting as the one sentence-case label among them. */
+  text-transform: var(--m-label-transform);
+  letter-spacing: var(--m-label-tracking);
 }
 .m-footer__disclosure-summary::-webkit-details-marker {
   display: none;
@@ -898,33 +1147,60 @@ html:not(.js) .m-drawer-scrim {
   max-width: var(--m-container-max);
   margin-inline: auto;
   border-top: var(--m-footer-rule);
-  padding-top: var(--m-space-6);
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--m-space-6);
+  /* Tightened 2026-07-12 (was --m-space-6/24px) now that cities is 12px
+     instead of 14px -- matches the other divider's gap (.m-footer__copyright's
+     padding-top, also --m-space-4) so both dividers read consistently. */
+  padding-top: var(--m-space-4);
+  /* Flex/wrap/justify-content/gap removed 2026-07-13 (Opus audit) -- this
+     element has wrapped a single child (.m-footer__meta) since the
+     2026-07-12 badge-repositioning commit moved .m-footer__badges inside
+     it; all of that was dead code with only one flex item to apply to. */
 }
 .m-footer__cities {
-  font-size: var(--m-text-sm);
+  /* Was --m-text-sm (14px, nav-link size) -- too big next to the legal
+     text it now sits among (badge/copyright/trademark all use
+     --m-footer-legal-size, 12px), and bigger than the reference footer's
+     own 12px cities row. */
+  font-size: var(--m-footer-legal-size);
   margin-bottom: var(--m-space-2);
+  /* Uppercase + tracking (2026-07-12, operator reference: software.
+     pointsav.com marketplace footer) -- same treatment as the disclosure
+     summary above and the SITE/NETWORK column labels. */
+  text-transform: var(--m-label-transform);
+  letter-spacing: var(--m-label-tracking);
 }
 .m-footer__copyright {
   font-size: var(--m-footer-legal-size);
   color: var(--m-footer-ink-muted);
-  margin: 0 0 var(--m-space-1);
+  /* Was --m-space-1 (4px) -- too tight between copyright and trademark,
+     operator call for a regular paragraph-style gap instead. */
+  margin: 0 0 var(--m-space-3);
+  /* Second divider (2026-07-12, operator reference: software.pointsav.com
+     marketplace footer) -- the reference footer has two dividers: one
+     before cities (we already have that, on .m-footer__base), one before
+     the copyright/trademark block. Copyright is the first element of that
+     block, so it carries the divider. */
+  border-top: var(--m-footer-rule);
+  padding-top: var(--m-space-4);
 }
 /* Persistent one-line disclaimer (project-knowledge relay, 2026-07-02,
    "Apollo Academy" pattern) — always visible whether the accordion above
    is open or collapsed, so a screenshot/print is never bare of any
    disclosure at all. Same muted legal-text styling as copyright/trademark
    either side of it. */
+/* Moved 2026-07-12 (operator reference: software.pointsav.com marketplace
+   footer) to sit directly under the disclosure accordion instead of
+   between copyright and trademark -- now a top-level footer section like
+   .m-footer__disclosure/.m-footer__columns, not nested inside
+   .m-footer__meta, so it needs its own max-width/centering. Also dropped
+   italic -- the reference footer's persistent disclaimer is plain text,
+   same weight as the rest of the footer copy. */
 .m-footer__notice {
+  max-width: var(--m-container-max);
+  margin-inline: auto;
   font-size: var(--m-footer-legal-size);
   color: var(--m-footer-ink-muted);
-  max-width: var(--m-prose-max);
-  margin: 0 0 var(--m-space-1);
-  font-style: italic;
+  margin-bottom: var(--m-space-6);
 }
 .m-footer__trademark {
   font-size: var(--m-footer-legal-size);
@@ -935,7 +1211,15 @@ html:not(.js) .m-drawer-scrim {
 
 .m-footer__badges {
   display: flex;
+  /* Right-aligned (2026-07-12, operator reference: software.pointsav.com
+     marketplace footer) -- now nested inside .m-footer__meta, right after
+     cities, instead of sitting as a separate flex sibling of the whole
+     legal block. justify-content alone is enough since this div is a
+     full-width block within its column; there's no second flex item to
+     space against. */
+  justify-content: flex-end;
   gap: var(--m-badge-row-gap);
+  margin-bottom: var(--m-space-3);
 }
 
 /* ==========================================================================
