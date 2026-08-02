@@ -49,22 +49,33 @@ already confirmed resolved — see git history for the full prior text if needed
   Command/project-editorial 2026-07-12 (msg-id `command-20260712-fyi-follow-up-legal-tokens-pointsav-yaml`).
   `app-privategit-marketplace` runtime wiring to this file deliberately held until the YAML is fixed.
 
-## Code work — this archive's own scope, in progress this session
+## Code work — done this session (2026-08-02)
 
-- [ ] Chromed 404/500 error pages + router `.fallback()` (M2).
-- [ ] Order-pending page auto-refresh (M3).
-- [ ] Per-version `MANIFEST.json` route — systemic 404 across every deposited product (S2/M10).
-- [ ] Product-detail SHA-fetch hardcoded absolute URL — CSP break on non-prod hosts (S2/M10).
-- [ ] `app-mediakit-distributions` missing from root `Cargo.toml` workspace members.
-- [ ] `/es/*` not extended to product-detail page (`/software/:id`) — Spanish localization follow-up.
-- [ ] Tier 2–4 hardening: rate limiting, Range/caching headers, RwLock poison handling, unified
-  error schema, product-detail JSON-LD/BreadcrumbList, sitemap product-page entries. Full detail
-  in `BRIEF-software-handoff-readiness.md`.
-- [ ] `og:image`/`twitter:image` asset — `/static/og-default.png` doesn't exist, every page's social
-  card is broken. Needs a real 1200×630 image (design-system/media-assets territory per
-  project-design's routing message) — not to be fabricated locally.
-- [ ] CLAUDE.md's stale "no nested sub-clone one level down" claim — needs a wording fix (the nested
-  clone genuinely exists and is intentional per `.gitignore`).
+- [x] Chromed 404/500 error pages + router `.fallback()` (M2).
+- [x] Order-pending page auto-refresh (M3).
+- [x] Per-version `MANIFEST.json` route — falls back to product-root manifest (S2/M10).
+- [x] Product-detail SHA-fetch — CSP `connect-src` allowance for the source origin (S2/M10).
+- [x] `app-mediakit-distributions` added to root `Cargo.toml` workspace members.
+- [x] `/es/*` extended to product-detail page (`/software/:id`) — Spanish localization follow-up.
+- [x] RwLock poison recovery on the revocation set (S11).
+- [x] Sitemap now includes product-detail pages (English + `/es/*`), drops the bare `/` redirect.
+- [x] Product-detail JSON-LD (`SoftwareApplication` + `BreadcrumbList`).
+- [x] `og:image`/`twitter:image` asset — requested from project-design (msg-id
+  `project-software-20260802-request-real-og-image-twitter-image-asse`), not fabricated locally.
+- [x] CLAUDE.md's stale "no nested sub-clone" claim fixed.
+
+## Code work — still open (Tier 2-4, lower priority, deferred this pass)
+
+- [ ] Rate limiting on both `app-privategit-marketplace` and `app-privategit-source` (S6) — no
+  limiter exists on either service today. Needs a policy decision (per-route limits, whether the
+  front proxy should own this instead) before implementation, not a pure mechanical fix.
+- [ ] Range/caching headers on binary streams (S10) — no `Accept-Ranges`/`ETag`/`Last-Modified`/
+  `Cache-Control` on `app-privategit-source`'s download routes; a dropped connection on a large
+  binary restarts from byte 0. `tower_http::ServeFile`/`ServeDir` would provide this under the
+  existing auth gate — real but non-trivial refactor of the streaming path.
+- [ ] Unified error schema (S15) — 5 inconsistent error shapes across `app-privategit-source`'s
+  endpoints, no stable machine-readable code field. Cross-cutting refactor touching most handlers;
+  deliberately not attempted alongside the higher-value per-page fixes above.
 
 ## New workstream — `/research` surface (2026-08-02)
 
