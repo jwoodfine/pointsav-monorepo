@@ -544,6 +544,25 @@ pub fn render_page(
     }
 }
 
+/// Content block for a chromed error page (404/500/etc.) — pass to [`render_page`]
+/// so error responses carry the same masthead/footer as every other page instead of
+/// a bare `text/plain` body (closes the M2/S-error-schema gap: error paths used to
+/// throw the visitor out of the site chrome entirely).
+pub fn error_markup(lang: Lang, heading: &str, message: &str) -> Markup {
+    let home_label = match lang {
+        Lang::En => "Back to the software catalog",
+        Lang::Es => "Volver al cat\u{e1}logo de software",
+    };
+    let home_href = lang.localize("/software");
+    html! {
+        div."sw-legal" {
+            h1 { (heading) }
+            p."sw-legal__lede" { (message) }
+            p { a href=(home_href) { (home_label) } }
+        }
+    }
+}
+
 // ── Splice: wrap prerendered static HTML with the Sovereign chrome ──────────────
 
 /// Wrap a storefront static page with the Sovereign Editorial chrome.

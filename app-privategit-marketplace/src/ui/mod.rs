@@ -30,7 +30,7 @@ pub use checkout::checkout_markup;
 pub use contact::contact_markup;
 pub use disclaimer::{disclaimer_markup, disclosure_body};
 pub use lang::Lang;
-pub use layout::{render_page, wrap_static_html};
+pub use layout::{error_markup, render_page, wrap_static_html};
 pub use order::{order_confirmed_markup, order_not_found_markup, order_pending_markup};
 pub use pricing::pricing_markup;
 pub use privacy::privacy_markup;

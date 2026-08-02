@@ -816,6 +816,51 @@ fn mint_license_token(signing_key: &SigningKey, product_id: &str) -> String {
 //
 // Note: axum's `Redirect::to` emits 303 See Other, not 302. The P1 contract
 // specifies 302, so we build the response explicitly with StatusCode::FOUND.
+// Chromed error response — replaces the bare `text/plain` 404/500 bodies that used
+// to throw a visitor out of the site chrome entirely (M2 in
+// BRIEF-software-handoff-readiness.md). `path` only affects the lang-toggle target;
+// error pages aren't marked `translated`, so no hreflang alternates are emitted.
+fn error_response(
+    lang: Lang,
+    status: StatusCode,
+    path: &str,
+    heading: &str,
+    message: &str,
+) -> Response {
+    let title = format!("{heading} — PointSav Software");
+    let body = ui::render_page(
+        SoftwareSurface::Marketplace,
+        lang,
+        &title,
+        message,
+        path,
+        false,
+        ui::error_markup(lang, heading, message),
+    )
+    .into_string();
+    (
+        status,
+        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
+        body,
+    )
+        .into_response()
+}
+
+// Router-level fallback for any request that matches no declared route — replaces
+// axum's default bare-empty 404 with the site's own chrome. English only: a
+// genuinely unmatched path gives no reliable signal of intended locale (`/es/*`
+// 404s inside known route prefixes are handled by the per-page 404 branches, which
+// know the requested language from the route itself).
+async fn not_found_fallback() -> Response {
+    error_response(
+        Lang::En,
+        StatusCode::NOT_FOUND,
+        "/software",
+        "Page not found",
+        "The page you're looking for doesn't exist. It may have moved, or the link may be out of date.",
+    )
+}
+
 async fn root() -> Response {
     (StatusCode::FOUND, [(header::LOCATION, "/software")]).into_response()
 }
@@ -880,12 +925,23 @@ async fn render_software_page(state: &AppState, lang: Lang) -> Response {
         }
         Err(e) => {
             tracing::error!("catalog load failed for /software: {e:#}");
-            (
+            let (heading, message) = match lang {
+                Lang::En => (
+                    "Catalog unavailable",
+                    "The product catalog couldn't be loaded right now. Please try again shortly.",
+                ),
+                Lang::Es => (
+                    "Cat\u{e1}logo no disponible",
+                    "El cat\u{e1}logo de productos no se pudo cargar en este momento. Int\u{e9}ntelo de nuevo en breve.",
+                ),
+            };
+            error_response(
+                lang,
                 StatusCode::INTERNAL_SERVER_ERROR,
-                [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-                "catalog unavailable",
+                &lang.localize("/software"),
+                heading,
+                message,
             )
-                .into_response()
         }
     }
 }
@@ -962,12 +1018,23 @@ async fn render_pricing_page(state: &AppState, lang: Lang) -> Response {
         }
         Err(e) => {
             tracing::error!("catalog load failed for /pricing: {e:#}");
-            (
+            let (heading, message) = match lang {
+                Lang::En => (
+                    "Catalog unavailable",
+                    "Pricing information couldn't be loaded right now. Please try again shortly.",
+                ),
+                Lang::Es => (
+                    "Cat\u{e1}logo no disponible",
+                    "La informaci\u{f3}n de precios no se pudo cargar en este momento. Int\u{e9}ntelo de nuevo en breve.",
+                ),
+            };
+            error_response(
+                lang,
                 StatusCode::INTERNAL_SERVER_ERROR,
-                [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-                "catalog unavailable",
+                &lang.localize("/pricing"),
+                heading,
+                message,
             )
-                .into_response()
         }
     }
 }
@@ -1225,21 +1292,23 @@ async fn product_detail_page(
                 )
                     .into_response()
             }
-            None => (
+            None => error_response(
+                Lang::En,
                 StatusCode::NOT_FOUND,
-                [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-                "product not found",
-            )
-                .into_response(),
+                "/software",
+                "Product not found",
+                "That product doesn't exist in the catalog. It may have been renamed or removed.",
+            ),
         },
         Err(e) => {
             tracing::error!("catalog load failed for /software/:id: {e:#}");
-            (
+            error_response(
+                Lang::En,
                 StatusCode::INTERNAL_SERVER_ERROR,
-                [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-                "catalog unavailable",
+                "/software",
+                "Catalog unavailable",
+                "The product catalog couldn't be loaded right now. Please try again shortly.",
             )
-                .into_response()
         }
     }
 }
@@ -1260,12 +1329,23 @@ fn serve_chrome_page(file_path: &PathBuf, lang: Lang, url_path: &str) -> Respons
         }
         Err(e) => {
             tracing::error!("failed to read static page {}: {e}", file_path.display());
-            (
+            let (heading, message) = match lang {
+                Lang::En => (
+                    "Page unavailable",
+                    "This page couldn't be loaded right now. Please try again shortly.",
+                ),
+                Lang::Es => (
+                    "P\u{e1}gina no disponible",
+                    "Esta p\u{e1}gina no se pudo cargar en este momento. Int\u{e9}ntelo de nuevo en breve.",
+                ),
+            };
+            error_response(
+                lang,
                 StatusCode::INTERNAL_SERVER_ERROR,
-                [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-                "page unavailable",
+                "/software",
+                heading,
+                message,
             )
-                .into_response()
         }
     }
 }
@@ -1467,21 +1547,45 @@ async fn render_checkout_page(state: &AppState, product_id: &str, lang: Lang) ->
                 )
                     .into_response()
             }
-            None => (
-                StatusCode::NOT_FOUND,
-                [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-                "product not found",
-            )
-                .into_response(),
+            None => {
+                let (heading, message) = match lang {
+                    Lang::En => (
+                        "Product not found",
+                        "That product doesn't exist in the catalog. It may have been renamed or removed.",
+                    ),
+                    Lang::Es => (
+                        "Producto no encontrado",
+                        "Ese producto no existe en el cat\u{e1}logo. Puede que haya sido renombrado o eliminado.",
+                    ),
+                };
+                error_response(
+                    lang,
+                    StatusCode::NOT_FOUND,
+                    &lang.localize("/software"),
+                    heading,
+                    message,
+                )
+            }
         },
         Err(e) => {
             tracing::error!("catalog load failed for /checkout: {e:#}");
-            (
+            let (heading, message) = match lang {
+                Lang::En => (
+                    "Catalog unavailable",
+                    "The product catalog couldn't be loaded right now. Please try again shortly.",
+                ),
+                Lang::Es => (
+                    "Cat\u{e1}logo no disponible",
+                    "El cat\u{e1}logo de productos no se pudo cargar en este momento. Int\u{e9}ntelo de nuevo en breve.",
+                ),
+            };
+            error_response(
+                lang,
                 StatusCode::INTERNAL_SERVER_ERROR,
-                [(header::CONTENT_TYPE, "text/plain; charset=utf-8")],
-                "catalog unavailable",
+                &lang.localize("/software"),
+                heading,
+                message,
             )
-                .into_response()
         }
     }
 }
@@ -1738,6 +1842,7 @@ async fn main() -> Result<()> {
         .route("/order/:tx_hash", get(order_status_page))
         .route("/es/order/:tx_hash", get(order_status_page_es))
         .route("/order/:tx_hash/download", get(order_download))
+        .fallback(not_found_fallback)
         .nest_service("/static", ServeDir::new(static_dir))
         .layer(SetResponseHeaderLayer::overriding(
             HeaderName::from_static("strict-transport-security"),
@@ -2671,7 +2776,14 @@ esac
 
         let (parts, body) = software_page(State(state)).await.into_parts();
         assert_eq!(parts.status, StatusCode::INTERNAL_SERVER_ERROR);
-        assert_eq!(body_text(body).await, "catalog unavailable");
+        assert_eq!(
+            parts.headers.get(header::CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
+        );
+        let html = body_text(body).await;
+        assert!(html.contains("Catalog unavailable"));
+        // Chromed error page (M2 fix), not a bare text/plain body.
+        assert!(html.contains("sw-masthead"));
 
         let _ = fs::remove_dir_all(&scratch);
     }
@@ -2723,9 +2835,32 @@ esac
 
         let (parts, body) = licensing_page(State(state)).await.into_parts();
         assert_eq!(parts.status, StatusCode::INTERNAL_SERVER_ERROR);
-        assert_eq!(body_text(body).await, "page unavailable");
+        assert_eq!(
+            parts.headers.get(header::CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
+        );
+        let html = body_text(body).await;
+        assert!(html.contains("Page unavailable"));
+        // Chromed error page (M2 fix), not a bare text/plain body.
+        assert!(html.contains("sw-masthead"));
 
         let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // Router-level fallback (M2) — any unmatched route gets the site's own chromed
+    // 404 instead of axum's default bare-empty body.
+    #[tokio::test]
+    async fn not_found_fallback_serves_chromed_404() {
+        let (parts, body) = not_found_fallback().await.into_parts();
+        assert_eq!(parts.status, StatusCode::NOT_FOUND);
+        assert_eq!(
+            parts.headers.get(header::CONTENT_TYPE).unwrap(),
+            "text/html; charset=utf-8"
+        );
+        let html = body_text(body).await;
+        assert!(html.contains("Page not found"));
+        assert!(html.contains("sw-masthead"));
+        assert!(html.contains("sw-footer"));
     }
 
     // Self-contained disclaimer page (operator instruction 2026-07-02): no static file,
