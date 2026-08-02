@@ -39,6 +39,76 @@ struct AppState {
     verify_key: Option<VerifyingKey>,
     revocation_list_path: Option<String>,
     revoked_tokens: Arc<RwLock<HashSet<String>>>,
+    rate_limiter: Arc<RateLimiter>,
+}
+
+// ── Rate limiting (S6) ───────────────────────────────────────────────────────
+//
+// In-memory per-IP sliding-window limiter — no new dependency, matching this
+// crate's existing preference for small hand-rolled utilities over pulling in a
+// crate for a narrow need. Scoped to the two routes the audit called out
+// specifically: `/verify-key` (a free, unbounded-CPU signature-verification
+// oracle) and `/admin/reload-revocation-list` (an on-demand disk read). Binary
+// download/streaming routes are deliberately NOT rate-limited here — that's
+// bundled with the separate Range/caching-headers work (both touch the same
+// download hot path) rather than tuned in isolation.
+//
+// Single-instance, in-process state: not distributed, resets on restart. That's
+// an accepted tradeoff for defense-in-depth on a service that (per NEXT.md) has
+// no confirmed front-proxy rate limiter in front of it today — this is not a
+// substitute for one if it exists, just a floor if it doesn't.
+struct RateLimiter {
+    max_requests: usize,
+    window: std::time::Duration,
+    hits: std::sync::Mutex<
+        std::collections::HashMap<std::net::IpAddr, std::collections::VecDeque<std::time::Instant>>,
+    >,
+}
+
+impl RateLimiter {
+    fn new(max_requests: usize, window: std::time::Duration) -> Self {
+        Self {
+            max_requests,
+            window,
+            hits: std::sync::Mutex::new(std::collections::HashMap::new()),
+        }
+    }
+
+    /// Returns `Ok(())` if the request is allowed, `Err(retry_after_secs)` if the
+    /// caller has exceeded `max_requests` within `window`. Prunes stale entries
+    /// (and drops empty per-IP queues) on every call — bounded by actual distinct
+    /// recent callers, not left to grow unbounded.
+    fn check(&self, ip: std::net::IpAddr) -> Result<(), u64> {
+        let now = std::time::Instant::now();
+        let mut hits = self
+            .hits
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let result = {
+            let queue = hits.entry(ip).or_default();
+            while queue
+                .front()
+                .is_some_and(|&t| now.duration_since(t) >= self.window)
+            {
+                queue.pop_front();
+            }
+            if queue.len() >= self.max_requests {
+                let retry_after = self
+                    .window
+                    .saturating_sub(now.duration_since(*queue.front().unwrap()))
+                    .as_secs()
+                    .max(1);
+                Err(retry_after)
+            } else {
+                queue.push_back(now);
+                Ok(())
+            }
+        };
+        // Opportunistic cleanup of other IPs' fully-expired queues, amortized
+        // across calls rather than a separate background task.
+        hits.retain(|_, q| !q.is_empty());
+        result
+    }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -539,9 +609,19 @@ async fn git_stub() -> (StatusCode, Json<Value>) {
 // 401: bad signature or malformed token
 // 403: valid sig but wrong product or channel expired
 async fn verify_key_endpoint(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<Arc<AppState>>,
     Json(req): Json<VerifyKeyRequest>,
 ) -> (StatusCode, Json<Value>) {
+    // S6: this endpoint is a free, unbounded-CPU signature-verification oracle —
+    // rate-limited before doing any real work.
+    if let Err(retry_after) = state.rate_limiter.check(addr.ip()) {
+        tracing::warn!(ip = %addr.ip(), retry_after, "verify-key: rate limited");
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(json!({"error": "rate limited", "retry_after_seconds": retry_after})),
+        );
+    }
     let Some(vk) = &state.verify_key else {
         tracing::warn!(
             result = "service-unavailable",
@@ -603,6 +683,20 @@ async fn reload_revocation_list(
         return (
             StatusCode::FORBIDDEN,
             Json(json!({"error": "admin endpoints are localhost-only"})),
+        )
+            .into_response();
+    }
+    // S6: on-demand disk read, checked after the loopback gate (no point rate
+    // limiting a request that's about to be rejected anyway).
+    if let Err(retry_after) = state.rate_limiter.check(addr.ip()) {
+        tracing::warn!(ip = %addr.ip(), retry_after, "reload-revocation-list: rate limited");
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            [(
+                header::RETRY_AFTER,
+                HeaderValue::from_str(&retry_after.to_string()).unwrap(),
+            )],
+            Json(json!({"error": "rate limited", "retry_after_seconds": retry_after})),
         )
             .into_response();
     }
@@ -753,11 +847,16 @@ async fn main() -> Result<()> {
         },
     }));
 
+    // 20 requests/60s per IP — conservative default for a CPU-bound signature
+    // oracle and an admin endpoint, not tuned against real traffic yet.
+    let rate_limiter = Arc::new(RateLimiter::new(20, std::time::Duration::from_secs(60)));
+
     let state = Arc::new(AppState {
         releases_dir,
         verify_key,
         revocation_list_path,
         revoked_tokens,
+        rate_limiter,
     });
 
     let app = build_router(state);
@@ -845,7 +944,26 @@ mod tests {
             verify_key,
             revocation_list_path,
             revoked_tokens: Arc::new(RwLock::new(HashSet::new())),
+            // Effectively unlimited — existing tests hit handlers repeatedly from
+            // the same IP; rate-limit-specific tests construct their own state
+            // with a tight limit via `test_state_with_rate_limit` instead.
+            rate_limiter: Arc::new(RateLimiter::new(
+                100_000,
+                std::time::Duration::from_secs(60),
+            )),
         })
+    }
+
+    fn test_state_with_rate_limit(
+        releases_dir: &std::path::Path,
+        max_requests: usize,
+    ) -> Arc<AppState> {
+        let mut state = (*test_state(releases_dir, None, None)).clone();
+        state.rate_limiter = Arc::new(RateLimiter::new(
+            max_requests,
+            std::time::Duration::from_secs(60),
+        ));
+        Arc::new(state)
     }
 
     async fn body_json(resp: Response) -> Value {
@@ -1503,6 +1621,7 @@ mod tests {
         let scratch = scratch_dir("vke-503");
         let state = test_state(&scratch, None, None);
         let (status, Json(body)) = verify_key_endpoint(
+            loopback(),
             State(state),
             Json(VerifyKeyRequest {
                 license_key_b64: "anything".into(),
@@ -1524,6 +1643,7 @@ mod tests {
         // Success shape.
         let token = make_token(&sk, &payload_json("prod", "9999-12-31"));
         let (status, Json(body)) = verify_key_endpoint(
+            loopback(),
             State(state.clone()),
             Json(VerifyKeyRequest {
                 license_key_b64: token,
@@ -1540,6 +1660,7 @@ mod tests {
         // Expired shape carries the expired date back.
         let token = make_token(&sk, &payload_json("prod", "2020-01-01"));
         let (status, Json(body)) = verify_key_endpoint(
+            loopback(),
             State(state),
             Json(VerifyKeyRequest {
                 license_key_b64: token,
@@ -1551,6 +1672,84 @@ mod tests {
         assert_eq!(body["valid"], false);
         assert_eq!(body["reason"], "channel expired");
         assert_eq!(body["expired"], "2020-01-01");
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // ── Rate limiting (S6) ──────────────────────────────────────────────────
+
+    #[test]
+    fn rate_limiter_allows_up_to_max_then_blocks() {
+        let rl = RateLimiter::new(3, std::time::Duration::from_secs(60));
+        let ip: std::net::IpAddr = "203.0.113.9".parse().unwrap();
+        assert!(rl.check(ip).is_ok());
+        assert!(rl.check(ip).is_ok());
+        assert!(rl.check(ip).is_ok());
+        let err = rl.check(ip).unwrap_err();
+        assert!(err >= 1, "retry_after should be at least 1 second");
+    }
+
+    #[test]
+    fn rate_limiter_tracks_ips_independently() {
+        let rl = RateLimiter::new(1, std::time::Duration::from_secs(60));
+        let a: std::net::IpAddr = "203.0.113.1".parse().unwrap();
+        let b: std::net::IpAddr = "203.0.113.2".parse().unwrap();
+        assert!(rl.check(a).is_ok());
+        assert!(rl.check(a).is_err());
+        // A different IP is unaffected by A's limit.
+        assert!(rl.check(b).is_ok());
+    }
+
+    #[tokio::test]
+    async fn verify_key_endpoint_429_when_rate_limited() {
+        let scratch = scratch_dir("vke-429");
+        let sk = test_signing_key();
+        let mut state = (*test_state(&scratch, Some(sk.verifying_key()), None)).clone();
+        state.rate_limiter = Arc::new(RateLimiter::new(1, std::time::Duration::from_secs(60)));
+        let state = Arc::new(state);
+
+        let req = || VerifyKeyRequest {
+            license_key_b64: "anything".into(),
+            product_id: "prod".into(),
+        };
+        let (first_status, _) =
+            verify_key_endpoint(loopback(), State(state.clone()), Json(req())).await;
+        assert_ne!(first_status, StatusCode::TOO_MANY_REQUESTS);
+
+        let (status, Json(body)) = verify_key_endpoint(loopback(), State(state), Json(req())).await;
+        assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(body["error"], "rate limited");
+        assert!(body["retry_after_seconds"].as_u64().unwrap() >= 1);
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn reload_revocation_list_429_when_rate_limited() {
+        let scratch = scratch_dir("rrl-429");
+        let list = scratch.join("revoked.txt");
+        fs::write(&list, "").unwrap();
+        let state = test_state_with_rate_limit(&scratch, 1);
+        // Patch in the revocation list path the generic helper doesn't set.
+        let mut state = (*state).clone();
+        state.revocation_list_path = Some(list.to_string_lossy().into_owned());
+        let state = Arc::new(state);
+
+        let first = reload_revocation_list(loopback(), State(state.clone())).await;
+        assert_ne!(first.status(), StatusCode::TOO_MANY_REQUESTS);
+
+        let resp = reload_revocation_list(loopback(), State(state)).await;
+        assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+        assert!(resp.headers().get(header::RETRY_AFTER).is_some());
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn reload_revocation_list_non_loopback_rejected_before_rate_limit_check() {
+        // Loopback gate must fire first -- an attacker spoofing a non-loopback
+        // source shouldn't be able to probe the rate limiter's state at all.
+        let scratch = scratch_dir("rrl-loopback-first");
+        let state = test_state_with_rate_limit(&scratch, 1);
+        let resp = reload_revocation_list(non_loopback(), State(state)).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
         let _ = fs::remove_dir_all(&scratch);
     }
 
