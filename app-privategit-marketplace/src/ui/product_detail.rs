@@ -25,6 +25,7 @@
 use crate::ui::Lang;
 use crate::{Installer, LicenseTier};
 use maud::{html, Markup, PreEscaped};
+use serde_json::json;
 
 /// Duplicated from `ui::catalog` rather than made `pub(crate)` — matches this
 /// crate's established preference for small per-page duplication over
@@ -144,6 +145,49 @@ impl ProductDetailLabels {
     }
 }
 
+// Duplicated from `ui::layout` rather than made `pub(crate)` — matches this crate's
+// established per-page-duplication preference (see `install_command` above).
+const SITE_URL: &str = "https://software.pointsav.com";
+
+/// `SoftwareApplication` + `BreadcrumbList` JSON-LD for a product-detail page (Tier 4,
+/// closing the gap `BRIEF-software-handoff-readiness.md` flagged: only `/software`
+/// carried JSON-LD, despite this page being the archetype's natural home for
+/// per-product structured data). Uses `serde_json::json!` rather than hand-formatted
+/// strings, unlike `catalog.rs`'s single static JSON-LD block — installer name/
+/// description are dynamic, untrusted-shape strings that need real JSON escaping.
+fn json_ld_script(i: &Installer, lang: Lang, page_path: &str) -> Markup {
+    let price = i.price_usdc as f64 / 1_000_000.0;
+    let data = json!({
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": i.name,
+        "description": i.description,
+        "applicationCategory": "BusinessApplication",
+        "softwareVersion": i.edition,
+        "offers": {
+            "@type": "Offer",
+            "price": format!("{price:.2}"),
+            "priceCurrency": "USD",
+        },
+        "provider": {"@type": "Organization", "@id": "https://pointsav.com/#organization"},
+    });
+    let breadcrumbs = json!({
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {"@type": "ListItem", "position": 1, "name": "Home", "item": format!("{SITE_URL}{}", lang.localize("/software"))},
+            {"@type": "ListItem", "position": 2, "name": "Software", "item": format!("{SITE_URL}{}", lang.localize("/software"))},
+            {"@type": "ListItem", "position": 3, "name": i.name, "item": format!("{SITE_URL}{page_path}")},
+        ],
+    });
+    let data_json = serde_json::to_string(&data).unwrap_or_default();
+    let breadcrumbs_json = serde_json::to_string(&breadcrumbs).unwrap_or_default();
+    html! {
+        script type="application/ld+json" { (PreEscaped(data_json)) }
+        script type="application/ld+json" { (PreEscaped(breadcrumbs_json)) }
+    }
+}
+
 pub fn product_detail_markup(i: &Installer, source_base_url: &str, lang: Lang) -> Markup {
     let base = source_base_url.trim_end_matches('/');
     let manifest_url = format!("{base}/{}/{}/MANIFEST", i.id, i.edition);
@@ -151,9 +195,11 @@ pub fn product_detail_markup(i: &Installer, source_base_url: &str, lang: Lang) -
     let command = install_command(source_base_url, &i.id);
     let l = ProductDetailLabels::for_lang(lang);
     let all_products_href = lang.localize("/software");
+    let page_path = lang.localize(&format!("/software/{}", i.id));
 
     html! {
         (product_detail_style())
+        (json_ld_script(i, lang, &page_path))
         div."sw-pd-wrap" {
             article."sw-pd-card" {
                 span."sw-pd-id" { (i.id) }
@@ -276,6 +322,41 @@ mod tests {
         assert!(html.contains("sw-pd-sha-value"));
         assert!(html.contains("verify via MANIFEST"));
         assert!(html.contains("fetch("));
+    }
+
+    // ── JSON-LD / BreadcrumbList (Tier 4) ───────────────────────────────────────
+
+    #[test]
+    fn json_ld_software_application_and_breadcrumbs_present_and_valid() {
+        let html = product_detail_markup(&fixture(1_000_000, None), BASE, Lang::En).into_string();
+        let blocks: Vec<&str> = html
+            .split("<script type=\"application/ld+json\">")
+            .skip(1)
+            .map(|s| s.split("</script>").next().unwrap())
+            .collect();
+        assert_eq!(blocks.len(), 2, "expected exactly 2 JSON-LD blocks");
+
+        let app: serde_json::Value = serde_json::from_str(blocks[0]).unwrap();
+        assert_eq!(app["@type"], "SoftwareApplication");
+        assert_eq!(app["name"], "MediaKit OS");
+        assert_eq!(app["offers"]["price"], "1.00");
+        assert_eq!(app["offers"]["priceCurrency"], "USD");
+
+        let breadcrumbs: serde_json::Value = serde_json::from_str(blocks[1]).unwrap();
+        assert_eq!(breadcrumbs["@type"], "BreadcrumbList");
+        let items = breadcrumbs["itemListElement"].as_array().unwrap();
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[2]["name"], "MediaKit OS");
+        assert!(items[2]["item"]
+            .as_str()
+            .unwrap()
+            .ends_with("/software/os-mediakit"));
+    }
+
+    #[test]
+    fn json_ld_breadcrumb_localizes_to_es_path() {
+        let html = product_detail_markup(&fixture(0, None), BASE, Lang::Es).into_string();
+        assert!(html.contains("\"item\":\"https://software.pointsav.com/es/software/os-mediakit\""));
     }
 
     // ── /es/* extension (Spanish localization follow-up, BRIEF-software-spanish-localization.md) ──
