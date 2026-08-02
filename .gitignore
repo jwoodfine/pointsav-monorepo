@@ -105,7 +105,22 @@ system-gateway-mba/vault_identity.key
 system-gateway-mba/keys/gcp_node_mba_ed25519
 *.key
 
-# Canonical-mirror repos never carry real per-archive .agent/ state — that lives in
-# clones/<archive>/.agent/ only. Untracked .agent/ residue here previously caused
-# false-positive CRITICAL drift alerts in bin/foundry-health.sh (root-caused 2026-07-09).
-.agent/
+# FIXED 2026-08-02 (known-bug-patterns.md #2) — this was a bare `.agent/` blanket
+# rule copy-pasted from a canonical-mirror repo's gitignore (where it's correct:
+# vendor/ mirrors never carry per-archive state), but this IS a working archive
+# root, not a mirror — the blanket rule was silently untracking this archive's
+# entire real .agent/ state (manifest, rules, briefs, memory — this archive
+# tracked ZERO .agent/ files as a result, the worst case found in the fleet
+# audit). Only the specific mailbox files below (never the whole directory)
+# should ever be ignored here — same narrow pattern as project-totebox's own
+# .gitignore.
+.agent/inbox.md
+.agent/inbox-archive.md
+.agent/outbox.md
+.agent/outbox-archive.md
+.agent/memory/session-context.md
+.agent/memory/session-context-archive.md
+.agent/drafts-outbound/
+.agent/engines/*/session.lock
+.agent/locks/
+.agent/scheduled_tasks.lock
