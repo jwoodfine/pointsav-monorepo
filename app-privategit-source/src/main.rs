@@ -162,6 +162,19 @@ fn release_path(releases_dir: &str, parts: &[&str]) -> PathBuf {
 
 /// Streams a file with real Range/ETag/Last-Modified/Cache-Control support (S10) via
 /// `tower_http::ServeFile`, replacing a raw `ReaderStream` that had none of those — a
+/// Error body carrying both a human-readable `error` message and a stable,
+/// machine-readable `code` (S15: "5 inconsistent error shapes... no stable
+/// machine-readable code field"). `code` is a kebab-case slug that won't change
+/// even if `error`'s wording does — every plain error response in this crate goes
+/// through this one helper now, instead of each call site hand-rolling its own
+/// `json!({"error": "..."})`. `LicenseVerifyErr::reason()` already returns codes in
+/// this same style; use it directly rather than duplicating a code table for it.
+fn err_json(code: &'static str, message: impl Into<String>) -> Value {
+    json!({"error": message.into(), "code": code})
+}
+
+/// Streams a file with real Range/ETag/Last-Modified/Cache-Control support (S10) via
+/// `tower_http::ServeFile`, replacing a raw `ReaderStream` that had none of those — a
 /// dropped connection on a large binary used to restart from byte 0, and nothing was
 /// ever cacheable. `ServeFile` handles conditional/partial requests correctly without
 /// hand-rolling `Range:` header parsing (a common source of off-by-one bugs).
@@ -189,7 +202,11 @@ async fn stream_file(
         // Never echo the server's real filesystem path to the client (live-confirmed
         // disclosure this session) — log it instead, where it's actually useful.
         tracing::debug!(path = %path.display(), "stream_file: not found");
-        return (StatusCode::NOT_FOUND, Json(json!({"error": "not found"}))).into_response();
+        return (
+            StatusCode::NOT_FOUND,
+            Json(err_json("not-found", "not found")),
+        )
+            .into_response();
     }
     let (mut parts, body) = resp.into_parts();
     parts
@@ -395,14 +412,14 @@ async fn product_index(
     if !is_safe_segment(&product) {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({"error": "invalid product identifier"})),
+            Json(err_json("invalid-identifier", "invalid product identifier")),
         );
     }
     let base = release_path(&state.releases_dir, &[&product]);
     if !base.exists() {
         return (
             StatusCode::NOT_FOUND,
-            Json(json!({"error": "product not found"})),
+            Json(err_json("product-not-found", "product not found")),
         );
     }
     let versions: Vec<String> = fs::read_dir(&base)
@@ -426,7 +443,10 @@ async fn manifest(
     if !is_safe_segment(&product) || !is_safe_segment(&version) {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({"error": "invalid product or version identifier"})),
+            Json(err_json(
+                "invalid-identifier",
+                "invalid product or version identifier",
+            )),
         )
             .into_response();
     }
@@ -460,7 +480,10 @@ async fn latest_redirect(
     if !is_safe_segment(&product) || !is_safe_segment(&platform) {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({"error": "invalid product or platform identifier"})),
+            Json(err_json(
+                "invalid-identifier",
+                "invalid product or platform identifier",
+            )),
         )
             .into_response();
     }
@@ -474,8 +497,11 @@ async fn latest_redirect(
         }
         None => (
             StatusCode::NOT_FOUND,
-            Json(json!({"error": "no binary available for this platform",
-                "hint": "The formal build pipeline has not produced a release for this platform yet."})),
+            Json(json!({
+                "error": "no binary available for this platform",
+                "code": "no-binary-for-platform",
+                "hint": "The formal build pipeline has not produced a release for this platform yet.",
+            })),
         )
             .into_response(),
     }
@@ -490,7 +516,10 @@ async fn binary(
     if !is_safe_segment(&product) || !is_safe_segment(&version) || !is_safe_segment(&platform) {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({"error": "invalid product, version, or platform identifier"})),
+            Json(err_json(
+                "invalid-identifier",
+                "invalid product, version, or platform identifier",
+            )),
         )
             .into_response();
     }
@@ -526,9 +555,12 @@ async fn binary(
             tracing::info!(product_id = %product, result = "unauthorized", reason = "missing-auth", "binary-download");
             return (
                 StatusCode::UNAUTHORIZED,
-                Json(json!({"error": "license key required",
+                Json(json!({
+                    "error": "license key required",
+                    "code": "license-key-required",
                     "header": "Authorization: Bearer <license_key_b64>",
-                    "query": "?token=<license_key_b64>"})),
+                    "query": "?token=<license_key_b64>",
+                })),
             )
                 .into_response();
         }
@@ -539,7 +571,10 @@ async fn binary(
         tracing::warn!(product_id = %product, result = "service-unavailable", "binary-download: VERIFY_KEY_PUB not set");
         return (
             StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({"error": "license verification not configured"})),
+            Json(err_json(
+                "service-unavailable",
+                "license verification not configured",
+            )),
         )
             .into_response();
     };
@@ -554,7 +589,10 @@ async fn binary(
                 "forbidden"
             };
             tracing::info!(product_id = %product, key_fp = %key_fp, result = log_result, reason = e.reason(), "binary-download");
-            return (e.status(), Json(json!({"error": e.reason()}))).into_response();
+            // `e.reason()` is already a stable kebab-case code — used as both
+            // fields here since binary-download errors don't have a separate
+            // longer human message today (unlike the other err_json() sites).
+            return (e.status(), Json(err_json(e.reason(), e.reason()))).into_response();
         }
         Ok(_payload) => {
             tracing::info!(product_id = %product, key_fp = %key_fp, result = "ok", "binary-download");
@@ -594,7 +632,11 @@ async fn verify_key_endpoint(
         tracing::warn!(ip = %addr.ip(), retry_after, "verify-key: rate limited");
         return (
             StatusCode::TOO_MANY_REQUESTS,
-            Json(json!({"error": "rate limited", "retry_after_seconds": retry_after})),
+            Json(json!({
+                "error": "rate limited",
+                "code": "rate-limited",
+                "retry_after_seconds": retry_after,
+            })),
         );
     }
     let Some(vk) = &state.verify_key else {
@@ -604,7 +646,10 @@ async fn verify_key_endpoint(
         );
         return (
             StatusCode::SERVICE_UNAVAILABLE,
-            Json(json!({"error": "verify key not configured — set VERIFY_KEY_PUB"})),
+            Json(err_json(
+                "service-unavailable",
+                "verify key not configured — set VERIFY_KEY_PUB",
+            )),
         );
     };
     let key_fp = hex::encode(&vk.as_bytes()[..4]);
@@ -617,9 +662,13 @@ async fn verify_key_endpoint(
     ) {
         Err(ref e @ LicenseVerifyErr::ChannelExpired(ref expired)) => {
             tracing::info!(product_id = %req.product_id, key_fp = %key_fp, result = "forbidden", reason = "channel-expired", expired = %expired, "verify-key");
+            // S15: was hardcoded "channel expired" (space) here while every other
+            // arm below uses e.reason() ("channel-expired", hyphenated) — the exact
+            // inconsistency the audit named by example. Same stable code now, both
+            // arms.
             (
                 e.status(),
-                Json(json!({"valid": false, "reason": "channel expired", "expired": expired})),
+                Json(json!({"valid": false, "reason": e.reason(), "expired": expired})),
             )
         }
         Err(e) => {
@@ -657,7 +706,10 @@ async fn reload_revocation_list(
     if !addr.ip().is_loopback() {
         return (
             StatusCode::FORBIDDEN,
-            Json(json!({"error": "admin endpoints are localhost-only"})),
+            Json(err_json(
+                "forbidden-non-loopback",
+                "admin endpoints are localhost-only",
+            )),
         )
             .into_response();
     }
@@ -671,28 +723,32 @@ async fn reload_revocation_list(
                 header::RETRY_AFTER,
                 HeaderValue::from_str(&retry_after.to_string()).unwrap(),
             )],
-            Json(json!({"error": "rate limited", "retry_after_seconds": retry_after})),
+            Json(json!({
+                "error": "rate limited",
+                "code": "rate-limited",
+                "retry_after_seconds": retry_after,
+            })),
         )
             .into_response();
     }
     let Some(ref path) = state.revocation_list_path else {
         return (
             StatusCode::NOT_FOUND,
-            Json(json!({"error": "no revocation list configured"})),
+            Json(err_json("not-configured", "no revocation list configured")),
         )
             .into_response();
     };
     match load_revocation_list(path) {
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => (
             StatusCode::NOT_FOUND,
-            Json(json!({"error": "revocation list file not found"})),
+            Json(err_json("not-found", "revocation list file not found")),
         )
             .into_response(),
         Err(e) => {
             tracing::warn!("reload_revocation_list failed: {e}");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": e.to_string()})),
+                Json(err_json("internal-error", e.to_string())),
             )
                 .into_response()
         }
@@ -717,7 +773,7 @@ async fn verify_key_pub(State(state): State<Arc<AppState>>) -> Response {
             .into_response(),
         None => (
             StatusCode::NOT_FOUND,
-            Json(json!({"error": "verify key not configured"})),
+            Json(err_json("not-configured", "verify key not configured")),
         )
             .into_response(),
     }
@@ -731,7 +787,7 @@ async fn install_script(
     if !is_safe_segment(&product) {
         return (
             StatusCode::BAD_REQUEST,
-            Json(json!({"error": "invalid product identifier"})),
+            Json(err_json("invalid-identifier", "invalid product identifier")),
         )
             .into_response();
     }
@@ -962,6 +1018,71 @@ mod tests {
             scratch.to_str().unwrap(),
             "no-such-product"
         ));
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // ── err_json / unified error schema (S15) ──────────────────────────────────
+
+    #[test]
+    fn err_json_carries_both_error_and_code() {
+        let v = err_json("invalid-identifier", "invalid product identifier");
+        assert_eq!(v["error"], "invalid product identifier");
+        assert_eq!(v["code"], "invalid-identifier");
+    }
+
+    #[tokio::test]
+    async fn manifest_rejects_unsafe_segments_carries_stable_code() {
+        let scratch = scratch_dir("manifest-code");
+        let state = test_state(&scratch, None, None);
+        let resp = manifest(
+            State(state),
+            HeaderMap::new(),
+            Path(("..".to_string(), "1.0.0".to_string())),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let body = body_json(resp).await;
+        assert_eq!(body["code"], "invalid-identifier");
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn verify_key_endpoint_channel_expired_reason_is_hyphenated_not_spaced() {
+        // The exact inconsistency the audit named by example: this arm used to
+        // hardcode "channel expired" (space) while every other reason in this same
+        // function used LicenseVerifyErr::reason()'s "channel-expired" (hyphen).
+        let scratch = scratch_dir("vke-channel-expired-code");
+        let sk = test_signing_key();
+        let state = test_state(&scratch, Some(sk.verifying_key()), None);
+        let token = make_token(&sk, &payload_json("prod", "2020-01-01"));
+        let (_, Json(body)) = verify_key_endpoint(
+            loopback(),
+            State(state),
+            Json(VerifyKeyRequest {
+                license_key_b64: token,
+                product_id: "prod".into(),
+            }),
+        )
+        .await;
+        assert_eq!(body["reason"], "channel-expired");
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn reload_revocation_list_rate_limited_carries_stable_code() {
+        let scratch = scratch_dir("rrl-code");
+        let list = scratch.join("revoked.txt");
+        fs::write(&list, "").unwrap();
+        let state = test_state_with_rate_limit(&scratch, 1);
+        let mut state = (*state).clone();
+        state.revocation_list_path = Some(list.to_string_lossy().into_owned());
+        let state = Arc::new(state);
+
+        let _ = reload_revocation_list(loopback(), State(state.clone())).await;
+        let resp = reload_revocation_list(loopback(), State(state)).await;
+        assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+        let body = body_json(resp).await;
+        assert_eq!(body["code"], "rate-limited");
         let _ = fs::remove_dir_all(&scratch);
     }
 
@@ -1769,7 +1890,10 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::FORBIDDEN);
         assert_eq!(body["valid"], false);
-        assert_eq!(body["reason"], "channel expired");
+        // S15 fix: was "channel expired" (space) — now matches LicenseVerifyErr's
+        // stable kebab-case code, same as every other reason value this endpoint
+        // returns.
+        assert_eq!(body["reason"], "channel-expired");
         assert_eq!(body["expired"], "2020-01-01");
         let _ = fs::remove_dir_all(&scratch);
     }
