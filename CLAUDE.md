@@ -13,9 +13,13 @@
 Software distribution substrate — `software.pointsav.com`. Owns the
 Ed25519 license key pipeline, Polygon USDC payment verification, and
 SOFT artifact type governance. This archive's root IS the
-`pointsav-monorepo` clone (there is no separate sub-clone one level
-down) — `Cargo.toml` and the crate/app/service directories sit
-directly at this directory's root.
+`pointsav-monorepo` clone — `Cargo.toml` and the crate/app/service
+directories sit directly at this directory's root. A nested
+`pointsav-monorepo/` sub-clone also exists one level down
+(intentional, documented in `.gitignore`, same pattern as
+project-marketing/project-design); see
+`conventions/pointsav-monorepo-subclone-guide.md` for how the two
+relate.
 
 **Owns:**
 - `app-privategit-marketplace` — software.pointsav.com storefront (static pages, `/v1/products`, `/v1/license`, `/v1/claim`)
