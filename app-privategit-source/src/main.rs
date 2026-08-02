@@ -4,7 +4,7 @@
 use anyhow::Result;
 use axum::{
     body::Body,
-    extract::{ConnectInfo, Path, Query, State},
+    extract::{ConnectInfo, Path, Query, Request, State},
     http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode},
     response::{IntoResponse, Json, Redirect, Response},
     routing::{get, post},
@@ -21,8 +21,8 @@ use std::{
     path::PathBuf,
     sync::{Arc, RwLock},
 };
-use tokio::fs::File;
-use tokio_util::io::ReaderStream;
+use tower::ServiceExt;
+use tower_http::services::ServeFile;
 use tower_http::set_header::SetResponseHeaderLayer;
 
 // Security headers applied to every response. No Content-Security-Policy here —
@@ -160,20 +160,47 @@ fn release_path(releases_dir: &str, parts: &[&str]) -> PathBuf {
     p
 }
 
-async fn stream_file(path: PathBuf, content_type: &'static str) -> Response {
-    match File::open(&path).await {
-        Ok(file) => {
-            let stream = ReaderStream::new(file);
-            let body = Body::from_stream(stream);
-            (StatusCode::OK, [(header::CONTENT_TYPE, content_type)], body).into_response()
-        }
-        Err(_) => {
-            // Never echo the server's real filesystem path to the client (live-confirmed
-            // disclosure this session) — log it instead, where it's actually useful.
-            tracing::debug!(path = %path.display(), "stream_file: not found");
-            (StatusCode::NOT_FOUND, Json(json!({"error": "not found"}))).into_response()
+/// Streams a file with real Range/ETag/Last-Modified/Cache-Control support (S10) via
+/// `tower_http::ServeFile`, replacing a raw `ReaderStream` that had none of those — a
+/// dropped connection on a large binary used to restart from byte 0, and nothing was
+/// ever cacheable. `ServeFile` handles conditional/partial requests correctly without
+/// hand-rolling `Range:` header parsing (a common source of off-by-one bugs).
+///
+/// `req_headers` forwards the incoming `Range`/`If-Modified-Since`/`If-None-Match`
+/// headers through to `ServeFile` so it can actually honor them. `content_type`
+/// overrides `ServeFile`'s extension-guessed MIME type (this crate's release
+/// filenames don't reliably carry the right extension). `content_disposition`, when
+/// set, forces a download with that filename rather than inline rendering.
+async fn stream_file(
+    req_headers: &HeaderMap,
+    path: PathBuf,
+    content_type: &'static str,
+    content_disposition: Option<&str>,
+) -> Response {
+    let mut req = Request::new(Body::empty());
+    *req.headers_mut() = req_headers.clone();
+    // ServeDir/ServeFile's Error is Infallible (checked against tower-http 0.5's
+    // source directly) — IO failures become a response (404/500), not a Service err.
+    let resp = ServeFile::new(&path)
+        .oneshot(req)
+        .await
+        .expect("ServeFile's Service::Error is Infallible");
+    if resp.status() == StatusCode::NOT_FOUND {
+        // Never echo the server's real filesystem path to the client (live-confirmed
+        // disclosure this session) — log it instead, where it's actually useful.
+        tracing::debug!(path = %path.display(), "stream_file: not found");
+        return (StatusCode::NOT_FOUND, Json(json!({"error": "not found"}))).into_response();
+    }
+    let (mut parts, body) = resp.into_parts();
+    parts
+        .headers
+        .insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
+    if let Some(name) = content_disposition {
+        if let Ok(v) = HeaderValue::from_str(&format!("attachment; filename=\"{name}\"")) {
+            parts.headers.insert(header::CONTENT_DISPOSITION, v);
         }
     }
+    Response::from_parts(parts, Body::new(body))
 }
 
 fn load_verify_key(val: &str) -> Option<VerifyingKey> {
@@ -393,6 +420,7 @@ async fn product_index(
 
 async fn manifest(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Path((product, version)): Path<(String, String)>,
 ) -> Response {
     if !is_safe_segment(&product) || !is_safe_segment(&version) {
@@ -421,7 +449,7 @@ async fn manifest(
     } else {
         release_path(&state.releases_dir, &[&product, "MANIFEST.json"])
     };
-    stream_file(path, "application/json").await
+    stream_file(&headers, path, "application/json", None).await
 }
 
 async fn latest_redirect(
@@ -472,7 +500,7 @@ async fn binary(
             &state.releases_dir,
             &[&product, &version, &format!("{base_platform}.sig")],
         );
-        return stream_file(path, "application/octet-stream").await;
+        return stream_file(&headers, path, "application/octet-stream", None).await;
     }
 
     // 2. Open products (requires_license: false in PRODUCT-ROOT MANIFEST.json) — serve without auth.
@@ -480,33 +508,7 @@ async fn binary(
         tracing::info!(product_id = %product, result = "ok-open", "binary-download");
         let path = release_path(&state.releases_dir, &[&product, &version, &platform]);
         let filename = format!("{product}-{version}-{platform}");
-        return match File::open(&path).await {
-            Ok(file) => {
-                let stream = ReaderStream::new(file);
-                let body = Body::from_stream(stream);
-                (
-                    StatusCode::OK,
-                    [
-                        (
-                            header::CONTENT_TYPE,
-                            HeaderValue::from_static("application/octet-stream"),
-                        ),
-                        (
-                            header::CONTENT_DISPOSITION,
-                            HeaderValue::from_str(&format!("attachment; filename=\"{filename}\""))
-                                .unwrap_or_else(|_| HeaderValue::from_static("attachment")),
-                        ),
-                    ],
-                    body,
-                )
-                    .into_response()
-            }
-            Err(_) => (
-                StatusCode::NOT_FOUND,
-                Json(json!({"error": "binary not found"})),
-            )
-                .into_response(),
-        };
+        return stream_file(&headers, path, "application/octet-stream", Some(&filename)).await;
     }
 
     // 3. License required — accept Authorization: Bearer <token> header OR ?token= query param
@@ -562,34 +564,7 @@ async fn binary(
     // 6. On success: stream the binary.
     let path = release_path(&state.releases_dir, &[&product, &version, &platform]);
     let filename = format!("{product}-{version}-{platform}");
-    match File::open(&path).await {
-        Ok(file) => {
-            let stream = ReaderStream::new(file);
-            let body = Body::from_stream(stream);
-            (
-                StatusCode::OK,
-                [
-                    (
-                        header::CONTENT_TYPE,
-                        HeaderValue::from_static("application/octet-stream"),
-                    ),
-                    (
-                        header::CONTENT_DISPOSITION,
-                        HeaderValue::from_str(&format!("attachment; filename=\"{filename}\""))
-                            .unwrap_or_else(|_| HeaderValue::from_static("attachment")),
-                    ),
-                ],
-                body,
-            )
-                .into_response()
-        }
-        Err(_) => (
-            StatusCode::NOT_FOUND,
-            Json(json!({"error": "binary not found",
-                "note": "Real OS binaries ship with the build pipeline. Check back soon."})),
-        )
-            .into_response(),
-    }
+    stream_file(&headers, path, "application/octet-stream", Some(&filename)).await
 }
 
 async fn git_stub() -> (StatusCode, Json<Value>) {
@@ -750,6 +725,7 @@ async fn verify_key_pub(State(state): State<Arc<AppState>>) -> Response {
 
 async fn install_script(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Path(product): Path<String>,
 ) -> Response {
     if !is_safe_segment(&product) {
@@ -760,7 +736,7 @@ async fn install_script(
             .into_response();
     }
     let path = release_path(&state.releases_dir, &[&product, "install.sh"]);
-    stream_file(path, "text/x-shellscript").await
+    stream_file(&headers, path, "text/x-shellscript", None).await
 }
 
 // ── Router ────────────────────────────────────────────────────────────────────
@@ -989,6 +965,121 @@ mod tests {
         let _ = fs::remove_dir_all(&scratch);
     }
 
+    // ── stream_file (S10: Range/ETag/Last-Modified/Cache-Control) ─────────────
+
+    #[tokio::test]
+    async fn stream_file_serves_full_content_with_accept_ranges() {
+        let scratch = scratch_dir("stream-full");
+        let file_path = scratch.join("payload.bin");
+        fs::write(&file_path, b"0123456789").unwrap();
+
+        let resp = stream_file(
+            &HeaderMap::new(),
+            file_path,
+            "application/octet-stream",
+            None,
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(resp.headers().get(header::ACCEPT_RANGES).unwrap(), "bytes");
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert_eq!(&bytes[..], b"0123456789");
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn stream_file_honors_range_header_with_206_partial_content() {
+        let scratch = scratch_dir("stream-range");
+        let file_path = scratch.join("payload.bin");
+        fs::write(&file_path, b"0123456789").unwrap();
+
+        let mut headers = HeaderMap::new();
+        headers.insert(header::RANGE, HeaderValue::from_static("bytes=2-4"));
+        let resp = stream_file(&headers, file_path, "application/octet-stream", None).await;
+        assert_eq!(resp.status(), StatusCode::PARTIAL_CONTENT);
+        assert!(resp.headers().get(header::CONTENT_RANGE).is_some());
+        let bytes = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        // bytes=2-4 is inclusive: '2','3','4'.
+        assert_eq!(&bytes[..], b"234");
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn stream_file_content_type_override_wins_over_extension_guess() {
+        let scratch = scratch_dir("stream-ctype");
+        // No extension at all -- ServeFile would otherwise guess
+        // application/octet-stream or fail to guess; the explicit override must win.
+        let file_path = scratch.join("install");
+        fs::write(&file_path, b"#!/bin/sh\necho hi\n").unwrap();
+
+        let resp = stream_file(&HeaderMap::new(), file_path, "text/x-shellscript", None).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert_eq!(
+            resp.headers().get(header::CONTENT_TYPE).unwrap(),
+            "text/x-shellscript"
+        );
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn stream_file_sets_content_disposition_when_requested() {
+        let scratch = scratch_dir("stream-disposition");
+        let file_path = scratch.join("payload.bin");
+        fs::write(&file_path, b"data").unwrap();
+
+        let resp = stream_file(
+            &HeaderMap::new(),
+            file_path,
+            "application/octet-stream",
+            Some("os-console-1.0.0-linux-x86_64"),
+        )
+        .await;
+        let disposition = resp
+            .headers()
+            .get(header::CONTENT_DISPOSITION)
+            .unwrap()
+            .to_str()
+            .unwrap();
+        assert!(disposition.contains("attachment"));
+        assert!(disposition.contains("os-console-1.0.0-linux-x86_64"));
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn stream_file_omits_content_disposition_when_not_requested() {
+        let scratch = scratch_dir("stream-no-disposition");
+        let file_path = scratch.join("payload.json");
+        fs::write(&file_path, b"{}").unwrap();
+
+        let resp = stream_file(&HeaderMap::new(), file_path, "application/json", None).await;
+        assert!(resp.headers().get(header::CONTENT_DISPOSITION).is_none());
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn stream_file_404_never_echoes_real_filesystem_path() {
+        let scratch = scratch_dir("stream-missing");
+        let file_path = scratch.join("does-not-exist.bin");
+
+        let resp = stream_file(
+            &HeaderMap::new(),
+            file_path.clone(),
+            "application/octet-stream",
+            None,
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        let body = body_json(resp).await;
+        let body_str = body.to_string();
+        assert!(!body_str.contains(&file_path.to_string_lossy().to_string()));
+        assert_eq!(body["error"], "not found");
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
     // ── manifest (S2 fix: per-version MANIFEST route) ─────────────────────────
 
     #[tokio::test]
@@ -1004,6 +1095,7 @@ mod tests {
         let state = test_state(&scratch, None, None);
         let resp = manifest(
             State(state),
+            HeaderMap::new(),
             Path(("prod".to_string(), "1.0.0".to_string())),
         )
         .await;
@@ -1030,6 +1122,7 @@ mod tests {
         let state = test_state(&scratch, None, None);
         let resp = manifest(
             State(state),
+            HeaderMap::new(),
             Path(("prod".to_string(), "1.0.0".to_string())),
         )
         .await;
@@ -1046,6 +1139,7 @@ mod tests {
         let state = test_state(&scratch, None, None);
         let resp = manifest(
             State(state),
+            HeaderMap::new(),
             Path(("prod".to_string(), "1.0.0".to_string())),
         )
         .await;
@@ -1057,7 +1151,12 @@ mod tests {
     async fn manifest_rejects_unsafe_segments() {
         let scratch = scratch_dir("manifest-unsafe");
         let state = test_state(&scratch, None, None);
-        let resp = manifest(State(state), Path(("..".to_string(), "1.0.0".to_string()))).await;
+        let resp = manifest(
+            State(state),
+            HeaderMap::new(),
+            Path(("..".to_string(), "1.0.0".to_string())),
+        )
+        .await;
         assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         let _ = fs::remove_dir_all(&scratch);
     }
@@ -1463,7 +1562,7 @@ mod tests {
     async fn install_script_404_on_missing_file() {
         let scratch = scratch_dir("install");
         let state = test_state(&scratch, None, None);
-        let resp = install_script(State(state), Path("ghost".to_string())).await;
+        let resp = install_script(State(state), HeaderMap::new(), Path("ghost".to_string())).await;
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         let body = body_json(resp).await;
         assert_eq!(body["error"], "not found");
@@ -1476,7 +1575,7 @@ mod tests {
         fs::create_dir_all(scratch.join("prod")).unwrap();
         fs::write(scratch.join("prod/install.sh"), "#!/bin/sh\necho hi\n").unwrap();
         let state = test_state(&scratch, None, None);
-        let resp = install_script(State(state), Path("prod".to_string())).await;
+        let resp = install_script(State(state), HeaderMap::new(), Path("prod".to_string())).await;
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(
             resp.headers()[header::CONTENT_TYPE].to_str().unwrap(),
@@ -1892,7 +1991,9 @@ mod tests {
         // Auth passed; the file simply is not there.
         assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         let body = body_json(resp).await;
-        assert_eq!(body["error"], "binary not found");
+        // Error shape now comes from the shared stream_file() 404, not a
+        // route-specific message (S10 refactor onto tower_http::ServeFile).
+        assert_eq!(body["error"], "not found");
         let _ = fs::remove_dir_all(&scratch);
     }
 
