@@ -1212,26 +1212,36 @@ async fn robots_txt() -> Response {
 // GET /sitemap.xml (SEO). Lists only this crate's real HTML pages — never `/v1/*`, and
 // never `app-privategit-source`'s `/releases/*`/`/git/*` (a different service entirely,
 // streams binaries/manifests only, no HTML to index).
-async fn sitemap_xml() -> Response {
-    let pages = [
-        "/",
-        "/software",
-        "/pricing",
-        "/licensing",
-        "/page/contact",
-        "/page/disclaimer",
-        "/page/privacy",
-        "/page/accessibility",
+// Tier 4 fix: previously a fixed list omitting product-detail pages entirely and
+// including `/`, which is only ever a 302 to `/software` — listing a redirect and
+// its own target. Product pages are now enumerated from the live catalog (never
+// drifts from what's actually deployed); `/` is dropped in favor of `/software`.
+async fn sitemap_xml(State(state): State<Arc<AppState>>) -> Response {
+    let mut pages = vec![
+        "/software".to_string(),
+        "/pricing".to_string(),
+        "/licensing".to_string(),
+        "/page/contact".to_string(),
+        "/page/disclaimer".to_string(),
+        "/page/privacy".to_string(),
+        "/page/accessibility".to_string(),
         // Spanish variants — every page now has a real ES sibling (2026-07-13
         // full-site-parity pass); /es alone omitted since it 302s to /es/software.
-        "/es/software",
-        "/es/pricing",
-        "/es/licensing",
-        "/es/page/contact",
-        "/es/page/disclaimer",
-        "/es/page/privacy",
-        "/es/page/accessibility",
+        "/es/software".to_string(),
+        "/es/pricing".to_string(),
+        "/es/licensing".to_string(),
+        "/es/page/contact".to_string(),
+        "/es/page/disclaimer".to_string(),
+        "/es/page/privacy".to_string(),
+        "/es/page/accessibility".to_string(),
     ];
+    if let Ok(catalog) = load_catalog(&state.catalog_path) {
+        for i in &catalog.installers {
+            pages.push(format!("/software/{}", i.id));
+            // Product-detail /es/* extension (2026-08-02) — English only until then.
+            pages.push(format!("/es/software/{}", i.id));
+        }
+    }
     let urls: String = pages
         .iter()
         .map(|p| format!("  <url><loc>https://software.pointsav.com{p}</loc></url>\n"))
@@ -3513,7 +3523,9 @@ esac
 
     #[tokio::test]
     async fn sitemap_xml_lists_html_pages_only_not_v1_or_source_routes() {
-        let resp = sitemap_xml().await;
+        let scratch = scratch_dir("sitemap-basic");
+        let state = test_state_full(&scratch);
+        let resp = sitemap_xml(State(state)).await;
         assert_eq!(resp.status(), StatusCode::OK);
         assert_eq!(
             resp.headers().get(header::CONTENT_TYPE).unwrap(),
@@ -3526,5 +3538,36 @@ esac
         assert!(!body.contains("/v1/"));
         assert!(!body.contains("/releases/"));
         assert!(!body.contains("/git/"));
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // Tier 4 fix: sitemap previously omitted product-detail pages entirely and
+    // included the bare `/` redirect.
+    #[tokio::test]
+    async fn sitemap_xml_includes_product_pages_and_drops_bare_redirect() {
+        let scratch = scratch_dir("sitemap-products");
+        let state = test_state_full(&scratch);
+        let resp = sitemap_xml(State(state)).await;
+        let body = body_text(resp.into_body()).await;
+        assert!(body.contains("<loc>https://software.pointsav.com/software/os-mediakit</loc>"));
+        assert!(body.contains("<loc>https://software.pointsav.com/software/os-console</loc>"));
+        assert!(body.contains("<loc>https://software.pointsav.com/es/software/os-mediakit</loc>"));
+        // `/` is only ever a 302 to `/software` — not worth listing both.
+        assert!(!body.contains("<loc>https://software.pointsav.com/</loc>"));
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn sitemap_xml_omits_product_pages_when_catalog_unavailable() {
+        let scratch = scratch_dir("sitemap-no-catalog");
+        let state = test_state_at(&scratch, scratch.join("no-such-products.yaml"));
+        let resp = sitemap_xml(State(state)).await;
+        // Degrades to the static page list rather than 500ing — sitemap staying up
+        // matters more than product coverage for one bad catalog read.
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_text(resp.into_body()).await;
+        assert!(body.contains("<loc>https://software.pointsav.com/software</loc>"));
+        assert!(!body.contains("/software/os-"));
+        let _ = fs::remove_dir_all(&scratch);
     }
 }
