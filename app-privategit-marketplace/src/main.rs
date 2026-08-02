@@ -27,9 +27,39 @@ use tower_http::set_header::SetResponseHeaderLayer;
 // hashes wired through the render pipeline to tighten this further, and no
 // external CDN/font dependency that would need its own allowance.
 const HSTS_VALUE: &str = "max-age=63072000; includeSubDomains";
-const CSP_VALUE: &str = "default-src 'self'; script-src 'self' 'unsafe-inline'; \
-    style-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; \
-    base-uri 'self'";
+
+// S2/M10 fix (part 2 of 2 — part 1 is `manifest()`'s product-root fallback in
+// app-privategit-source): the product-detail page's client-side SHA256 fetch
+// (`ui::product_detail::sha_fetch_script`) hits `SOURCE_BASE_URL` directly, which is
+// a different origin than this marketplace on every host except prod (where a
+// front-proxy happens to collapse them). `default-src 'self'` alone blocks that
+// fetch outright — live-confirmed console errors on any non-prod host. Rather than
+// adding a same-origin proxy route (a new marketplace→source network coupling this
+// crate's own docs deliberately avoid — see `product_detail.rs`'s module doc), CSP
+// gets one explicit `connect-src` allowance for the known, trusted source origin.
+fn csp_value(source_base_url: &str) -> String {
+    format!(
+        "default-src 'self'; script-src 'self' 'unsafe-inline'; \
+         style-src 'self' 'unsafe-inline'; img-src 'self' data:; \
+         connect-src 'self' {}; frame-ancestors 'none'; base-uri 'self'",
+        url_origin(source_base_url)
+    )
+}
+
+/// Extracts `scheme://host[:port]` from a full URL — avoids pulling in a
+/// URL-parsing dependency for this one string operation. Falls back to the input
+/// unchanged if it doesn't look like `scheme://host/...` (defensive; `connect-src`
+/// simply grants no extra origin in that case, it doesn't break anything else).
+fn url_origin(url: &str) -> String {
+    match url.find("://") {
+        Some(scheme_end) => {
+            let after_scheme = &url[scheme_end + 3..];
+            let host_end = after_scheme.find('/').unwrap_or(after_scheme.len());
+            url[..scheme_end + 3 + host_end].to_string()
+        }
+        None => url.to_string(),
+    }
+}
 
 mod ui;
 use ui::{Lang, SoftwareSurface};
@@ -1792,6 +1822,7 @@ async fn main() -> Result<()> {
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(1.37);
+    let csp_value = csp_value(&source_base_url);
 
     let state = Arc::new(AppState {
         catalog_path,
@@ -1862,7 +1893,7 @@ async fn main() -> Result<()> {
         ))
         .layer(SetResponseHeaderLayer::overriding(
             HeaderName::from_static("content-security-policy"),
-            HeaderValue::from_static(CSP_VALUE),
+            HeaderValue::from_str(&csp_value).expect("csp_value must be a valid header value"),
         ))
         .with_state(state);
 
@@ -1886,6 +1917,42 @@ mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
     static SEQ: AtomicUsize = AtomicUsize::new(0);
+
+    // ── url_origin / csp_value (S2/M10 CSP connect-src fix) ────────────────────
+
+    #[test]
+    fn url_origin_strips_path_from_full_url() {
+        assert_eq!(
+            url_origin("https://software.pointsav.com/releases"),
+            "https://software.pointsav.com"
+        );
+        assert_eq!(
+            url_origin("http://127.0.0.1:9201/some/path"),
+            "http://127.0.0.1:9201"
+        );
+    }
+
+    #[test]
+    fn url_origin_bare_origin_unchanged() {
+        assert_eq!(
+            url_origin("https://software.pointsav.com"),
+            "https://software.pointsav.com"
+        );
+    }
+
+    #[test]
+    fn url_origin_falls_back_to_input_when_not_a_url() {
+        assert_eq!(url_origin("not-a-url"), "not-a-url");
+    }
+
+    #[test]
+    fn csp_value_allows_source_origin_via_connect_src() {
+        let csp = csp_value("http://127.0.0.1:9201/releases");
+        assert!(csp.contains("connect-src 'self' http://127.0.0.1:9201"));
+        // Still a real, complete policy — not just the one directive.
+        assert!(csp.contains("default-src 'self'"));
+        assert!(csp.contains("frame-ancestors 'none'"));
+    }
 
     /// Fresh, unique scratch directory under /tmp for one test.
     fn scratch_dir(tag: &str) -> PathBuf {
