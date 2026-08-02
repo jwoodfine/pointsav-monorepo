@@ -1294,24 +1294,54 @@ fn render_contact_page(lang: Lang) -> Response {
 
 // GET /software/:product_id — S136 product detail page. Mirrors checkout_page's
 // catalog-lookup + 404/500 shape exactly.
+// GET /software/:product_id — English product detail page.
 async fn product_detail_page(
     State(state): State<Arc<AppState>>,
     Path(product_id): Path<String>,
 ) -> Response {
+    render_product_detail_page(&state, &product_id, Lang::En).await
+}
+
+// GET /es/software/:product_id — Spanish product detail page (2026-08-02 follow-up
+// to the full-site Spanish localization pass, which had explicitly deferred this
+// page — see BRIEF-software-spanish-localization.md). Static labels translate;
+// product name/description stay English (no translation source for catalog data).
+async fn product_detail_page_es(
+    State(state): State<Arc<AppState>>,
+    Path(product_id): Path<String>,
+) -> Response {
+    render_product_detail_page(&state, &product_id, Lang::Es).await
+}
+
+async fn render_product_detail_page(state: &AppState, product_id: &str, lang: Lang) -> Response {
     match load_catalog(&state.catalog_path) {
         Ok(catalog) => match catalog.installers.iter().find(|i| i.id == product_id) {
             Some(installer) => {
-                let content = ui::product_detail_markup(installer, &state.source_base_url);
+                let content = ui::product_detail_markup(installer, &state.source_base_url, lang);
+                let (title, description) = match lang {
+                    Lang::En => (
+                        format!("{} — PointSav Software", installer.name),
+                        format!(
+                            "{} — {} Licensed binary download, install command, and version/checksum details.",
+                            installer.name, installer.description
+                        ),
+                    ),
+                    Lang::Es => (
+                        format!("{} — PointSav Software", installer.name),
+                        format!(
+                            "{} — {} Descarga de binario con licencia, comando de instalaci\u{f3}n \
+                             y detalles de versi\u{f3}n/suma de verificaci\u{f3}n.",
+                            installer.name, installer.description
+                        ),
+                    ),
+                };
                 let body = ui::render_page(
                     SoftwareSurface::Marketplace,
-                    Lang::En,
-                    &format!("{} — PointSav Software", installer.name),
-                    &format!(
-                        "{} — {} Licensed binary download, install command, and version/checksum details.",
-                        installer.name, installer.description
-                    ),
-                    &format!("/software/{}", installer.id),
-                    false,
+                    lang,
+                    &title,
+                    &description,
+                    &lang.localize(&format!("/software/{}", installer.id)),
+                    true,
                     content,
                 )
                 .into_string();
@@ -1322,22 +1352,44 @@ async fn product_detail_page(
                 )
                     .into_response()
             }
-            None => error_response(
-                Lang::En,
-                StatusCode::NOT_FOUND,
-                "/software",
-                "Product not found",
-                "That product doesn't exist in the catalog. It may have been renamed or removed.",
-            ),
+            None => {
+                let (heading, message) = match lang {
+                    Lang::En => (
+                        "Product not found",
+                        "That product doesn't exist in the catalog. It may have been renamed or removed.",
+                    ),
+                    Lang::Es => (
+                        "Producto no encontrado",
+                        "Ese producto no existe en el cat\u{e1}logo. Puede que haya sido renombrado o eliminado.",
+                    ),
+                };
+                error_response(
+                    lang,
+                    StatusCode::NOT_FOUND,
+                    &lang.localize("/software"),
+                    heading,
+                    message,
+                )
+            }
         },
         Err(e) => {
             tracing::error!("catalog load failed for /software/:id: {e:#}");
+            let (heading, message) = match lang {
+                Lang::En => (
+                    "Catalog unavailable",
+                    "The product catalog couldn't be loaded right now. Please try again shortly.",
+                ),
+                Lang::Es => (
+                    "Cat\u{e1}logo no disponible",
+                    "El cat\u{e1}logo de productos no se pudo cargar en este momento. Int\u{e9}ntelo de nuevo en breve.",
+                ),
+            };
             error_response(
-                Lang::En,
+                lang,
                 StatusCode::INTERNAL_SERVER_ERROR,
-                "/software",
-                "Catalog unavailable",
-                "The product catalog couldn't be loaded right now. Please try again shortly.",
+                &lang.localize("/software"),
+                heading,
+                message,
             )
         }
     }
@@ -1849,6 +1901,7 @@ async fn main() -> Result<()> {
         // parity 2026-07-13) — see `ui::lang` module docs.
         .route("/es", get(root_es))
         .route("/es/software", get(software_page_es))
+        .route("/es/software/:product_id", get(product_detail_page_es))
         .route("/es/licensing", get(licensing_page_es))
         .route("/es/pricing", get(pricing_page_es))
         .route("/page/disclaimer", get(disclaimer_page))
@@ -3198,6 +3251,34 @@ esac
         let state = test_state_at(&scratch, scratch.join("no-such-products.yaml"));
         let resp = product_detail_page(State(state), Path("os-console".to_string())).await;
         assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // /es/software/:product_id follow-up (2026-08-02), scoped in
+    // BRIEF-software-spanish-localization.md as deferred out of the original pass.
+    #[tokio::test]
+    async fn product_detail_page_es_renders_translated_labels() {
+        let scratch = scratch_dir("product-detail-es-ok");
+        let state = test_state_full(&scratch);
+        let resp = product_detail_page_es(State(state), Path("os-mediakit".to_string())).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let html = body_text(resp.into_body()).await;
+        // Product name/description stay English; static labels translate.
+        assert!(html.contains("MediaKit OS"));
+        assert!(html.contains("Instalaci\u{f3}n"));
+        assert!(html.contains("sw-masthead"));
+        assert!(html.contains("lang=\"es\""));
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn product_detail_page_es_404_for_unknown_product() {
+        let scratch = scratch_dir("product-detail-es-404");
+        let state = test_state_full(&scratch);
+        let resp = product_detail_page_es(State(state), Path("no-such-product".to_string())).await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        let html = body_text(resp.into_body()).await;
+        assert!(html.contains("Producto no encontrado"));
         let _ = fs::remove_dir_all(&scratch);
     }
 

@@ -22,6 +22,7 @@
 //!   new marketplace→source-2 network coupling at render time. Degrades to a
 //!   visible "verify via MANIFEST" link if the fetch fails or JS is disabled.
 
+use crate::ui::Lang;
 use crate::{Installer, LicenseTier};
 use maud::{html, Markup, PreEscaped};
 
@@ -87,11 +88,69 @@ fn product_detail_style() -> Markup {
     html! { style { (PreEscaped(css)) } }
 }
 
-pub fn product_detail_markup(i: &Installer, source_base_url: &str) -> Markup {
+/// Static-label translations for this page — installer name/description stay
+/// English regardless of `lang` (no translation source exists for catalog data,
+/// same convention as `catalog.rs`/`checkout.rs`).
+struct ProductDetailLabels {
+    platform_h2: &'static str,
+    platform_col: &'static str,
+    download_col: &'static str,
+    install_h2: &'static str,
+    copy_label: &'static str,
+    copy_aria: &'static str,
+    version_h2: &'static str,
+    sha_label: &'static str,
+    sha_verifying: &'static str,
+    sha_fallback: &'static str,
+    guide_h2: &'static str,
+    guide_link: &'static str,
+    back_link: &'static str,
+}
+
+impl ProductDetailLabels {
+    fn for_lang(lang: Lang) -> Self {
+        match lang {
+            Lang::En => Self {
+                platform_h2: "Platform",
+                platform_col: "Platform",
+                download_col: "Download",
+                install_h2: "Install",
+                copy_label: "Copy",
+                copy_aria: "Copy install command to clipboard",
+                version_h2: "Version & checksum",
+                sha_label: "SHA256: ",
+                sha_verifying: "verifying\u{2026}",
+                sha_fallback: "verify via MANIFEST",
+                guide_h2: "Guide",
+                guide_link: "Operational guide",
+                back_link: "\u{2190} All products",
+            },
+            Lang::Es => Self {
+                platform_h2: "Plataforma",
+                platform_col: "Plataforma",
+                download_col: "Descarga",
+                install_h2: "Instalaci\u{f3}n",
+                copy_label: "Copiar",
+                copy_aria: "Copiar comando de instalaci\u{f3}n al portapapeles",
+                version_h2: "Versi\u{f3}n y suma de verificaci\u{f3}n",
+                sha_label: "SHA256: ",
+                sha_verifying: "verificando\u{2026}",
+                sha_fallback: "verificar via MANIFEST",
+                guide_h2: "Gu\u{ed}a",
+                guide_link: "Gu\u{ed}a operativa",
+                back_link: "\u{2190} Todos los productos",
+            },
+        }
+    }
+}
+
+pub fn product_detail_markup(i: &Installer, source_base_url: &str, lang: Lang) -> Markup {
     let base = source_base_url.trim_end_matches('/');
     let manifest_url = format!("{base}/{}/{}/MANIFEST", i.id, i.edition);
     let download_url = format!("{base}/{}/{}/linux-x86_64", i.id, i.edition);
     let command = install_command(source_base_url, &i.id);
+    let l = ProductDetailLabels::for_lang(lang);
+    let all_products_href = lang.localize("/software");
 
     html! {
         (product_detail_style())
@@ -108,9 +167,9 @@ pub fn product_detail_markup(i: &Installer, source_base_url: &str) -> Markup {
                     span."sw-cat-badge sw-cat-badge--ver" { "v" (i.edition) }
                 }
 
-                h2."sw-pd-h2" { "Platform" }
+                h2."sw-pd-h2" { (l.platform_h2) }
                 table."sw-pd-table" {
-                    thead { tr { th { "Platform" } th { "Download" } } }
+                    thead { tr { th { (l.platform_col) } th { (l.download_col) } } }
                     tbody {
                         tr {
                             td { (i.platform) }
@@ -119,31 +178,31 @@ pub fn product_detail_markup(i: &Installer, source_base_url: &str) -> Markup {
                     }
                 }
 
-                h2."sw-pd-h2" { "Install" }
+                h2."sw-pd-h2" { (l.install_h2) }
                 div."sw-cat-install" {
                     div."sw-cat-cmd" {
                         code."sw-cat-cmd__text" { (command) }
                         button."sw-cat-cmd__copy" type="button"
-                            data-sw-clip=(command) data-sw-label="Copy"
-                            aria-label="Copy install command to clipboard" { "Copy" }
+                            data-sw-clip=(command) data-sw-label=(l.copy_label)
+                            aria-label=(l.copy_aria) { (l.copy_label) }
                     }
                 }
 
-                h2."sw-pd-h2" { "Version & checksum" }
+                h2."sw-pd-h2" { (l.version_h2) }
                 p."sw-pd-version" { "v" (i.edition) }
                 p."sw-pd-sha" {
-                    span."sw-pd-sha__label" { "SHA256: " }
-                    span."sw-pd-sha__value" #"sw-pd-sha-value" { "verifying\u{2026}" }
+                    span."sw-pd-sha__label" { (l.sha_label) }
+                    span."sw-pd-sha__value" #"sw-pd-sha-value" { (l.sha_verifying) }
                     " \u{2014} "
-                    a."sw-pd-sha__fallback" href=(manifest_url) { "verify via MANIFEST" }
+                    a."sw-pd-sha__fallback" href=(manifest_url) { (l.sha_fallback) }
                 }
 
                 @if let Some(url) = &i.guide_url {
-                    h2."sw-pd-h2" { "Guide" }
-                    p { a href=(url) { "Operational guide" } }
+                    h2."sw-pd-h2" { (l.guide_h2) }
+                    p { a href=(url) { (l.guide_link) } }
                 }
 
-                p."sw-pd-back" { a href="/software" { "\u{2190} All products" } }
+                p."sw-pd-back" { a href=(all_products_href) { (l.back_link) } }
             }
         }
         (sha_fetch_script(&manifest_url))
@@ -177,7 +236,7 @@ mod tests {
 
     #[test]
     fn renders_badge_platform_install_and_version() {
-        let html = product_detail_markup(&fixture(0, None), BASE).into_string();
+        let html = product_detail_markup(&fixture(0, None), BASE, Lang::En).into_string();
         assert!(html.contains("os-mediakit"));
         assert!(html.contains("MediaKit OS"));
         assert!(html.contains("BETA \u{00b7} free"));
@@ -192,18 +251,19 @@ mod tests {
 
     #[test]
     fn paid_product_omits_beta_badge() {
-        let html = product_detail_markup(&fixture(1_000_000, None), BASE).into_string();
+        let html = product_detail_markup(&fixture(1_000_000, None), BASE, Lang::En).into_string();
         assert!(!html.contains("BETA \u{00b7} free"));
     }
 
     #[test]
     fn guide_link_renders_only_when_present() {
-        let without = product_detail_markup(&fixture(0, None), BASE).into_string();
+        let without = product_detail_markup(&fixture(0, None), BASE, Lang::En).into_string();
         assert!(!without.contains("Operational guide"));
 
         let with = product_detail_markup(
             &fixture(0, Some("https://docs.example.invalid/guide".into())),
             BASE,
+            Lang::En,
         )
         .into_string();
         assert!(with.contains("Operational guide"));
@@ -212,9 +272,45 @@ mod tests {
 
     #[test]
     fn sha_placeholder_and_fetch_script_present() {
-        let html = product_detail_markup(&fixture(0, None), BASE).into_string();
+        let html = product_detail_markup(&fixture(0, None), BASE, Lang::En).into_string();
         assert!(html.contains("sw-pd-sha-value"));
         assert!(html.contains("verify via MANIFEST"));
         assert!(html.contains("fetch("));
+    }
+
+    // ── /es/* extension (Spanish localization follow-up, BRIEF-software-spanish-localization.md) ──
+
+    #[test]
+    fn spanish_translates_static_labels_not_product_data() {
+        let html = product_detail_markup(
+            &fixture(0, Some("https://docs.example.invalid/guide".into())),
+            BASE,
+            Lang::Es,
+        )
+        .into_string();
+        // Static labels translated.
+        assert!(html.contains("Plataforma"));
+        assert!(html.contains("Descarga"));
+        assert!(html.contains("Instalaci\u{f3}n"));
+        assert!(html.contains("Versi\u{f3}n y suma de verificaci\u{f3}n"));
+        assert!(html.contains("verificando\u{2026}"));
+        assert!(html.contains("verificar via MANIFEST"));
+        assert!(html.contains("Gu\u{ed}a operativa"));
+        assert!(html.contains("Todos los productos"));
+        // Product name/description are NOT translated — no translation source exists.
+        assert!(html.contains("MediaKit OS"));
+        assert!(html.contains("Sovereign media workstation image."));
+    }
+
+    #[test]
+    fn spanish_back_link_localizes_to_es_software() {
+        let html = product_detail_markup(&fixture(0, None), BASE, Lang::Es).into_string();
+        assert!(html.contains("href=\"/es/software\""));
+    }
+
+    #[test]
+    fn english_back_link_is_unprefixed() {
+        let html = product_detail_markup(&fixture(0, None), BASE, Lang::En).into_string();
+        assert!(html.contains("href=\"/software\""));
     }
 }
