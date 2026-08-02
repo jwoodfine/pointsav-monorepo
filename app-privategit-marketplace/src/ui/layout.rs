@@ -480,11 +480,12 @@ pub fn footer(surface: SoftwareSurface, lang: Lang) -> Markup {
 /// bind address (see `CLAUDE.md`'s foundry-prod/foundry-workspace split).
 const SITE_URL: &str = "https://software.pointsav.com";
 
-/// Site-default social preview image. **Open question, not silently resolved**:
-/// no real 1200×630 asset exists yet for this property (flagged by
-/// project-editorial's SEO draft) — this path is where one should land once
-/// produced; until then `og:image`/`twitter:image` point at a real, live URL
-/// that 404s honestly rather than a fabricated-looking placeholder path.
+/// Site-default social preview image. Real 1200×630 asset, sourced from
+/// `pointsav-media-assets/og-images/ASSET-OG-IMAGE-SOFTWARE.png` (commit `d21ad9e`,
+/// Command, 2026-08-02) and vendored byte-identical into `static/og-default.png` —
+/// same vendoring convention this crate already uses for fonts, since this repo has
+/// no live cross-repo asset-mounting pipeline of its own. Previously a live 404;
+/// closes the one blocking SEO defect `BRIEF-software-handoff-readiness.md` flagged.
 const OG_IMAGE_PATH: &str = "/static/og-default.png";
 
 /// `translated`: true only for the three MVL Spanish pages (`/software`,
