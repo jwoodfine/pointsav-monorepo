@@ -234,7 +234,13 @@ fn verify_license_key(
     // Revocation check before expiry: a revoked key returns Revoked regardless of expiry date.
     // Fingerprint is of the RAW base64url token STRING (not the decoded bytes).
     {
-        let revoked = revoked_tokens.read().unwrap();
+        // S11: recover from a poisoned lock rather than panicking. A prior panic while
+        // holding the write lock (line ~626) would otherwise turn into a full-service
+        // panic loop on every subsequent request — the revocation set itself is still
+        // structurally valid after a panic mid-read/write, just possibly stale.
+        let revoked = revoked_tokens
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if !revoked.is_empty() && revoked.contains(&token_fingerprint(key_b64)) {
             return Err(Revoked);
         }
@@ -623,7 +629,10 @@ async fn reload_revocation_list(
         }
         Ok(fresh) => {
             let count = fresh.len();
-            *state.revoked_tokens.write().unwrap() = fresh;
+            *state
+                .revoked_tokens
+                .write()
+                .unwrap_or_else(std::sync::PoisonError::into_inner) = fresh;
             Json(json!({"reloaded": count})).into_response()
         }
     }
@@ -1444,6 +1453,45 @@ mod tests {
         assert_eq!(body["reloaded"], 1);
         let now = state.revoked_tokens.read().unwrap();
         assert_eq!(now.len(), 1);
+        assert!(now.contains(&fp));
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // S11: a panic while holding the write lock must not turn every subsequent
+    // request into a panic loop. Poison the lock deliberately, then prove both the
+    // read path (verify_license_key's revocation check) and the write path
+    // (reload_revocation_list) still function afterward.
+    #[tokio::test]
+    async fn revocation_lock_recovers_after_poison() {
+        let scratch = scratch_dir("poison-recover");
+        let list = scratch.join("revoked.txt");
+        let fp = token_fingerprint("some-token");
+        fs::write(&list, format!("{fp}\n")).unwrap();
+        let state = test_state(&scratch, None, Some(list.to_string_lossy().into_owned()));
+
+        // Poison the lock: panic on another thread while holding the write guard.
+        let lock = state.revoked_tokens.clone();
+        let _ = std::thread::spawn(move || {
+            let _guard = lock.write().unwrap();
+            panic!("intentional poison for revocation_lock_recovers_after_poison");
+        })
+        .join();
+        assert!(state.revoked_tokens.is_poisoned());
+
+        // Read path recovers instead of panicking.
+        let revoked = state
+            .revoked_tokens
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        drop(revoked);
+
+        // Write path (the actual production call site) also recovers.
+        let resp = reload_revocation_list(loopback(), State(state.clone())).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let now = state
+            .revoked_tokens
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         assert!(now.contains(&fp));
         let _ = fs::remove_dir_all(&scratch);
     }
