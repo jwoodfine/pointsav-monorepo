@@ -31,6 +31,21 @@ fn order_style() -> Markup {
     html! { style { (PreEscaped(css)) } }
 }
 
+/// Client-side auto-refresh for the pending state — the payment-confirmation moment
+/// is the highest-anxiety point in a crypto purchase, so this page shouldn't be the
+/// site's least responsive one (M3). `render_page` has no head-injection hook for a
+/// `<meta http-equiv="refresh">`, so this uses the same inline-`<script>` pattern
+/// already established elsewhere in this crate (SHA256 verify fetch, install-command
+/// copy) — CSP already allows it (`script-src 'self' 'unsafe-inline'`). A single
+/// one-shot `setTimeout` reload, not a poll loop: the page re-fetches the whole
+/// state machine on reload anyway, so there's no separate poll endpoint to call.
+fn auto_refresh_script(retry_after: u64) -> Markup {
+    let ms = retry_after.saturating_mul(1000);
+    html! {
+        script { (PreEscaped(format!("setTimeout(function(){{location.reload();}},{ms});"))) }
+    }
+}
+
 pub fn order_pending_markup(tx_hash: &str, retry_after: u64, lang: Lang) -> Markup {
     match lang {
         Lang::En => html! {
@@ -41,12 +56,13 @@ pub fn order_pending_markup(tx_hash: &str, retry_after: u64, lang: Lang) -> Mark
                     span."sw-or-status sw-or-status--pending" { "Pending" }
                     p { "Your transaction " code { (tx_hash) } " has not yet confirmed on Polygon." }
                     p."sw-or-hint" {
-                        "This page checks the same payment record every visit — reload in about "
-                        (retry_after) " seconds, or come back later. This page stays valid forever \
-                         once your payment confirms."
+                        "This page checks itself automatically — it will refresh in about "
+                        (retry_after) " seconds. This page stays valid forever once your payment \
+                         confirms, so it's safe to leave open or come back to later."
                     }
                 }
             }
+            (auto_refresh_script(retry_after))
         },
         Lang::Es => html! {
             (order_style())
@@ -59,13 +75,14 @@ pub fn order_pending_markup(tx_hash: &str, retry_after: u64, lang: Lang) -> Mark
                         " a\u{fa}n no se ha confirmado en Polygon."
                     }
                     p."sw-or-hint" {
-                        "Esta p\u{e1}gina verifica el mismo registro de pago en cada visita \u{2014} "
-                        "recargue en aproximadamente " (retry_after) " segundos, o vuelva m\u{e1}s "
-                        "tarde. Esta p\u{e1}gina permanece v\u{e1}lida para siempre una vez que su "
-                        "pago se confirme."
+                        "Esta p\u{e1}gina se verifica autom\u{e1}ticamente \u{2014} se actualizar\u{e1} "
+                        "en aproximadamente " (retry_after) " segundos. Esta p\u{e1}gina permanece "
+                        "v\u{e1}lida para siempre una vez que su pago se confirme, as\u{ed} que es "
+                        "seguro dejarla abierta o volver m\u{e1}s tarde."
                     }
                 }
             }
+            (auto_refresh_script(retry_after))
         },
     }
 }
@@ -181,6 +198,25 @@ mod tests {
         assert!(html.contains("Pending"));
         assert!(html.contains("0xabc"));
         assert!(html.contains("30"));
+    }
+
+    // M3: the pending page used to instruct a manual reload with no auto-refresh at
+    // all — the highest-anxiety moment in a crypto purchase deserved better.
+    #[test]
+    fn pending_state_auto_refreshes_via_inline_script() {
+        let html = order_pending_markup("0xabc", 30, Lang::En).into_string();
+        assert!(html.contains("<script>"));
+        assert!(html.contains("setTimeout"));
+        assert!(html.contains("location.reload()"));
+        // retry_after (seconds) converted to milliseconds for setTimeout.
+        assert!(html.contains("30000"));
+    }
+
+    #[test]
+    fn pending_state_auto_refresh_ms_conversion_is_exact() {
+        let html = order_pending_markup("0xabc", 7, Lang::En).into_string();
+        assert!(html.contains("7000"));
+        assert!(!html.contains("7000000"));
     }
 
     #[test]
