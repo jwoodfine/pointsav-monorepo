@@ -326,8 +326,25 @@ async fn manifest(
         )
             .into_response();
     }
-    // NO AUTH CHECK AT ALL — the version-dir MANIFEST.json is served raw.
-    let path = release_path(&state.releases_dir, &[&product, &version, "MANIFEST.json"]);
+    // NO AUTH CHECK AT ALL — this route serves manifest JSON raw, whichever file it
+    // resolves to.
+    //
+    // S2 fix: the per-version manifest (`<product>/<version>/MANIFEST.json`) is
+    // never written by the deposit pipeline — this route 404s for every product on
+    // every host today, breaking the marketplace product-detail page's SHA256
+    // display. Per the audit's own suggested fix ("repoint the detail page at
+    // product-root"), fall back to the product-root manifest
+    // (`<product>/MANIFEST.json`) — the file that's actually always deposited, and
+    // already trusted enough to drive the unauthenticated `requires_license` check
+    // (`product_requires_license` above) — when no version-specific file exists.
+    // A real per-version manifest, if the deposit pipeline is later extended to
+    // write one, still takes priority.
+    let versioned = release_path(&state.releases_dir, &[&product, &version, "MANIFEST.json"]);
+    let path = if versioned.is_file() {
+        versioned
+    } else {
+        release_path(&state.releases_dir, &[&product, "MANIFEST.json"])
+    };
     stream_file(path, "application/json").await
 }
 
@@ -842,6 +859,79 @@ mod tests {
             scratch.to_str().unwrap(),
             "no-such-product"
         ));
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // ── manifest (S2 fix: per-version MANIFEST route) ─────────────────────────
+
+    #[tokio::test]
+    async fn manifest_falls_back_to_product_root_when_version_manifest_missing() {
+        let scratch = scratch_dir("manifest-fallback");
+        fs::create_dir_all(scratch.join("prod/1.0.0")).unwrap();
+        // Only the product-root manifest is deposited — matches every real host today.
+        fs::write(
+            scratch.join("prod/MANIFEST.json"),
+            r#"{"requires_license": false, "sha256": "root-sha"}"#,
+        )
+        .unwrap();
+        let state = test_state(&scratch, None, None);
+        let resp = manifest(
+            State(state),
+            Path(("prod".to_string(), "1.0.0".to_string())),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_json(resp).await;
+        assert_eq!(body["sha256"], "root-sha");
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn manifest_prefers_version_specific_manifest_when_present() {
+        let scratch = scratch_dir("manifest-versioned");
+        fs::create_dir_all(scratch.join("prod/1.0.0")).unwrap();
+        fs::write(
+            scratch.join("prod/MANIFEST.json"),
+            r#"{"requires_license": false, "sha256": "root-sha"}"#,
+        )
+        .unwrap();
+        fs::write(
+            scratch.join("prod/1.0.0/MANIFEST.json"),
+            r#"{"sha256": "versioned-sha"}"#,
+        )
+        .unwrap();
+        let state = test_state(&scratch, None, None);
+        let resp = manifest(
+            State(state),
+            Path(("prod".to_string(), "1.0.0".to_string())),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = body_json(resp).await;
+        assert_eq!(body["sha256"], "versioned-sha");
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn manifest_404s_when_neither_manifest_exists() {
+        let scratch = scratch_dir("manifest-neither");
+        fs::create_dir_all(scratch.join("prod/1.0.0")).unwrap();
+        let state = test_state(&scratch, None, None);
+        let resp = manifest(
+            State(state),
+            Path(("prod".to_string(), "1.0.0".to_string())),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn manifest_rejects_unsafe_segments() {
+        let scratch = scratch_dir("manifest-unsafe");
+        let state = test_state(&scratch, None, None);
+        let resp = manifest(State(state), Path(("..".to_string(), "1.0.0".to_string()))).await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
         let _ = fs::remove_dir_all(&scratch);
     }
 
