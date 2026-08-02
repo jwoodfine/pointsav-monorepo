@@ -60,22 +60,30 @@ already confirmed resolved — see git history for the full prior text if needed
 - [x] RwLock poison recovery on the revocation set (S11).
 - [x] Sitemap now includes product-detail pages (English + `/es/*`), drops the bare `/` redirect.
 - [x] Product-detail JSON-LD (`SoftwareApplication` + `BreadcrumbList`).
-- [x] `og:image`/`twitter:image` asset — requested from project-design (msg-id
-  `project-software-20260802-request-real-og-image-twitter-image-asse`), not fabricated locally.
+- [x] `og:image`/`twitter:image` asset — requested from project-design, Command shipped a real
+  1200×630 asset same session (`pointsav-media-assets` commit `d21ad9e`), vendored into
+  `static/og-default.png`.
 - [x] CLAUDE.md's stale "no nested sub-clone" claim fixed.
+- [x] Rate limiting on `/verify-key` + `/admin/reload-revocation-list` (S6) — in-memory per-IP
+  sliding-window limiter, 20 req/60s, no new dependency. Binary download/streaming routes
+  deliberately left unlimited (see Range/caching note below).
+- [x] Range/ETag/Last-Modified/Cache-Control on binary streams (S10) — all 5 download-adjacent
+  routes (`.sig`, open-product, licensed download, MANIFEST, install.sh) now go through one
+  `stream_file()` helper backed by `tower_http::ServeFile`, real Range support included.
+- [x] Unified error schema (S15) — every error response now carries a stable `code` field
+  alongside `error`; fixed the audit's own named "channel-expired" vs "channel expired"
+  inconsistency along the way.
 
-## Code work — still open (Tier 2-4, lower priority, deferred this pass)
+## Deliberately out of scope, not forgotten
 
-- [ ] Rate limiting on both `app-privategit-marketplace` and `app-privategit-source` (S6) — no
-  limiter exists on either service today. Needs a policy decision (per-route limits, whether the
-  front proxy should own this instead) before implementation, not a pure mechanical fix.
-- [ ] Range/caching headers on binary streams (S10) — no `Accept-Ranges`/`ETag`/`Last-Modified`/
-  `Cache-Control` on `app-privategit-source`'s download routes; a dropped connection on a large
-  binary restarts from byte 0. `tower_http::ServeFile`/`ServeDir` would provide this under the
-  existing auth gate — real but non-trivial refactor of the streaming path.
-- [ ] Unified error schema (S15) — 5 inconsistent error shapes across `app-privategit-source`'s
-  endpoints, no stable machine-readable code field. Cross-cutting refactor touching most handlers;
-  deliberately not attempted alongside the higher-value per-page fixes above.
+- Full RFC 9457 Problem Details (`type`/`title`/`instance` URIs) for the error schema — considered
+  during the S15 work and not pursued; no real `type` documentation pages exist to point at yet.
+  `error` + `code` is the honest version of that today; revisit if/when this crate gets a real
+  developer-docs surface.
+- Rate limiting was deliberately NOT extended to binary download/streaming routes — those are
+  the highest-legitimate-traffic paths (every real customer download goes through them), and
+  tuning limits there properly wants the same context as the Range/caching work, not a separate
+  bolt-on pass.
 
 ## New workstream — `/research` surface (2026-08-02)
 
