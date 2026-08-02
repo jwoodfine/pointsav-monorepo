@@ -21,6 +21,12 @@
 // (`primitive.json`, `pointsav-brand.json`, `paper/*`, `writing/*`). The real generator
 // is `pointsav-design-system/bin/generate-tokens-export.py` (added same day, closes this
 // gap) — run it after editing any source file, before committing `tokens.full.json`.
+// Correction (2026-08-02 registry-reconciliation pass): the tier list below was missing
+// "wcp" (the finance/wcp pillar, 25 tokens — `tokens.full.json`'s real top-level keys are
+// primitive/theme/paper/writing/wcp/ibm-carbon-org-chart/org-chart-extended, confirmed
+// against `exports/tokens.manifest.json`'s `leafCount: 611`). Every count derived from this
+// function had silently undercounted by exactly 25 (586 vs. 611) since wcp was added, and
+// the gallery page never rendered those tokens at all. Added "wcp" below to fix both.
 use serde_json::Value;
 use std::path::Path;
 
@@ -61,6 +67,7 @@ pub fn load_and_flatten(vault: &Path) -> Vec<TokenTier> {
         "theme",
         "paper",
         "writing",
+        "wcp",
         "ibm-carbon-org-chart",
         "org-chart-extended",
     ] {
@@ -116,8 +123,25 @@ fn flatten(val: &Value, path: String, inherited_type: Option<String>, out: &mut 
         } else {
             None
         };
+        // Correction (2026-08-02 MCP functional-test finding): this used to reconstruct
+        // css_var from the DTCG path (`--{path with dots as dashes}`), which does NOT
+        // match the token's real canonical id -- the one actually emitted into
+        // exports/tokens.css by generate-tokens-export.py, and the one get_token callers
+        // see in real rendered CSS. A caller pasting the real variable name they see on
+        // the page got a false "not found" from get_token, the opposite of what an
+        // AI-agent-consumable registry is supposed to guarantee. Read the real canonical
+        // id from $extensions when present; only fall back to the reconstructed form for
+        // entries that somehow lack it (there shouldn't be any -- the generator's own
+        // migrate-canonical-ids.py stamps every real leaf).
+        let css_var = map
+            .get("$extensions")
+            .and_then(|e| e.get("com.pointsav.tokens"))
+            .and_then(|t| t.get("id"))
+            .and_then(|v| v.as_str())
+            .map(String::from)
+            .unwrap_or_else(|| format!("--{}", path.replace('.', "-")));
         out.push(TokenEntry {
-            css_var: format!("--{}", path.replace('.', "-")),
+            css_var,
             path,
             value,
             kind,
@@ -133,6 +157,27 @@ fn flatten(val: &Value, path: String, inherited_type: Option<String>, out: &mut 
         }
         flatten(v, format!("{path}.{k}"), own_type.clone(), out);
     }
+}
+
+// Real count, not a hardcoded literal (2026-08-02 registry-reconciliation pass — the
+// homepage previously hardcoded this as "6", stale against the real 10 families in
+// `paper.semantic`). Counts top-level non-`$`-prefixed keys directly from the same
+// `tokens.full.json` `load_and_flatten` already reads, so it can't drift independently.
+pub fn paper_family_count(vault: &Path) -> usize {
+    let path = vault.join("exports").join("tokens.full.json");
+    let Ok(raw) = std::fs::read_to_string(&path) else {
+        return 0;
+    };
+    let Ok(Value::Object(root)) = serde_json::from_str::<Value>(&raw) else {
+        return 0;
+    };
+    let Some(Value::Object(paper)) = root.get("paper") else {
+        return 0;
+    };
+    let Some(Value::Object(semantic)) = paper.get("semantic") else {
+        return 0;
+    };
+    semantic.keys().filter(|k| !k.starts_with('$')).count()
 }
 
 fn contrast_ratio_vs_white(hex: &str) -> Option<String> {
