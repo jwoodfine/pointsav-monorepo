@@ -44,3 +44,17 @@ _QUARANTINE_ROOT/
 # as project-marketing's/project-design's identical .gitignore gap, not
 # yet manifested as active drift here.
 pointsav-monorepo/
+
+# Standardized 2026-08-02 (known-bug-patterns.md #2 cleanup, Phase 6) — canonical
+# mailbox-file-only .agent/ exclusion set, matching mailbox-scope-discipline.md.
+# Never gitignore the whole .agent/ directory in a working archive.
+.agent/engines/*/session.lock
+.agent/locks/
+.agent/scheduled_tasks.lock
+.agent/inbox.md
+.agent/inbox-archive.md
+.agent/outbox.md
+.agent/outbox-archive.md
+.agent/memory/session-context.md
+.agent/memory/session-context-archive.md
+.agent/drafts-outbound/
