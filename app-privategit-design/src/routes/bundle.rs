@@ -91,7 +91,9 @@ pub async fn list(Path(name): Path<String>, State(state): State<AppState>) -> Re
         &state.component_groups,
         &state.site_origin,
         &format!("{title} — PointSav Design System"),
-        &format!("Download the {title} bundle from the PointSav Design System — {file_count} files."),
+        &format!(
+            "Download the {title} bundle from the PointSav Design System — {file_count} files."
+        ),
         &path,
         &PageLang::en_only(),
         &nav_html,
@@ -131,7 +133,10 @@ pub async fn file(
         &state.component_groups,
         &state.site_origin,
         &format!("{filename} — PointSav Design System"),
-        &format!("{filename}, from the {} bundle in the PointSav Design System.", vault::to_title(&name)),
+        &format!(
+            "{filename}, from the {} bundle in the PointSav Design System.",
+            vault::to_title(&name)
+        ),
         &format!("/bundles/{name}/{filename}"),
         &PageLang::en_only(),
         &nav_html,
