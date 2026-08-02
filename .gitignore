@@ -1,2 +1,16 @@
 # Multi-agent session locks (ephemeral — not committed)
 .agent/engines/*/session.lock
+
+# Standardized 2026-08-02 (known-bug-patterns.md #2 cleanup, Phase 6) — canonical
+# mailbox-file-only .agent/ exclusion set, matching mailbox-scope-discipline.md.
+# Never gitignore the whole .agent/ directory in a working archive.
+.agent/engines/*/session.lock
+.agent/locks/
+.agent/scheduled_tasks.lock
+.agent/inbox.md
+.agent/inbox-archive.md
+.agent/outbox.md
+.agent/outbox-archive.md
+.agent/memory/session-context.md
+.agent/memory/session-context-archive.md
+.agent/drafts-outbound/
