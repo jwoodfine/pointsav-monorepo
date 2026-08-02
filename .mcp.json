@@ -12,6 +12,11 @@
         "FOUNDRY_ROOT": "/srv/foundry"
       },
       "type": "stdio"
+    },
+    "playwright": {
+      "command": "playwright-mcp",
+      "args": ["--headless", "--isolated"],
+      "type": "stdio"
     }
   }
 }
