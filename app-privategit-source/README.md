@@ -64,4 +64,4 @@ this if configured; see that crate's README.
 
 ## License
 
-AGPL-3.0-or-later. See the repository root `LICENSE`.
+FSL-1.1-ALv2. See the repository root `LICENSE`.

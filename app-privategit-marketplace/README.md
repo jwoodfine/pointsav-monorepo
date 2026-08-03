@@ -64,4 +64,4 @@ Binary lands at `$CARGO_TARGET_DIR/release/app-privategit-marketplace`
 
 ## License
 
-AGPL-3.0-or-later. See the repository root `LICENSE`.
+FSL-1.1-ALv2. See the repository root `LICENSE`.
