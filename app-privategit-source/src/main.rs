@@ -205,8 +205,6 @@ fn release_path(releases_dir: &str, parts: &[&str]) -> PathBuf {
     p
 }
 
-/// Streams a file with real Range/ETag/Last-Modified/Cache-Control support (S10) via
-/// `tower_http::ServeFile`, replacing a raw `ReaderStream` that had none of those — a
 /// Error body carrying both a human-readable `error` message and a stable,
 /// machine-readable `code` (S15: "5 inconsistent error shapes... no stable
 /// machine-readable code field"). `code` is a kebab-case slug that won't change
@@ -218,23 +216,91 @@ fn err_json(code: &'static str, message: impl Into<String>) -> Value {
     json!({"error": message.into(), "code": code})
 }
 
-/// Streams a file with real Range/ETag/Last-Modified/Cache-Control support (S10) via
-/// `tower_http::ServeFile`, replacing a raw `ReaderStream` that had none of those — a
-/// dropped connection on a large binary used to restart from byte 0, and nothing was
-/// ever cacheable. `ServeFile` handles conditional/partial requests correctly without
-/// hand-rolling `Range:` header parsing (a common source of off-by-one bugs).
+/// A weak validator derived from the file's mtime + size, in the common
+/// nginx/Apache "weak etag from stat()" style — not a content hash. Hashing every
+/// release binary (some multi-hundred-MB) on every request would be its own
+/// CPU-exhaustion vector; mtime+size changes whenever the file's replaced, which is
+/// the property that matters here.
+fn file_etag(meta: &std::fs::Metadata) -> Option<HeaderValue> {
+    let secs = meta
+        .modified()
+        .ok()?
+        .duration_since(std::time::UNIX_EPOCH)
+        .ok()?
+        .as_secs();
+    HeaderValue::from_str(&format!("W/\"{:x}-{:x}\"", secs, meta.len())).ok()
+}
+
+/// True if any comma-separated token in an `If-None-Match` header value matches
+/// `etag`, or is `*`. Weak comparison (plain string equality) per RFC 7232 §2.3.2 —
+/// acceptable since `etag` is already a weak (`W/`-prefixed) validator.
+fn if_none_match_hits(header_val: &HeaderValue, etag: &HeaderValue) -> bool {
+    let (Ok(given), Ok(etag)) = (header_val.to_str(), etag.to_str()) else {
+        return false;
+    };
+    given
+        .split(',')
+        .map(str::trim)
+        .any(|tok| tok == "*" || tok == etag)
+}
+
+fn set_caching_headers(headers: &mut HeaderMap, etag: &HeaderValue) {
+    headers.insert(header::ETAG, etag.clone());
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("public, max-age=300, must-revalidate"),
+    );
+}
+
+/// Streams a file with Range/Last-Modified support via `tower_http::ServeFile`,
+/// replacing a raw `ReaderStream` that had none of those — a dropped connection on
+/// a large binary used to restart from byte 0. ETag and Cache-Control are added by
+/// this function directly (M1 fix): `ServeFile` was previously assumed to supply
+/// them too, but its vendored source (tower-http 0.5.2) shows it emits only
+/// `Accept-Ranges` and `Last-Modified` — no `ETag`, no `Cache-Control` at all.
 ///
-/// `req_headers` forwards the incoming `Range`/`If-Modified-Since`/`If-None-Match`
-/// headers through to `ServeFile` so it can actually honor them. `content_type`
-/// overrides `ServeFile`'s extension-guessed MIME type (this crate's release
-/// filenames don't reliably carry the right extension). `content_disposition`, when
-/// set, forces a download with that filename rather than inline rendering.
+/// Also rejects any `path` that isn't a regular file before handing off to
+/// `ServeFile` (M3 fix): `ServeFile`'s single-file mode never checks `is_dir()`
+/// (that check only exists in `ServeDir`'s directory-listing mode) — opening a
+/// directory fd as if it were a file succeeds on Unix and would otherwise have
+/// streamed a bogus `200 OK` with an unreadable body instead of a clean 404.
+///
+/// `req_headers` forwards the incoming `Range`/`If-Modified-Since`/`If-Unmodified-Since`
+/// headers through to `ServeFile` so it can actually honor them; `If-None-Match` is
+/// handled here directly, since `ServeFile` doesn't understand it at all.
+/// `content_type` overrides `ServeFile`'s extension-guessed MIME type (this crate's
+/// release filenames don't reliably carry the right extension). `content_disposition`,
+/// when set, forces a download with that filename rather than inline rendering.
 async fn stream_file(
     req_headers: &HeaderMap,
     path: PathBuf,
     content_type: &'static str,
     content_disposition: Option<&str>,
 ) -> Response {
+    let meta = match tokio::fs::metadata(&path).await {
+        Ok(meta) if meta.is_file() => meta,
+        _ => {
+            // Covers both "doesn't exist" and "exists but isn't a regular file"
+            // (M3) — never echo the real filesystem path to the client (live-
+            // confirmed disclosure this session); log it instead.
+            tracing::debug!(path = %path.display(), "stream_file: not found or not a regular file");
+            return (
+                StatusCode::NOT_FOUND,
+                Json(err_json("not-found", "not found")),
+            )
+                .into_response();
+        }
+    };
+    let etag = file_etag(&meta);
+
+    if let (Some(etag), Some(inm)) = (&etag, req_headers.get(header::IF_NONE_MATCH)) {
+        if if_none_match_hits(inm, etag) {
+            let mut resp = StatusCode::NOT_MODIFIED.into_response();
+            set_caching_headers(resp.headers_mut(), etag);
+            return resp;
+        }
+    }
+
     let mut req = Request::new(Body::empty());
     *req.headers_mut() = req_headers.clone();
     // ServeDir/ServeFile's Error is Infallible (checked against tower-http 0.5's
@@ -244,8 +310,6 @@ async fn stream_file(
         .await
         .expect("ServeFile's Service::Error is Infallible");
     if resp.status() == StatusCode::NOT_FOUND {
-        // Never echo the server's real filesystem path to the client (live-confirmed
-        // disclosure this session) — log it instead, where it's actually useful.
         tracing::debug!(path = %path.display(), "stream_file: not found");
         return (
             StatusCode::NOT_FOUND,
@@ -254,12 +318,26 @@ async fn stream_file(
             .into_response();
     }
     let (mut parts, body) = resp.into_parts();
-    parts
-        .headers
-        .insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
-    if let Some(name) = content_disposition {
-        if let Ok(v) = HeaderValue::from_str(&format!("attachment; filename=\"{name}\"")) {
-            parts.headers.insert(header::CONTENT_DISPOSITION, v);
+    // M2 fix: only stamp content-identity headers on responses that actually carry
+    // the file's representation. The old code stamped Content-Type/Content-Disposition
+    // unconditionally, including on 304/412/416/500 — meaningless there, since those
+    // describe "nothing changed" or an error, not the file itself.
+    if matches!(parts.status, StatusCode::OK | StatusCode::PARTIAL_CONTENT) {
+        parts
+            .headers
+            .insert(header::CONTENT_TYPE, HeaderValue::from_static(content_type));
+        if let Some(name) = content_disposition {
+            if let Ok(v) = HeaderValue::from_str(&format!("attachment; filename=\"{name}\"")) {
+                parts.headers.insert(header::CONTENT_DISPOSITION, v);
+            }
+        }
+    }
+    if let Some(etag) = &etag {
+        if matches!(
+            parts.status,
+            StatusCode::OK | StatusCode::PARTIAL_CONTENT | StatusCode::NOT_MODIFIED
+        ) {
+            set_caching_headers(&mut parts.headers, etag);
         }
     }
     Response::from_parts(parts, Body::new(body))
@@ -1317,6 +1395,126 @@ mod tests {
         let body = body_json(resp).await;
         let body_str = body.to_string();
         assert!(!body_str.contains(&file_path.to_string_lossy().to_string()));
+        assert_eq!(body["error"], "not found");
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // ── stream_file: M1 (ETag/Cache-Control actually present) ─────────────────
+
+    #[tokio::test]
+    async fn stream_file_sets_etag_and_cache_control_on_200() {
+        let scratch = scratch_dir("stream-etag-200");
+        let file_path = scratch.join("payload.bin");
+        fs::write(&file_path, b"0123456789").unwrap();
+
+        let resp = stream_file(
+            &HeaderMap::new(),
+            file_path,
+            "application/octet-stream",
+            None,
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert!(resp.headers().get(header::ETAG).is_some());
+        assert_eq!(
+            resp.headers().get(header::CACHE_CONTROL).unwrap(),
+            "public, max-age=300, must-revalidate"
+        );
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn stream_file_matching_if_none_match_short_circuits_to_304_without_content_type() {
+        let scratch = scratch_dir("stream-etag-304");
+        let file_path = scratch.join("payload.bin");
+        fs::write(&file_path, b"0123456789").unwrap();
+
+        let first = stream_file(
+            &HeaderMap::new(),
+            file_path.clone(),
+            "application/octet-stream",
+            None,
+        )
+        .await;
+        let etag = first.headers().get(header::ETAG).unwrap().clone();
+
+        let mut headers = HeaderMap::new();
+        headers.insert(header::IF_NONE_MATCH, etag.clone());
+        let second = stream_file(&headers, file_path, "application/octet-stream", None).await;
+        assert_eq!(second.status(), StatusCode::NOT_MODIFIED);
+        assert_eq!(second.headers().get(header::ETAG).unwrap(), &etag);
+        assert!(second.headers().get(header::CONTENT_TYPE).is_none());
+        let bytes = axum::body::to_bytes(second.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(bytes.is_empty());
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn stream_file_mismatched_if_none_match_serves_full_content() {
+        let scratch = scratch_dir("stream-etag-mismatch");
+        let file_path = scratch.join("payload.bin");
+        fs::write(&file_path, b"0123456789").unwrap();
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            header::IF_NONE_MATCH,
+            HeaderValue::from_static("W/\"stale-etag\""),
+        );
+        let resp = stream_file(&headers, file_path, "application/octet-stream", None).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // ── stream_file: M2 (no content-identity headers on non-content statuses) ──
+
+    #[tokio::test]
+    async fn stream_file_range_not_satisfiable_omits_our_content_disposition_override() {
+        let scratch = scratch_dir("stream-416");
+        let file_path = scratch.join("payload.bin");
+        fs::write(&file_path, b"0123456789").unwrap();
+
+        let mut headers = HeaderMap::new();
+        headers.insert(header::RANGE, HeaderValue::from_static("bytes=9999-10999"));
+        let resp = stream_file(
+            &headers,
+            file_path,
+            "application/x-marketplace-override",
+            Some("payload.bin"),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::RANGE_NOT_SATISFIABLE);
+        // Our custom override must NOT be stamped on an error response -- ServeFile's
+        // own guessed type stands instead of a misleading claim that the body is the
+        // binary (it's the plain-text "range not satisfiable" message).
+        assert_ne!(
+            resp.headers().get(header::CONTENT_TYPE).unwrap(),
+            "application/x-marketplace-override"
+        );
+        // A 416 body is an error message, not the file -- forcing a download
+        // disposition on it would be actively misleading.
+        assert!(resp.headers().get(header::CONTENT_DISPOSITION).is_none());
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // ── stream_file: M3 (directory-as-path rejected instead of a bogus 200) ────
+
+    #[tokio::test]
+    async fn stream_file_rejects_a_directory_path_as_not_found() {
+        let scratch = scratch_dir("stream-dir-as-file");
+        let dir_path = scratch.join("0.0.1");
+        fs::create_dir_all(&dir_path).unwrap();
+
+        let resp = stream_file(
+            &HeaderMap::new(),
+            dir_path,
+            "application/octet-stream",
+            None,
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+        let body = body_json(resp).await;
         assert_eq!(body["error"], "not found");
         let _ = fs::remove_dir_all(&scratch);
     }
