@@ -312,6 +312,43 @@ fn generate_license_key(product_id: &str, tx_hash: &str, customer_ref: &str) -> 
     format!("{}-{}-{}-{}", &h[0..8], &h[8..16], &h[16..24], &h[24..32])
 }
 
+/// Validates a Polygon transaction hash: `0x` followed by exactly 64 hex digits
+/// (case-insensitive). Every caller that reaches a filesystem path
+/// (`receipt_path`, via `resolve_license`) or embeds this value in a `Location`
+/// header (`Redirect::to`, in `order_redirect`/`order_redirect_es`) must
+/// validate first — unvalidated input let a percent-decoded newline reach
+/// `Redirect::to`, which panics on an invalid header value, and this workspace
+/// sets `panic = "abort"`, so that panic took down the whole process, not just
+/// the request. The same missing check let `..` segments reach `receipt_path`
+/// and read/write outside `receipts_dir` entirely (independent finding, same
+/// root cause: this value was never validated anywhere on any path).
+fn is_valid_tx_hash(s: &str) -> bool {
+    let Some(hex) = s.strip_prefix("0x") else {
+        return false;
+    };
+    hex.len() == 64 && hex.chars().all(|c| c.is_ascii_hexdigit())
+}
+
+/// Validates a product identifier — matches every real catalog `id` (lowercase
+/// alphanumeric and hyphens, e.g. `os-console`, `app-orchestration-command`).
+/// Same rationale as `is_valid_tx_hash`: this crate had no equivalent of
+/// `app-privategit-source`'s `is_safe_segment` anywhere, despite product ids
+/// reaching `Redirect::to` (`order_redirect`) same as tx_hash.
+fn is_safe_product_id(s: &str) -> bool {
+    !s.is_empty() && s.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+}
+
+/// Validates an Ethereum/Polygon wallet address: `0x` followed by exactly 40
+/// hex digits. Used by `/v1/claim` (S2) — the address was previously joined
+/// directly into a filesystem path with no validation at all; an absolute path
+/// there discards the base directory entirely (`PathBuf::join` semantics).
+fn is_valid_eth_address(s: &str) -> bool {
+    let Some(hex) = s.strip_prefix("0x") else {
+        return false;
+    };
+    hex.len() == 40 && hex.chars().all(|c| c.is_ascii_hexdigit())
+}
+
 /// Receipt file path: `<receipts_dir>/<current-UTC-year>/<current-UTC-month>/<tx_hash>.json`.
 ///
 /// NOTE (carried forward, NOT fixed in this phase): the year/month are TODAY's at
@@ -608,6 +645,14 @@ enum LicenseOutcome {
 }
 
 async fn resolve_license(state: &AppState, tx_hash: &str) -> LicenseOutcome {
+    // S1 fix: reject before this value ever reaches receipt_path(). A percent-decoded
+    // `../` here escaped receipts_dir entirely on both the read (this fn) and write
+    // (below) paths -- live-demonstrated reading and being steered to write outside
+    // receipts_dir. A malformed-but-real-looking tx_hash simply isn't a transaction
+    // we know about, so NotFound is the correct outcome, not a distinct error shape.
+    if !is_valid_tx_hash(tx_hash) {
+        return LicenseOutcome::NotFound;
+    }
     // 1. Check local receipt file (idempotent replay of a prior confirmation).
     let rpath = receipt_path(&state.receipts_dir, tx_hash);
     if rpath.exists() {
@@ -841,6 +886,15 @@ fn mint_license_token(signing_key: &SigningKey, product_id: &str) -> String {
 }
 
 // ── Handlers ──────────────────────────────────────────────────────────────────
+
+/// JSON API error body carrying both a human-readable `error` message and a
+/// stable, machine-readable `code` (M4: matches `app-privategit-source`'s
+/// `err_json` — S15's schema work landed there but not here; this crate's own
+/// JSON API responses (`/v1/*`) had no equivalent). `code` is a kebab-case
+/// slug that won't change even if `error`'s wording does.
+fn err_json(code: &'static str, message: impl Into<String>) -> Value {
+    json!({"error": message.into(), "code": code})
+}
 
 // GET / -> 302 Found redirect to /software.
 //
@@ -1531,10 +1585,37 @@ struct ClaimRequest {
 
 // POST /v1/claim — placeholder token issuance (on-chain mint arrives v0.0.2). Ported
 // as-is from the OLD crate; not made "more real" in this phase.
+/// Validates a binary's SHA256 digest: exactly 64 hex digits (case-insensitive),
+/// matching `hex::encode(Sha256::digest(..))`'s own output shape.
+fn is_valid_sha256_hex(s: &str) -> bool {
+    s.len() == 64 && s.chars().all(|c| c.is_ascii_hexdigit())
+}
+
 async fn v1_claim(
     State(state): State<Arc<AppState>>,
     Json(req): Json<ClaimRequest>,
 ) -> (StatusCode, Json<Value>) {
+    // C1/S2 fix: both fields used to reach a filesystem path and a byte-slice
+    // completely unvalidated. `binary_sha256[..16.min(len)]` panicked on any
+    // input where byte 16 isn't a UTF-8 char boundary (e.g. a multi-byte
+    // character straddling it) -- and this workspace's panic = "abort" turns
+    // that into a full process crash on one request, not just a dropped
+    // connection. Separately, `claims_dir.join(wallet_address)` with an
+    // absolute-looking wallet_address discards claims_dir entirely
+    // (`PathBuf::join` semantics) -- live-demonstrated writing an
+    // attacker-controlled file anywhere the service can write. Validating the
+    // expected shape of both fields up front closes both at once: neither
+    // value can now be anything but safe, fixed-length hex.
+    if !is_valid_sha256_hex(&req.binary_sha256) || !is_valid_eth_address(&req.wallet_address) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(err_json(
+                "invalid-claim-fields",
+                "binary_sha256 must be 64 hex digits and wallet_address must be 0x + 40 hex digits",
+            )),
+        );
+    }
+
     let claimed_at = Utc::now().to_rfc3339();
     let token = hex::encode(Sha256::digest(
         format!(
@@ -1547,8 +1628,17 @@ async fn v1_claim(
     let claim_dir = state
         .claims_dir
         .join(req.wallet_address.trim_start_matches("0x"));
-    let _ = fs::create_dir_all(&claim_dir);
-    let short = &req.binary_sha256[..16.min(req.binary_sha256.len())];
+    if let Err(e) = fs::create_dir_all(&claim_dir) {
+        tracing::error!(
+            "v1_claim: failed to create claim dir {}: {e}",
+            claim_dir.display()
+        );
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(err_json("internal-error", "could not record claim")),
+        );
+    }
+    let short = &req.binary_sha256[..16];
     let claim_file = claim_dir.join(format!("{short}.json"));
     let payload = json!({
         "token": token,
@@ -1556,10 +1646,16 @@ async fn v1_claim(
         "wallet_address": req.wallet_address,
         "claimed_at": claimed_at
     });
-    let _ = fs::write(
-        claim_file,
+    if let Err(e) = fs::write(
+        &claim_file,
         serde_json::to_string_pretty(&payload).unwrap_or_default(),
-    );
+    ) {
+        tracing::error!("v1_claim: failed to write {}: {e}", claim_file.display());
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(err_json("internal-error", "could not record claim")),
+        );
+    }
 
     (
         StatusCode::OK,
@@ -1692,15 +1788,35 @@ struct OrderRedirectQuery {
 // Redirects to the canonical, bookmarkable /order/:tx_hash?product=<id> so the
 // order page has one durable URL regardless of how the customer arrived at it.
 async fn order_redirect(Query(q): Query<OrderRedirectQuery>) -> Response {
-    let tx_hash = q.tx_hash.trim().to_lowercase();
-    Redirect::to(&format!("/order/{tx_hash}?product={}", q.product)).into_response()
+    render_order_redirect(q, Lang::En, "/order")
 }
 
 // GET /es/order?product=<id>&tx_hash=<value> — Spanish checkout form's submit target,
 // same pattern as `order_redirect`. Full-site-parity pass (2026-07-13).
 async fn order_redirect_es(Query(q): Query<OrderRedirectQuery>) -> Response {
+    render_order_redirect(q, Lang::Es, "/es/order")
+}
+
+// C1 fix: `Redirect::to()` panics if its argument isn't a valid HTTP header
+// value (axum's own doc comment says so) -- q.tx_hash/q.product were built into
+// the redirect target completely unvalidated, so a percent-decoded control
+// character (e.g. `%0A`) reached `Redirect::to` and panicked. This workspace
+// sets `panic = "abort"` in every profile, so that panic killed the entire
+// process on a single unauthenticated request, not just the connection.
+// Validating both values before ever calling Redirect::to closes it structurally
+// -- an invalid value now can't reach that call at all.
+fn render_order_redirect(q: OrderRedirectQuery, lang: Lang, base_path: &str) -> Response {
     let tx_hash = q.tx_hash.trim().to_lowercase();
-    Redirect::to(&format!("/es/order/{tx_hash}?product={}", q.product)).into_response()
+    if !is_valid_tx_hash(&tx_hash) || !is_safe_product_id(&q.product) {
+        return error_response(
+            lang,
+            StatusCode::BAD_REQUEST,
+            "/software",
+            "Invalid request",
+            "That link is malformed. Please start again from the checkout page.",
+        );
+    }
+    Redirect::to(&format!("{base_path}/{tx_hash}?product={}", q.product)).into_response()
 }
 
 #[derive(Deserialize, Default)]
@@ -2032,6 +2148,21 @@ mod tests {
         dir
     }
 
+    /// Deterministic, format-valid (`0x` + 64 hex) tx_hash for tests. Real code
+    /// now rejects any tx_hash not matching this exact shape (S1/C1 fixes), so
+    /// the old short readable placeholders like `"0xconfirmedpayment01"` are no
+    /// longer valid input. `kind` is a fixed 2-hex-char prefix the
+    /// `write_tool_wallet_double` mock matches on ("c0" = confirmed, "be" =
+    /// pending, "00" = neither -- arbitrary but fixed on both sides, since hex
+    /// can't spell "confirmed"/"pending" the way the old placeholders did).
+    /// `seed` differentiates otherwise-identical tx hashes (e.g. two different
+    /// confirmed transactions) without needing embedded English words.
+    fn test_tx_hash(kind: &str, seed: &str) -> String {
+        debug_assert_eq!(kind.len(), 2, "kind must be exactly 2 hex chars");
+        let body = hex::encode(Sha256::digest(seed.as_bytes()));
+        format!("0x{kind}{}", &body[..62])
+    }
+
     /// Minimal products.yaml with a realistic paid tier (os-console = $1.00 =
     /// 1_000_000 micro-USDC, os-mediakit = $19.00 = 19_000_000 micro-USDC), written
     /// into `dir`. Returns the catalog path. Prices are ACTIVE (nonzero) here
@@ -2078,11 +2209,15 @@ mod tests {
             &path,
             r#"#!/usr/bin/env bash
 # args: check <tx_hash> --rpc-url <url> --wallet-address <addr>
+# Matches by fixed hex prefix, not embedded English words -- real tx_hash
+# values are now validated as 0x + 64 hex (S1/C1 fixes), so a placeholder like
+# the old "*confirmed*"/"*pending*" substring can't appear in valid input.
+# See test_tx_hash()'s doc comment for the kind convention (c0/be/00).
 tx="$2"
 case "$tx" in
-  *confirmed*) echo '{"confirmed":true,"amount_usdc":1.00,"amount_units":1000000,"from":"0xcaffee","block":123,"tx_hash":"'"$tx"'"}'; exit 0;;
-  *pending*)   echo '{"confirmed":false,"reason":"not yet mined"}'; exit 0;;
-  *)           echo '{"confirmed":false,"reason":"transaction not found"}'; exit 1;;
+  0xc0*) echo '{"confirmed":true,"amount_usdc":1.00,"amount_units":1000000,"from":"0xcaffee","block":123,"tx_hash":"'"$tx"'"}'; exit 0;;
+  0xbe*) echo '{"confirmed":false,"reason":"not yet mined"}'; exit 0;;
+  *)     echo '{"confirmed":false,"reason":"transaction not found"}'; exit 1;;
 esac
 "#,
         )
@@ -2359,29 +2494,31 @@ esac
         // tool_wallet_bin points at a non-existent binary: this path must NOT shell out.
         let state = test_state(&scratch, "/nonexistent/tool-wallet".into());
 
-        let tx = "0xdeadbeefreceipt";
-        let rpath = receipt_path(&state.receipts_dir, tx);
+        let tx = test_tx_hash("00", "deadbeefreceipt");
+        let rpath = receipt_path(&state.receipts_dir, &tx);
         fs::create_dir_all(rpath.parent().unwrap()).unwrap();
         // Fixture INCLUDES `license_tier` — the extra field tool-wallet writes.
         // It must be ignored on read (proves cross-binary receipt compatibility).
         fs::write(
             &rpath,
-            r#"{
+            format!(
+                r#"{{
   "product_id": "apache",
   "license_tier": "apache",
   "version": "0.0.1",
   "customer_ref": "0xcaffee",
   "price_usdc": 1000000,
-  "tx_hash": "0xdeadbeefreceipt",
+  "tx_hash": "{tx}",
   "chain": "polygon-pos",
   "confirmed_at": "2026-07-01T00:00:00+00:00",
   "block_number": 123,
   "license_key": "aaaaaaaa-bbbbbbbb-cccccccc-dddddddd"
-}"#,
+}}"#
+            ),
         )
         .unwrap();
 
-        let (status, Json(body)) = v1_license(State(state.clone()), Path(tx.to_string())).await;
+        let (status, Json(body)) = v1_license(State(state.clone()), Path(tx.clone())).await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["status"], "confirmed");
         assert_eq!(body["product_id"], "apache");
@@ -2406,19 +2543,19 @@ esac
         let double = write_tool_wallet_double(&scratch);
         let state = test_state(&scratch, double.to_string_lossy().into_owned());
 
-        let tx = "0xconfirmedpayment01";
-        let (status, Json(body)) = v1_license(State(state.clone()), Path(tx.to_string())).await;
+        let tx = test_tx_hash("c0", "confirmedpayment01");
+        let (status, Json(body)) = v1_license(State(state.clone()), Path(tx.clone())).await;
 
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body["status"], "confirmed");
         // The FIX in action end-to-end: $1.00 -> 1_000_000 -> catalog "os-console".
         assert_eq!(body["product_id"], "os-console");
         assert_eq!(body["customer_ref"], "0xcaffee");
-        let expected_key = generate_license_key("os-console", tx, "0xcaffee");
+        let expected_key = generate_license_key("os-console", &tx, "0xcaffee");
         assert_eq!(body["license_key"], expected_key);
 
         // A receipt must have been written to the SCRATCH dir (never /var/lib).
-        let rpath = receipt_path(&state.receipts_dir, tx);
+        let rpath = receipt_path(&state.receipts_dir, &tx);
         assert!(
             rpath.exists(),
             "receipt should be persisted to scratch receipts dir"
@@ -2456,12 +2593,11 @@ esac
         let marker = first_live_transaction_marker_path(&state.receipts_dir);
         assert!(!marker.exists(), "no marker before any transaction");
 
+        let tx1 = test_tx_hash("c0", "confirmedpayment01");
+        let tx2 = test_tx_hash("c0", "confirmedpayment19");
+
         // First confirmed transaction -> marker written.
-        let (status, _) = v1_license(
-            State(state.clone()),
-            Path("0xconfirmedpayment01".to_string()),
-        )
-        .await;
+        let (status, _) = v1_license(State(state.clone()), Path(tx1.clone())).await;
         assert_eq!(status, StatusCode::OK);
         assert!(
             marker.exists(),
@@ -2469,21 +2605,17 @@ esac
         );
         let recorded: LicenseReceipt =
             serde_json::from_str(&fs::read_to_string(&marker).unwrap()).unwrap();
-        assert_eq!(recorded.tx_hash, "0xconfirmedpayment01");
+        assert_eq!(recorded.tx_hash, tx1);
         let first_marker_mtime = fs::metadata(&marker).unwrap().modified().unwrap();
 
         // A second, DIFFERENT confirmed transaction must NOT overwrite the marker --
         // it stays pointing at the first one.
-        let (status2, _) = v1_license(
-            State(state.clone()),
-            Path("0xconfirmedpayment19".to_string()),
-        )
-        .await;
+        let (status2, _) = v1_license(State(state.clone()), Path(tx2)).await;
         assert_eq!(status2, StatusCode::OK);
         let still_recorded: LicenseReceipt =
             serde_json::from_str(&fs::read_to_string(&marker).unwrap()).unwrap();
         assert_eq!(
-            still_recorded.tx_hash, "0xconfirmedpayment01",
+            still_recorded.tx_hash, tx1,
             "marker must still point at the FIRST transaction, not be overwritten by the second"
         );
         assert_eq!(
@@ -2502,7 +2634,7 @@ esac
         let state = test_state(&scratch, double.to_string_lossy().into_owned());
 
         let (status, Json(body)) =
-            v1_license(State(state), Path("0xpendingtx01".to_string())).await;
+            v1_license(State(state), Path(test_tx_hash("be", "pendingtx01"))).await;
         assert_eq!(status, StatusCode::ACCEPTED);
         assert_eq!(body["status"], "pending");
         assert_eq!(body["retry_after"], 30);
@@ -2518,7 +2650,7 @@ esac
 
         // Neither *confirmed* nor *pending* -> test-double exits 1 -> NotFound.
         let (status, Json(body)) =
-            v1_license(State(state), Path("0xunknowntx01".to_string())).await;
+            v1_license(State(state), Path(test_tx_hash("00", "unknowntx01"))).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(body["status"], "not_found");
 
@@ -2530,7 +2662,8 @@ esac
         let scratch = scratch_dir("nobin");
         let state = test_state(&scratch, "/nonexistent/tool-wallet".into());
 
-        let (status, Json(body)) = v1_license(State(state), Path("0xanytx01".to_string())).await;
+        let (status, Json(body)) =
+            v1_license(State(state), Path(test_tx_hash("00", "anytx01"))).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(body["status"], "not_found");
 
@@ -2554,13 +2687,17 @@ esac
         let _ = fs::remove_dir_all(&scratch);
     }
 
+    const VALID_SHA256_HEX: &str =
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+    const VALID_WALLET_ADDRESS: &str = "0x1234567890123456789012345678901234567890";
+
     #[tokio::test]
     async fn claim_writes_placeholder_and_returns_ok() {
         let scratch = scratch_dir("claim");
         let state = test_state(&scratch, "tool-wallet".into());
         let req = ClaimRequest {
-            binary_sha256: "0123456789abcdef0123456789abcdef".into(),
-            wallet_address: "0xWALLET123".into(),
+            binary_sha256: VALID_SHA256_HEX.into(),
+            wallet_address: VALID_WALLET_ADDRESS.into(),
         };
         let (status, Json(body)) = v1_claim(State(state.clone()), Json(req)).await;
         assert_eq!(status, StatusCode::OK);
@@ -2570,9 +2707,60 @@ esac
         // File written under claims/<addr-without-0x>/<first16>.json in scratch.
         let claim_file = state
             .claims_dir
-            .join("WALLET123")
+            .join("1234567890123456789012345678901234567890")
             .join("0123456789abcdef.json");
         assert!(claim_file.exists());
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // C1/S2 regression tests: malformed binary_sha256/wallet_address used to
+    // reach a byte-slice panic (short/non-ASCII sha256) or an arbitrary
+    // filesystem write (absolute-looking wallet_address). Both must now be
+    // rejected with 400, never reach fs::create_dir_all/fs::write at all.
+    #[tokio::test]
+    async fn claim_rejects_short_binary_sha256_instead_of_panicking() {
+        let scratch = scratch_dir("claim-short-sha");
+        let state = test_state(&scratch, "tool-wallet".into());
+        let req = ClaimRequest {
+            binary_sha256: "tooshort".into(),
+            wallet_address: VALID_WALLET_ADDRESS.into(),
+        };
+        let (status, Json(body)) = v1_claim(State(state), Json(req)).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(body["code"], "invalid-claim-fields");
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn claim_rejects_non_char_boundary_binary_sha256_instead_of_panicking() {
+        let scratch = scratch_dir("claim-multibyte-sha");
+        let state = test_state(&scratch, "tool-wallet".into());
+        // A multi-byte character straddling byte index 16 -- this exact shape
+        // panicked on the old `&s[..16.min(len)]` byte-slice.
+        let req = ClaimRequest {
+            binary_sha256: "aaaaaaaaaaaaaaaézzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz".into(),
+            wallet_address: VALID_WALLET_ADDRESS.into(),
+        };
+        let (status, _) = v1_claim(State(state), Json(req)).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn claim_rejects_absolute_path_wallet_address_instead_of_escaping_claims_dir() {
+        let scratch = scratch_dir("claim-traversal");
+        let state = test_state(&scratch, "tool-wallet".into());
+        let evil_target = scratch.join("escaped");
+        let req = ClaimRequest {
+            binary_sha256: VALID_SHA256_HEX.into(),
+            wallet_address: format!("0x{}", evil_target.to_string_lossy()),
+        };
+        let (status, _) = v1_claim(State(state), Json(req)).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert!(
+            !evil_target.exists(),
+            "must not have written outside claims_dir"
+        );
         let _ = fs::remove_dir_all(&scratch);
     }
 
@@ -3294,19 +3482,59 @@ esac
 
     // ── Phase 2: GET /order redirect ──────────────────────────────────────────
 
+    const VALID_TX_HASH_UPPER: &str =
+        "0xABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789";
+    const VALID_TX_HASH_LOWER: &str =
+        "0xabcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+
     #[tokio::test]
     async fn order_redirect_builds_canonical_url_and_lowercases_tx_hash() {
         let resp = order_redirect(Query(OrderRedirectQuery {
             product: "os-console".to_string(),
-            tx_hash: "0xABCDEF".to_string(),
+            tx_hash: VALID_TX_HASH_UPPER.to_string(),
         }))
         .await;
         // axum's Redirect::to emits 303 See Other (matches the / -> /software note above).
         assert_eq!(resp.status(), StatusCode::SEE_OTHER);
         assert_eq!(
             resp.headers().get(header::LOCATION).unwrap(),
-            "/order/0xabcdef?product=os-console"
+            &format!("/order/{VALID_TX_HASH_LOWER}?product=os-console")
         );
+    }
+
+    // C1 regression test: a malformed tx_hash/product used to reach Redirect::to()
+    // unvalidated, which panics on an invalid header value -- and panic = abort in
+    // this workspace turns that into a full process crash on one request. Both
+    // order_redirect and order_redirect_es must reject before ever calling
+    // Redirect::to, not just return something -- the request must not panic.
+    #[tokio::test]
+    async fn order_redirect_rejects_malformed_tx_hash_instead_of_panicking() {
+        let resp = order_redirect(Query(OrderRedirectQuery {
+            product: "os-console".to_string(),
+            tx_hash: "not-a-real-hash\nwith-a-newline".to_string(),
+        }))
+        .await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn order_redirect_rejects_malformed_product_instead_of_panicking() {
+        let resp = order_redirect(Query(OrderRedirectQuery {
+            product: "os-console\nwith-a-newline".to_string(),
+            tx_hash: VALID_TX_HASH_LOWER.to_string(),
+        }))
+        .await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn order_redirect_es_rejects_malformed_tx_hash_instead_of_panicking() {
+        let resp = order_redirect_es(Query(OrderRedirectQuery {
+            product: "os-console".to_string(),
+            tx_hash: "../../etc/passwd".to_string(),
+        }))
+        .await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
     }
 
     // ── Phase 2: GET /order/:tx_hash status page ──────────────────────────────
@@ -3316,18 +3544,15 @@ esac
         let scratch = scratch_dir("order-confirmed");
         let double = write_tool_wallet_double(&scratch);
         let state = test_state(&scratch, double.to_string_lossy().into_owned());
-        let resp = order_status_page(
-            State(state),
-            Path("0xconfirmedpayment01".to_string()),
-            Query(OrderQuery::default()),
-        )
-        .await;
+        let tx = test_tx_hash("c0", "confirmedpayment01");
+        let resp =
+            order_status_page(State(state), Path(tx.clone()), Query(OrderQuery::default())).await;
         assert_eq!(resp.status(), StatusCode::OK);
         let html = body_text(resp.into_body()).await;
         assert!(html.contains("Confirmed"));
         // A $1.00 payment matches os-console in this test's write_catalog fixture.
         assert!(html.contains("os-console"));
-        assert!(html.contains("href=\"/order/0xconfirmedpayment01/download?product=os-console\""));
+        assert!(html.contains(&format!("href=\"/order/{tx}/download?product=os-console\"")));
         let _ = fs::remove_dir_all(&scratch);
     }
 
@@ -3336,18 +3561,16 @@ esac
         let scratch = scratch_dir("order-confirmed-es");
         let double = write_tool_wallet_double(&scratch);
         let state = test_state(&scratch, double.to_string_lossy().into_owned());
-        let resp = order_status_page_es(
-            State(state),
-            Path("0xconfirmedpayment01".to_string()),
-            Query(OrderQuery::default()),
-        )
-        .await;
+        let tx = test_tx_hash("c0", "confirmedpayment01");
+        let resp =
+            order_status_page_es(State(state), Path(tx.clone()), Query(OrderQuery::default()))
+                .await;
         assert_eq!(resp.status(), StatusCode::OK);
         let html = body_text(resp.into_body()).await;
         assert!(html.contains("Confirmado"));
         assert!(html.contains(r#"<html lang="es">"#));
         // Download link stays unprefixed — no UI to translate, machine link only.
-        assert!(html.contains("href=\"/order/0xconfirmedpayment01/download?product=os-console\""));
+        assert!(html.contains(&format!("href=\"/order/{tx}/download?product=os-console\"")));
         let _ = fs::remove_dir_all(&scratch);
     }
 
@@ -3358,7 +3581,7 @@ esac
         let state = test_state(&scratch, double.to_string_lossy().into_owned());
         let resp = order_status_page(
             State(state),
-            Path("0xpendingtx01".to_string()),
+            Path(test_tx_hash("be", "pendingtx01")),
             Query(OrderQuery::default()),
         )
         .await;
@@ -3375,7 +3598,7 @@ esac
         let state = test_state(&scratch, double.to_string_lossy().into_owned());
         let resp = order_status_page(
             State(state),
-            Path("0xunknowntx01".to_string()),
+            Path(test_tx_hash("00", "unknowntx01")),
             Query(OrderQuery {
                 product: Some("os-console".to_string()),
             }),
@@ -3397,7 +3620,7 @@ esac
         let state = test_state(&scratch, double.to_string_lossy().into_owned());
         let resp = order_download(
             State(state.clone()),
-            Path("0xconfirmedpayment01".to_string()),
+            Path(test_tx_hash("c0", "confirmedpayment01")),
             Query(OrderQuery::default()),
         )
         .await;
@@ -3441,7 +3664,7 @@ esac
         let state = test_state(&scratch, double.to_string_lossy().into_owned());
         let resp = order_download(
             State(state),
-            Path("0xpendingtx01".to_string()),
+            Path(test_tx_hash("be", "pendingtx01")),
             Query(OrderQuery::default()),
         )
         .await;
@@ -3458,7 +3681,7 @@ esac
         // os-mediakit here must be rejected rather than trusted.
         let resp = order_download(
             State(state),
-            Path("0xconfirmedpayment01".to_string()),
+            Path(test_tx_hash("c0", "confirmedpayment01")),
             Query(OrderQuery {
                 product: Some("os-mediakit".to_string()),
             }),
@@ -3479,7 +3702,7 @@ esac
         });
         let resp = order_download(
             State(state),
-            Path("0xconfirmedpayment01".to_string()),
+            Path(test_tx_hash("c0", "confirmedpayment01")),
             Query(OrderQuery::default()),
         )
         .await;
