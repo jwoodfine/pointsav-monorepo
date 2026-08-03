@@ -601,7 +601,20 @@ pub async fn item_tab(
     Query(langq): Query<LangQuery>,
     State(state): State<AppState>,
 ) -> Response {
-    if slug.contains("..") || slug.contains('/') || tab.contains("..") || tab.contains('/') {
+    // Fable-audit finding (2026-08-02): `tab` was checked for ".." and "/" but not a
+    // bare ".", so a URL like /components/button/usage.es built content_path's
+    // "usage.es" + ".md" = "usage.es.md" -- the deliberately-filtered Spanish sibling
+    // file (vault.rs excludes `.es.md` from discover_tabs/nav/search everywhere else)
+    // -- and served it at an English-labeled URL: wrong `lang` in the page chrome
+    // (based on `?lang=es`, not the tab name), a tab-bar that can't highlight
+    // "usage.es" as active, and a duplicate-content URL search engines could index.
+    // Real tab values are plain slugs (usage/accessibility/code/style) with no dots.
+    if slug.contains("..")
+        || slug.contains('/')
+        || tab.contains("..")
+        || tab.contains('/')
+        || tab.contains('.')
+    {
         return (StatusCode::BAD_REQUEST, "invalid").into_response();
     }
     if !vault::is_known_section(&section) {
