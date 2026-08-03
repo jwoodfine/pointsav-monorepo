@@ -117,9 +117,16 @@ impl RateLimiter {
                 queue.pop_front();
             }
             if queue.len() >= self.max_requests {
-                let retry_after = self
-                    .window
-                    .saturating_sub(now.duration_since(*queue.front().unwrap()))
+                // L1 fix: `queue` can be empty here when `max_requests == 0` (a
+                // config that denies every request outright) -- `front()` was
+                // unconditionally `.unwrap()`'d, which panicked (and, with
+                // `panic = "abort"`, killed the whole process) on the very first
+                // request. Fall back to the full window as the retry hint in that
+                // case instead of assuming there's always a queued hit to measure from.
+                let retry_after = queue
+                    .front()
+                    .map(|&t| self.window.saturating_sub(now.duration_since(t)))
+                    .unwrap_or(self.window)
                     .as_secs()
                     .max(1);
                 Err(retry_after)
@@ -194,7 +201,11 @@ fn is_safe_segment(s: &str) -> bool {
         && !s.contains('\\')
         && s != ".."
         && s != "."
-        && !s.chars().any(|c| (c as u32) < 0x20)
+        // L6 fix: the control-character band only excluded C0 (0x00-0x1F),
+        // missing DEL (0x7F) -- also a control character, and one some
+        // filesystems/shells treat specially. Not independently a traversal
+        // vector, but there's no reason to admit it into a path segment either.
+        && !s.chars().any(|c| (c as u32) < 0x20 || c == '\u{7f}')
 }
 
 fn release_path(releases_dir: &str, parts: &[&str]) -> PathBuf {
@@ -592,6 +603,17 @@ async fn manifest(
     } else {
         release_path(&state.releases_dir, &[&product, "MANIFEST.json"])
     };
+    // L9 (informational, not fixed here): this route serves whatever `sha256`
+    // value the deposit pipeline (`xtask deposit`/`characterize`, a shared
+    // cross-archive workspace member -- not this crate's code) happened to write
+    // into MANIFEST.json at build time. Nothing on this side re-hashes the
+    // release binary to confirm the two still agree. A stale or hand-edited
+    // MANIFEST could serve an incorrect checksum without this route ever
+    // noticing. Fixing it for real means either the deposit pipeline itself
+    // (out of this crate's scope) or a separate periodic reconciliation job --
+    // hashing every release binary on every manifest request is not viable for
+    // multi-hundred-MB artifacts. Routed to Command as a NEXT.md item rather
+    // than papered over here.
     stream_file(&headers, path, "application/json", None).await
 }
 
@@ -2309,6 +2331,17 @@ mod tests {
         assert!(rl.check(b).is_ok());
     }
 
+    #[test]
+    fn rate_limiter_zero_max_requests_denies_without_panicking() {
+        // L1: a `max_requests: 0` config used to panic on the very first `check()`
+        // call -- `queue.front().unwrap()` on a queue that had never had anything
+        // pushed to it. With `panic = "abort"` that would have killed the process.
+        let rl = RateLimiter::new(0, std::time::Duration::from_secs(60));
+        let ip: std::net::IpAddr = "203.0.113.9".parse().unwrap();
+        let err = rl.check(ip).unwrap_err();
+        assert!(err >= 1, "retry_after should be at least 1 second");
+    }
+
     #[tokio::test]
     async fn verify_key_endpoint_429_when_rate_limited() {
         let scratch = scratch_dir("vke-429");
@@ -2746,6 +2779,15 @@ mod tests {
         // the separator/`..`-only blocklist and reached `File::open`; only the OS
         // syscall boundary's rejection of interior NUL prevented a real leak.
         for s in ["..\u{0}", "prod\u{0}", "\u{0}", "a\tb", "a\nb", "a\rb"] {
+            assert!(!is_safe_segment(s), "{s:?} should be rejected");
+        }
+    }
+
+    #[test]
+    fn is_safe_segment_rejects_del() {
+        // L6: the control-char band excluded 0x00-0x1F but not 0x7F (DEL) --
+        // also a control character, just outside the C0 block.
+        for s in ["\u{7f}", "prod\u{7f}", "a\u{7f}b"] {
             assert!(!is_safe_segment(s), "{s:?} should be rejected");
         }
     }

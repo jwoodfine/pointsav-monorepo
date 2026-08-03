@@ -69,13 +69,9 @@ use ui::{Lang, SoftwareSurface};
 // The payment-config fields (`polygon_wallet_address`, `receipts_dir`,
 // `claims_dir`, `polygon_rpc_url`, `tool_wallet_bin`) were wired as placeholders
 // in P1 and are consumed by the P4 license/claim/wallet handlers below.
-// `bind_addr` remains stored for symmetry but is only read via the local in
-// `main`; it is retained behind `#[allow(dead_code)]`.
 #[derive(Clone)]
-#[allow(dead_code)]
 struct AppState {
     catalog_path: PathBuf,
-    bind_addr: String,
     // Static-HTML source of truth (single source: the on-disk directory). Both
     // /software and /licensing read from this directory at request time, and
     // /static/* mounts the same directory via ServeDir. Nothing is baked with
@@ -2014,7 +2010,6 @@ async fn main() -> Result<()> {
 
     let state = Arc::new(AppState {
         catalog_path,
-        bind_addr: bind_addr.clone(),
         static_dir: static_dir.clone(),
         polygon_wallet_address,
         receipts_dir,
@@ -2063,7 +2058,15 @@ async fn main() -> Result<()> {
         .route("/es/order/:tx_hash", get(order_status_page_es))
         .route("/order/:tx_hash/download", get(order_download))
         .fallback(not_found_fallback)
-        .nest_service("/static", ServeDir::new(static_dir))
+        // L4 fix: `.fallback()` above only fires for paths that match no route at
+        // all. `/static/*` IS a matched route (a nested service) -- a missing file
+        // under it returns axum/tower_http's bare empty-body 404 straight from
+        // `ServeDir`, bypassing the site's chrome entirely. `not_found_service`
+        // routes that specific case through the same chromed page.
+        .nest_service(
+            "/static",
+            ServeDir::new(static_dir).not_found_service(get(not_found_fallback)),
+        )
         .layer(SetResponseHeaderLayer::overriding(
             HeaderName::from_static("strict-transport-security"),
             HeaderValue::from_static(HSTS_VALUE),
@@ -2292,7 +2295,6 @@ esac
     fn test_state(scratch: &std::path::Path, tool_wallet_bin: String) -> Arc<AppState> {
         Arc::new(AppState {
             catalog_path: write_catalog(scratch),
-            bind_addr: "127.0.0.1:0".into(),
             static_dir: scratch.to_path_buf(),
             polygon_wallet_address: "0xTESTWALLET".into(),
             receipts_dir: scratch.join("receipts"),
@@ -2352,7 +2354,6 @@ esac
     fn test_state_at(scratch: &std::path::Path, catalog_path: PathBuf) -> Arc<AppState> {
         Arc::new(AppState {
             catalog_path,
-            bind_addr: "127.0.0.1:0".into(),
             static_dir: scratch.to_path_buf(),
             polygon_wallet_address: "0xTESTWALLET".into(),
             receipts_dir: scratch.join("receipts"),

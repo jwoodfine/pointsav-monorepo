@@ -171,21 +171,41 @@ fn json_ld_script(i: &Installer, lang: Lang, page_path: &str) -> Markup {
         },
         "provider": {"@type": "Organization", "@id": "https://pointsav.com/#organization"},
     });
+    // L3 fix: "Home" and "Software" previously both pointed at the same
+    // `/software` URL -- a BreadcrumbList entry that doesn't actually advance
+    // toward the page is invalid per Google's structured-data guidance ("each
+    // item should represent a page in the hierarchy"). "Home" now points at the
+    // site root instead of duplicating the "Software" entry's target.
     let breadcrumbs = json!({
         "@context": "https://schema.org",
         "@type": "BreadcrumbList",
         "itemListElement": [
-            {"@type": "ListItem", "position": 1, "name": "Home", "item": format!("{SITE_URL}{}", lang.localize("/software"))},
+            {"@type": "ListItem", "position": 1, "name": "Home", "item": format!("{SITE_URL}{}", lang.localize(""))},
             {"@type": "ListItem", "position": 2, "name": "Software", "item": format!("{SITE_URL}{}", lang.localize("/software"))},
             {"@type": "ListItem", "position": 3, "name": i.name, "item": format!("{SITE_URL}{page_path}")},
         ],
     });
-    let data_json = serde_json::to_string(&data).unwrap_or_default();
-    let breadcrumbs_json = serde_json::to_string(&breadcrumbs).unwrap_or_default();
+    let data_json = escape_for_script_tag(&serde_json::to_string(&data).unwrap_or_default());
+    let breadcrumbs_json =
+        escape_for_script_tag(&serde_json::to_string(&breadcrumbs).unwrap_or_default());
     html! {
         script type="application/ld+json" { (PreEscaped(data_json)) }
         script type="application/ld+json" { (PreEscaped(breadcrumbs_json)) }
     }
+}
+
+/// L2 fix: the doc comment above claims `serde_json` gives "real JSON escaping" for
+/// the untrusted-shape name/description fields, but JSON-string escaping alone
+/// doesn't protect the embedding script tag -- serde_json doesn't escape the
+/// less-than sign, so an installer name containing a literal close-script-tag /
+/// open-script-tag sequence would close the JSON-LD block early and inject a
+/// sibling script element. Replacing that raw byte with its `<` unicode
+/// escape is semantically a no-op for any JSON parser (identical decoded string)
+/// but makes a close-script-tag un-splicable in the surrounding HTML -- the
+/// standard mitigation for JSON-in-script-tag embedding (matches e.g. Django's
+/// `json_script` / OWASP's JSON-in-HTML guidance).
+fn escape_for_script_tag(json: &str) -> String {
+    json.replace('<', "\\u003c")
 }
 
 pub fn product_detail_markup(i: &Installer, source_base_url: &str, lang: Lang) -> Markup {
@@ -354,9 +374,51 @@ mod tests {
     }
 
     #[test]
+    fn json_ld_breadcrumb_home_and_software_items_are_distinct_urls() {
+        // L3: "Home" and "Software" previously pointed at the identical URL --
+        // not a real breadcrumb hierarchy.
+        let html = product_detail_markup(&fixture(1_000_000, None), BASE, Lang::En).into_string();
+        let blocks: Vec<&str> = html
+            .split("<script type=\"application/ld+json\">")
+            .skip(1)
+            .map(|s| s.split("</script>").next().unwrap())
+            .collect();
+        let breadcrumbs: serde_json::Value = serde_json::from_str(blocks[1]).unwrap();
+        let items = breadcrumbs["itemListElement"].as_array().unwrap();
+        assert_eq!(items[0]["name"], "Home");
+        assert_eq!(items[1]["name"], "Software");
+        assert_ne!(items[0]["item"], items[1]["item"]);
+        assert_eq!(items[0]["item"], "https://software.pointsav.com");
+    }
+
+    #[test]
     fn json_ld_breadcrumb_localizes_to_es_path() {
         let html = product_detail_markup(&fixture(0, None), BASE, Lang::Es).into_string();
         assert!(html.contains("\"item\":\"https://software.pointsav.com/es/software/os-mediakit\""));
+    }
+
+    #[test]
+    fn json_ld_name_containing_closing_script_tag_cannot_break_out_of_the_script_element() {
+        // L2: serde_json's string escaping alone doesn't protect a <script> embedding
+        // -- it never escapes '<'. A name/description containing a literal
+        // "</script><script>...", if not additionally escaped, would close the
+        // JSON-LD block early and splice in a sibling script element.
+        let mut i = fixture(0, None);
+        i.name = "</script><script>alert(1)</script>".into();
+        let html = product_detail_markup(&i, BASE, Lang::En).into_string();
+        assert!(
+            !html.contains("</script><script>alert(1)"),
+            "a literal close/open script sequence in installer data must not survive \
+             into the rendered HTML unescaped: {html}"
+        );
+        // And the JSON is still valid / round-trips to the original string once parsed.
+        let blocks: Vec<&str> = html
+            .split("<script type=\"application/ld+json\">")
+            .skip(1)
+            .map(|s| s.split("</script>").next().unwrap())
+            .collect();
+        let app: serde_json::Value = serde_json::from_str(blocks[0]).unwrap();
+        assert_eq!(app["name"], "</script><script>alert(1)</script>");
     }
 
     // ── /es/* extension (Spanish localization follow-up, BRIEF-software-spanish-localization.md) ──
