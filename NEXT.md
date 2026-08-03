@@ -84,6 +84,16 @@ already confirmed resolved — see git history for the full prior text if needed
   the highest-legitimate-traffic paths (every real customer download goes through them), and
   tuning limits there properly wants the same context as the Range/caching work, not a separate
   bolt-on pass.
+- `ui::surface::trademark_line()`'s hardcoded text is confirmed correct (matches `TRADEMARK.md`,
+  home.pointsav.com's live HTML, and `factory-release-engineering`'s now-fixed
+  `legal-tokens-pointsav.yaml` — commit `f169e4e`, 2026-07-27) but still a duplicate, not read
+  live. Not wired this session: no crate anywhere in the workspace consumes
+  `factory-release-engineering` tokens at build or runtime today, so there's no pattern to
+  follow, and the two real options each carry real infra cost — a build-time `include_str!`
+  creates a fragile absolute cross-repo compile dependency (breaks off this VM/layout), and a
+  runtime read needs the YAML actually deployed alongside `local-software-marketplace`, which it
+  isn't today. Worth doing once a real cross-repo token-consumption pattern exists somewhere in
+  the workspace to follow, or once someone decides to establish one.
 
 ## New workstream — `/research` surface (2026-08-02)
 
