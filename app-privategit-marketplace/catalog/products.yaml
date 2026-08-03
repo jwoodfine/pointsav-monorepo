@@ -11,10 +11,10 @@ installers:
   - id: os-network-admin
     name: PointSav Network OS
     description: Orchestrates VM map, private network routing, and provisioning authorisation
-    edition: "beta"
+    edition: "0.1.0"
     platform: "Linux x86_64"
     size_mb: 1
-    path: os-network-admin/beta
+    path: os-network-admin/0.1.0
     license_tier: fsl
     price_usdc: 0
 
