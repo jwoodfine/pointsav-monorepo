@@ -32,18 +32,18 @@ fn privacy_markup_en() -> Markup {
                 "Projects Inc."
             }
             p {
-                "This site distributes software binaries and issues product licenses. "
-                "This page describes what data it collects and how it is used."
+                "PointSav distributes software binaries and issues product licenses. "
+                "This page describes what data we collect and how we use it."
             }
 
-            h2 { "1. What this site collects" }
+            h2 { "1. What we collect" }
             p {
-                "This site collects payment-verification data only: the transaction hash "
+                "On this site, we collect payment-verification data only: the transaction hash "
                 "and wallet address you supply when purchasing a license, and the receipt "
-                "and claim records generated from a confirmed payment. This site does not "
-                "use tracking cookies for analytics or advertising. It does use a session "
+                "and claim records generated from a confirmed payment. We don't "
+                "use tracking cookies for analytics or advertising. We do use a session "
                 "token for signed-in account/license-status functionality where "
-                "applicable — this is a functional exception, not a tracking mechanism."
+                "applicable — a functional exception, not a tracking mechanism."
             }
 
             h2 { "2. On-chain data" }
@@ -55,26 +55,26 @@ fn privacy_markup_en() -> Markup {
                 "Digital Systems."
             }
 
-            h2 { "3. How data is used" }
+            h2 { "3. How we use it" }
             p {
-                "Payment-verification data is used to issue and validate product "
-                "licenses, to answer order-status lookups, and to maintain the "
-                "transaction-log bookkeeping this business is required to keep. It is "
-                "not sold or shared with third parties for marketing purposes."
+                "We use payment-verification data to issue and validate product "
+                "licenses, answer order-status lookups, and maintain the "
+                "transaction-log bookkeeping our business is required to keep. We don't "
+                "sell it or share it with third parties for marketing purposes."
             }
 
             h2 { "4. Data retention and access" }
             p {
-                "Receipt and claim records are stored on PointSav Digital Systems' own "
-                "infrastructure. No specific retention period is documented for this "
-                "site as of this writing; this is a genuine open item, not an oversight "
-                "concealed here. If you have a question about a specific record, contact "
+                "We store receipt and claim records on our own "
+                "infrastructure. We haven't documented a specific retention period "
+                "for this site yet — a genuine open item, not an oversight we're "
+                "concealing. If you have a question about a specific record, contact "
                 "us using the details below."
             }
 
             h2 { "5. Contact" }
             p {
-                "Questions about this privacy page can be sent to " a href="mailto:open.source@pointsav.com" { "open.source@pointsav.com" } "."
+                "Send questions about this page to " a href="mailto:open.source@pointsav.com" { "open.source@pointsav.com" } "."
             }
         }
     }
@@ -89,19 +89,19 @@ fn privacy_markup_es() -> Markup {
                 "Capital Projects Inc."
             }
             p {
-                "Este sitio distribuye binarios de software y emite licencias de "
-                "producto. Esta p\u{e1}gina describe qu\u{e9} datos recopila y c\u{f3}mo se usan."
+                "PointSav distribuye binarios de software y emite licencias de "
+                "producto. Esta p\u{e1}gina describe qu\u{e9} datos recopilamos y c\u{f3}mo los usamos."
             }
 
-            h2 { "1. Qu\u{e9} recopila este sitio" }
+            h2 { "1. Qu\u{e9} recopilamos" }
             p {
-                "Este sitio recopila \u{fa}nicamente datos de verificaci\u{f3}n de pago: el hash "
+                "En este sitio, recopilamos \u{fa}nicamente datos de verificaci\u{f3}n de pago: el hash "
                 "de transacci\u{f3}n y la direcci\u{f3}n de billetera que usted proporciona al "
                 "comprar una licencia, y los registros de recibo y reclamo generados a "
-                "partir de un pago confirmado. Este sitio no usa cookies de seguimiento "
-                "con fines de anal\u{ed}tica o publicidad. S\u{ed} usa un token de sesi\u{f3}n para la "
-                "funcionalidad de estado de cuenta/licencia cuando corresponde \u{2014} esto "
-                "es una excepci\u{f3}n funcional, no un mecanismo de rastreo."
+                "partir de un pago confirmado. No usamos cookies de seguimiento "
+                "con fines de anal\u{ed}tica o publicidad. S\u{ed} usamos un token de sesi\u{f3}n para la "
+                "funcionalidad de estado de cuenta/licencia cuando corresponde \u{2014} una "
+                "excepci\u{f3}n funcional, no un mecanismo de rastreo."
             }
 
             h2 { "2. Datos en cadena" }
@@ -113,28 +113,27 @@ fn privacy_markup_es() -> Markup {
                 "ser retirado ni eliminado por PointSav Digital Systems."
             }
 
-            h2 { "3. C\u{f3}mo se usan los datos" }
+            h2 { "3. C\u{f3}mo los usamos" }
             p {
-                "Los datos de verificaci\u{f3}n de pago se usan para emitir y validar "
+                "Usamos los datos de verificaci\u{f3}n de pago para emitir y validar "
                 "licencias de producto, responder consultas de estado de pedido, y "
-                "mantener el registro de transacciones que este negocio est\u{e1} obligado "
-                "a conservar. No se venden ni se comparten con terceros con fines de "
+                "mantener el registro de transacciones que nuestro negocio est\u{e1} obligado "
+                "a conservar. No los vendemos ni los compartimos con terceros con fines de "
                 "marketing."
             }
 
             h2 { "4. Retenci\u{f3}n y acceso a los datos" }
             p {
-                "Los registros de recibo y reclamo se almacenan en la infraestructura "
-                "propia de PointSav Digital Systems. No se documenta un per\u{ed}odo de "
-                "retenci\u{f3}n espec\u{ed}fico para este sitio al momento de escribir esto; se "
-                "trata de un punto genuinamente pendiente, no de un descuido ocultado "
-                "aqu\u{ed}. Si tiene alguna pregunta sobre un registro espec\u{ed}fico, "
-                "cont\u{e1}ctenos usando los datos a continuaci\u{f3}n."
+                "Almacenamos los registros de recibo y reclamo en nuestra propia "
+                "infraestructura. Todav\u{ed}a no hemos documentado un per\u{ed}odo de "
+                "retenci\u{f3}n espec\u{ed}fico para este sitio \u{2014} un punto genuinamente "
+                "pendiente, no un descuido que ocultamos. Si tiene alguna pregunta sobre un "
+                "registro espec\u{ed}fico, cont\u{e1}ctenos usando los datos a continuaci\u{f3}n."
             }
 
             h2 { "5. Contacto" }
             p {
-                "Las preguntas sobre esta p\u{e1}gina de privacidad pueden enviarse a "
+                "Env\u{ed}e sus preguntas sobre esta p\u{e1}gina a "
                 a href="mailto:open.source@pointsav.com" { "open.source@pointsav.com" } "."
             }
         }

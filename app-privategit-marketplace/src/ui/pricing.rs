@@ -40,13 +40,13 @@ fn tier_card(tier: LicenseTier, catalog: &Catalog, lang: Lang) -> Markup {
         .count();
     let desc = match (tier, lang) {
         (LicenseTier::Proprietary, Lang::En) => {
-            "No source grant. The company's stated commercial moat — solo use is \
+            "No source grant. PointSav's stated commercial moat — solo use is \
              free during BETA; aggregation or resale requires a separate \
              commercial agreement, permanently."
         }
         (LicenseTier::Proprietary, Lang::Es) => {
-            "Sin concesi\u{f3}n de c\u{f3}digo fuente. El resguardo comercial declarado de la \
-             empresa: el uso individual es gratuito durante la fase BETA; la agregaci\u{f3}n o \
+            "Sin concesi\u{f3}n de c\u{f3}digo fuente. El resguardo comercial declarado de \
+             PointSav: el uso individual es gratuito durante la fase BETA; la agregaci\u{f3}n o \
              reventa requiere un acuerdo comercial independiente, de forma permanente."
         }
         (LicenseTier::Fsl, Lang::En) => {

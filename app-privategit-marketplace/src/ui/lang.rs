@@ -176,8 +176,8 @@ impl Lang {
                 lede: "Buy it once. Run it anywhere. Own it forever. No subscription, no cloud \
                        dependency, no kill switch. Buying your first component here is also your \
                        key to the rest of the stack\u{2014}the components of an orchestration, not \
-                       an app store. This catalog is rendered directly from the release catalog\
-                       \u{2014}what you see here is exactly what the download API serves.",
+                       an app store. This catalog always matches what's actually available to \
+                       download\u{2014}nothing here is stale or hand-curated.",
                 shelves_h: "Shelves",
                 commercial: "Commercial",
                 open_source: "Open Source / Community",
@@ -205,9 +205,9 @@ impl Lang {
                        siempre. Sin suscripci\u{f3}n, sin dependencia de la nube, sin interruptor \
                        de apagado remoto. Comprar aqu\u{ed} su primer componente es tambi\u{e9}n \
                        su llave al resto de la plataforma\u{2014}los componentes de una \
-                       orquestaci\u{f3}n, no una tienda de aplicaciones. Este cat\u{e1}logo se \
-                       genera directamente del cat\u{e1}logo de versiones\u{2014}lo que ve aqu\u{ed} \
-                       es exactamente lo que sirve la API de descargas.",
+                       orquestaci\u{f3}n, no una tienda de aplicaciones. Este cat\u{e1}logo \
+                       siempre coincide con lo que realmente est\u{e1} disponible para \
+                       descargar\u{2014}nada aqu\u{ed} est\u{e1} desactualizado ni curado a mano.",
                 shelves_h: "Estantes",
                 commercial: "Comercial",
                 open_source: "C\u{f3}digo abierto / Comunidad",

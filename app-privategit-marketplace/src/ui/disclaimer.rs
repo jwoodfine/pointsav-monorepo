@@ -88,7 +88,7 @@ fn disclaimer_markup_en() -> Markup {
 
             h2 { "1. No warranty" }
             p {
-                "Software made available on this site is provided \"as is,\" without "
+                "Software we make available on this site is provided \"as is,\" without "
                 "warranty of any kind, express or implied, including but not limited to "
                 "warranties of merchantability, fitness for a particular purpose, and "
                 "non-infringement. PointSav Digital Systems does not guarantee that any "
@@ -118,7 +118,7 @@ fn disclaimer_markup_en() -> Markup {
 
             h2 { "4. Payment, on the Polygon network, in USDC" }
             p {
-                "Licenses on this site are purchased by sending USDC on the Polygon "
+                "You purchase licenses here by sending USDC on the Polygon "
                 "network to the address shown at time of purchase. You are solely "
                 "responsible for verifying that address, the network (Polygon, not "
                 "Ethereum mainnet or any other chain), and the payment amount before "
@@ -141,7 +141,7 @@ fn disclaimer_markup_en() -> Markup {
 
             h2 { "6. Forward-looking information" }
             p {
-                "This site may describe planned or intended product capabilities, "
+                "We may describe planned or intended product capabilities, "
                 "including BETA features and pricing. Words such as \"plans,\" "
                 "\"intends,\" \"expects,\" \"may,\" \"will,\" and \"targets\" are intended "
                 "to identify forward-looking statements. Actual availability, "
@@ -183,7 +183,7 @@ fn disclaimer_markup_es() -> Markup {
 
             h2 { "1. Sin garant\u{ed}a" }
             p {
-                "El software disponible en este sitio se proporciona \u{ab}tal cual\u{bb}, sin "
+                "El software que ponemos a disposici\u{f3}n en este sitio se proporciona \u{ab}tal cual\u{bb}, sin "
                 "garant\u{ed}a de ning\u{fa}n tipo, expresa o impl\u{ed}cita, incluyendo pero sin "
                 "limitarse a garant\u{ed}as de comerciabilidad, idoneidad para un prop\u{f3}sito "
                 "particular y no infracci\u{f3}n. PointSav Digital Systems no garantiza que "
@@ -215,7 +215,7 @@ fn disclaimer_markup_es() -> Markup {
 
             h2 { "4. Pago, en la red Polygon, en USDC" }
             p {
-                "Las licencias de este sitio se compran enviando USDC en la red Polygon "
+                "Usted compra las licencias aqu\u{ed} enviando USDC en la red Polygon "
                 "a la direcci\u{f3}n mostrada al momento de la compra. Usted es el \u{fa}nico "
                 "responsable de verificar esa direcci\u{f3}n, la red (Polygon, no Ethereum "
                 "mainnet ni ninguna otra cadena) y el monto del pago antes de enviar los "
@@ -238,7 +238,7 @@ fn disclaimer_markup_es() -> Markup {
 
             h2 { "6. Informaci\u{f3}n prospectiva" }
             p {
-                "Este sitio puede describir capacidades de producto planeadas o "
+                "Podemos describir capacidades de producto planeadas o "
                 "previstas, incluyendo funciones y precios en fase BETA. Palabras como "
                 "\u{ab}planea\u{bb}, \u{ab}pretende\u{bb}, \u{ab}espera\u{bb}, \u{ab}puede\u{bb}, \u{ab}ser\u{e1}\u{bb} y "
                 "\u{ab}tiene como meta\u{bb} tienen como fin identificar declaraciones "

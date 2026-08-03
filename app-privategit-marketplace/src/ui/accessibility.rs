@@ -35,19 +35,19 @@ fn accessibility_markup_en() -> Markup {
 
             h2 { "1. Standard targeted" }
             p {
-                "This site targets WCAG 2.1 Level AA, the same standard used across the "
-                "PointSav platform's other properties."
+                "We target WCAG 2.1 Level AA, the same standard we use across "
+                "PointSav's other properties."
             }
 
             h2 { "2. What has been addressed" }
             p {
-                "A 2026-06-24 audit of this site identified a complete mobile layout "
+                "A 2026-06-24 audit of this site found a complete mobile layout "
                 "breakdown and a high density of automated accessibility-check findings. "
-                "As part of the 2026-07 storefront rebuild, contrast tokens, responsive "
-                "layout, and semantic landmarks were addressed across the site's chrome "
-                "and content pages. This is a factual description of work completed, not "
-                "a claim of full WCAG 2.1 AA conformance — no formal re-audit score has "
-                "been recorded for this rebuild."
+                "As part of the 2026-07 storefront rebuild, we addressed contrast tokens, "
+                "responsive layout, and semantic landmarks across the site's chrome "
+                "and content pages. That's a factual description of work completed, not "
+                "a claim of full WCAG 2.1 AA conformance — we haven't recorded a formal "
+                "re-audit score for this rebuild yet."
             }
 
             h2 { "3. Known gaps and how to report one" }
@@ -76,21 +76,21 @@ fn accessibility_markup_es() -> Markup {
 
             h2 { "1. Est\u{e1}ndar objetivo" }
             p {
-                "Este sitio tiene como objetivo el nivel WCAG 2.1 AA, el mismo est\u{e1}ndar "
-                "usado en las dem\u{e1}s plataformas de PointSav."
+                "Nuestro objetivo es el nivel WCAG 2.1 AA, el mismo est\u{e1}ndar "
+                "que usamos en las dem\u{e1}s plataformas de PointSav."
             }
 
             h2 { "2. Qu\u{e9} se ha abordado" }
             p {
-                "Una auditor\u{ed}a del 2026-06-24 de este sitio identific\u{f3} una falla "
+                "Una auditor\u{ed}a del 2026-06-24 de este sitio encontr\u{f3} una falla "
                 "completa del dise\u{f1}o m\u{f3}vil y una alta densidad de hallazgos "
                 "autom\u{e1}ticos de accesibilidad. Como parte de la reconstrucci\u{f3}n de la "
-                "tienda de 2026-07, se abordaron los tokens de contraste, el dise\u{f1}o "
+                "tienda de 2026-07, abordamos los tokens de contraste, el dise\u{f1}o "
                 "responsivo y los puntos de referencia sem\u{e1}nticos en todo el chrome y "
-                "las p\u{e1}ginas de contenido del sitio. Esta es una descripci\u{f3}n factual "
+                "las p\u{e1}ginas de contenido del sitio. Esa es una descripci\u{f3}n factual "
                 "del trabajo realizado, no una afirmaci\u{f3}n de conformidad total con "
-                "WCAG 2.1 AA \u{2014} no se ha registrado una puntuaci\u{f3}n de reauditor\u{ed}a "
-                "formal para esta reconstrucci\u{f3}n."
+                "WCAG 2.1 AA \u{2014} todav\u{ed}a no hemos registrado una puntuaci\u{f3}n de "
+                "reauditor\u{ed}a formal para esta reconstrucci\u{f3}n."
             }
 
             h2 { "3. Brechas conocidas y c\u{f3}mo reportarlas" }

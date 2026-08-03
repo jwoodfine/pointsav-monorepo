@@ -56,9 +56,9 @@ pub fn order_pending_markup(tx_hash: &str, retry_after: u64, lang: Lang) -> Mark
                     span."sw-or-status sw-or-status--pending" { "Pending" }
                     p { "Your transaction " code { (tx_hash) } " has not yet confirmed on Polygon." }
                     p."sw-or-hint" {
-                        "This page checks itself automatically — it will refresh in about "
-                        (retry_after) " seconds. This page stays valid forever once your payment \
-                         confirms, so it's safe to leave open or come back to later."
+                        "We check your transaction automatically — this page refreshes itself "
+                        "in about " (retry_after) " seconds. It stays valid forever once your \
+                         payment confirms, so it's safe to leave open or come back to later."
                     }
                 }
             }
@@ -75,10 +75,10 @@ pub fn order_pending_markup(tx_hash: &str, retry_after: u64, lang: Lang) -> Mark
                         " a\u{fa}n no se ha confirmado en Polygon."
                     }
                     p."sw-or-hint" {
-                        "Esta p\u{e1}gina se verifica autom\u{e1}ticamente \u{2014} se actualizar\u{e1} "
-                        "en aproximadamente " (retry_after) " segundos. Esta p\u{e1}gina permanece "
-                        "v\u{e1}lida para siempre una vez que su pago se confirme, as\u{ed} que es "
-                        "seguro dejarla abierta o volver m\u{e1}s tarde."
+                        "Verificamos su transacci\u{f3}n autom\u{e1}ticamente \u{2014} esta p\u{e1}gina "
+                        "se actualizar\u{e1} en aproximadamente " (retry_after) " segundos. La p\u{e1}gina "
+                        "permanece v\u{e1}lida para siempre una vez que su pago se confirme, as\u{ed} "
+                        "que es seguro dejarla abierta o volver m\u{e1}s tarde."
                     }
                 }
             }
