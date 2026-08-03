@@ -21,6 +21,19 @@ remains free at `github.com/pointsav/pointsav-monorepo`.
 - **Download** — the license token authenticates one download against
   `app-privategit-source`
 
+## Operational notes
+
+- **Input validation.** `tx_hash` (64 hex digits), `wallet_address` (40 hex
+  digits), and `binary_sha256` (64 hex digits) are all validated to their
+  exact expected shape before touching the filesystem or the on-chain check —
+  none of them can steer a path (receipts/claims directories are keyed by
+  these values).
+- **Error shape.** JSON error responses carry `{"error": "<message>", "code":
+  "<stable-kebab-case-slug>"}`; match on `code`, not `error`'s wording.
+- `resolve_license`'s `tool-wallet check` subprocess call is async
+  (`tokio::process::Command`) — the Polygon RPC round-trip it performs does
+  not block other requests on the same worker thread.
+
 ## Environment variables
 
 | Variable | Default | Purpose |
