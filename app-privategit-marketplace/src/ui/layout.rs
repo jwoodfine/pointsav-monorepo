@@ -350,7 +350,7 @@ pub fn footer(surface: SoftwareSurface, lang: Lang) -> Markup {
                     div."sw-footer__brand" {
                         div."sw-footer__brand-name" { "PointSav Software" }
                         p."sw-footer__tagline" {
-                            "Sovereign binary distribution and licensing for the PointSav platform."
+                            "Binary distribution and licensing for the PointSav platform."
                         }
                     }
                     div."sw-footer__col" {
