@@ -17,7 +17,7 @@ use serde_json::{json, Value};
 use std::{
     collections::HashSet,
     fs,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     path::PathBuf,
     sync::{Arc, RwLock},
 };
@@ -39,19 +39,43 @@ struct AppState {
     verify_key: Option<VerifyingKey>,
     revocation_list_path: Option<String>,
     revoked_tokens: Arc<RwLock<HashSet<String>>>,
-    rate_limiter: Arc<RateLimiter>,
+    // C2 fix: two SEPARATE limiters, not one shared bucket. The original single
+    // limiter let an unauthenticated caller exhaust /verify-key's budget and
+    // have that same exhaustion apply to /admin/reload-revocation-list --
+    // live-demonstrated locking out the emergency license-revocation kill
+    // switch with nothing but repeated public requests. `public_rate_limiter`
+    // now also guards `binary()`'s per-request signature verification (the
+    // audit's own point: that route, not the not-publicly-routed /verify-key,
+    // is the one actually reachable through this host's nginx config).
+    public_rate_limiter: Arc<RateLimiter>,
+    admin_rate_limiter: Arc<RateLimiter>,
 }
 
-// ── Rate limiting (S6) ───────────────────────────────────────────────────────
+// ── Rate limiting (S6, revised) ─────────────────────────────────────────────
 //
 // In-memory per-IP sliding-window limiter — no new dependency, matching this
 // crate's existing preference for small hand-rolled utilities over pulling in a
-// crate for a narrow need. Scoped to the two routes the audit called out
-// specifically: `/verify-key` (a free, unbounded-CPU signature-verification
-// oracle) and `/admin/reload-revocation-list` (an on-demand disk read). Binary
-// download/streaming routes are deliberately NOT rate-limited here — that's
-// bundled with the separate Range/caching-headers work (both touch the same
-// download hot path) rather than tuned in isolation.
+// crate for a narrow need.
+//
+// Revised after an independent audit found the original single-limiter design
+// substantively ineffective: (1) it keyed on `ConnectInfo`'s peer address,
+// which behind this host's nginx is always 127.0.0.1, not the real client --
+// `client_ip()` below now prefers `X-Forwarded-For` (nginx confirmed to set it
+// correctly in this vhost's config) and falls back to ConnectInfo only when
+// absent (direct/test access); (2) `/verify-key` and the admin
+// reload-revocation-list endpoint shared one bucket, so exhausting the public
+// endpoint's budget also locked out the emergency revocation kill switch --
+// `AppState` now carries two independent `RateLimiter`s (`public_rate_limiter`,
+// `admin_rate_limiter`), so public traffic can never affect the admin bucket
+// regardless of key computation; (3) the limiter was applied to `/verify-key`,
+// which this host's nginx config does not actually proxy publicly at all
+// (only `/releases/` and `/git/` are), while `binary()`'s own per-request
+// `verify_license_key` call -- genuinely reachable, genuinely doing Ed25519
+// verification work per request -- was unlimited. `public_rate_limiter` now
+// also guards that call.
+//
+// Binary download/streaming itself is still deliberately NOT rate-limited --
+// that's bundled with the separate Range/caching-headers work instead.
 //
 // Single-instance, in-process state: not distributed, resets on restart. That's
 // an accepted tradeoff for defense-in-depth on a service that (per NEXT.md) has
@@ -109,6 +133,27 @@ impl RateLimiter {
         hits.retain(|_, q| !q.is_empty());
         result
     }
+}
+
+/// Resolves the real client IP for rate-limiting purposes. Prefers the LAST
+/// (rightmost) entry in `X-Forwarded-For`, falling back to the direct TCP
+/// peer otherwise. The rightmost entry specifically, not the first: nginx's
+/// `$proxy_add_x_forwarded_for` (confirmed in this vhost's config) APPENDS the
+/// real connecting peer to whatever the client already sent, producing
+/// `"<client-supplied-or-empty>, <real-peer>"` — so the leftmost entry is
+/// exactly the part a client CAN spoof, and the rightmost is exactly the part
+/// only nginx itself writes. This service is only ever reachable through this
+/// host's own nginx (confirmed single-hop topology), so trusting that
+/// nginx-written rightmost value is safe; it would not be safe if an
+/// untrusted intermediate proxy could sit between nginx and this process.
+fn client_ip(headers: &HeaderMap, connect_addr: SocketAddr) -> IpAddr {
+    headers
+        .get("x-forwarded-for")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.rsplit(',').next())
+        .map(str::trim)
+        .and_then(|s| s.parse::<IpAddr>().ok())
+        .unwrap_or_else(|| connect_addr.ip())
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -525,6 +570,7 @@ async fn latest_redirect(
 }
 
 async fn binary(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
     Path((product, version, platform)): Path<(String, String, String)>,
@@ -596,7 +642,31 @@ async fn binary(
             .into_response();
     };
 
-    // 5. Verify the license key.
+    // 5. Rate limit before the CPU-expensive part (C2 fix): this is the route
+    // genuinely reachable through this host's nginx config and doing
+    // per-request Ed25519 verification on every call — the audit's own point
+    // that the original limiter protected an unreachable route while this one
+    // stayed unlimited. Shares the PUBLIC bucket with /verify-key, never the
+    // admin bucket.
+    let ip = client_ip(&headers, addr);
+    if let Err(retry_after) = state.public_rate_limiter.check(ip) {
+        tracing::warn!(product_id = %product, %ip, retry_after, "binary-download: rate limited");
+        return (
+            StatusCode::TOO_MANY_REQUESTS,
+            [(
+                header::RETRY_AFTER,
+                HeaderValue::from_str(&retry_after.to_string()).unwrap(),
+            )],
+            Json(json!({
+                "error": "rate limited",
+                "code": "rate-limited",
+                "retry_after_seconds": retry_after,
+            })),
+        )
+            .into_response();
+    }
+
+    // 6. Verify the license key.
     let key_fp = hex::encode(&vk.as_bytes()[..4]);
     match verify_license_key(vk, &key_b64, &product, &state.revoked_tokens) {
         Err(e) => {
@@ -616,7 +686,7 @@ async fn binary(
         }
     }
 
-    // 6. On success: stream the binary.
+    // 7. On success: stream the binary.
     let path = release_path(&state.releases_dir, &[&product, &version, &platform]);
     let filename = format!("{product}-{version}-{platform}");
     stream_file(&headers, path, "application/octet-stream", Some(&filename)).await
@@ -641,12 +711,17 @@ async fn git_stub() -> (StatusCode, Json<Value>) {
 async fn verify_key_endpoint(
     ConnectInfo(addr): ConnectInfo<SocketAddr>,
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(req): Json<VerifyKeyRequest>,
 ) -> (StatusCode, Json<Value>) {
     // S6: this endpoint is a free, unbounded-CPU signature-verification oracle —
-    // rate-limited before doing any real work.
-    if let Err(retry_after) = state.rate_limiter.check(addr.ip()) {
-        tracing::warn!(ip = %addr.ip(), retry_after, "verify-key: rate limited");
+    // rate-limited before doing any real work. Uses the PUBLIC limiter (shared
+    // with binary()'s per-request verify_license_key call, never with the
+    // admin endpoint's limiter) and the real client IP, not nginx's own
+    // 127.0.0.1 peer address (C2 fix).
+    let ip = client_ip(&headers, addr);
+    if let Err(retry_after) = state.public_rate_limiter.check(ip) {
+        tracing::warn!(%ip, retry_after, "verify-key: rate limited");
         return (
             StatusCode::TOO_MANY_REQUESTS,
             Json(json!({
@@ -731,8 +806,13 @@ async fn reload_revocation_list(
             .into_response();
     }
     // S6: on-demand disk read, checked after the loopback gate (no point rate
-    // limiting a request that's about to be rejected anyway).
-    if let Err(retry_after) = state.rate_limiter.check(addr.ip()) {
+    // limiting a request that's about to be rejected anyway). Uses the
+    // dedicated ADMIN limiter (C2 fix) -- never shared with public traffic,
+    // regardless of key computation. Keys on the direct TCP peer, not
+    // X-Forwarded-For: this endpoint is reached by direct loopback access
+    // only (nginx doesn't proxy it at all), so addr.ip() is already correct
+    // and trusting a client-supplied header here would be actively wrong.
+    if let Err(retry_after) = state.admin_rate_limiter.check(addr.ip()) {
         tracing::warn!(ip = %addr.ip(), retry_after, "reload-revocation-list: rate limited");
         return (
             StatusCode::TOO_MANY_REQUESTS,
@@ -896,16 +976,20 @@ async fn main() -> Result<()> {
         },
     }));
 
-    // 20 requests/60s per IP — conservative default for a CPU-bound signature
-    // oracle and an admin endpoint, not tuned against real traffic yet.
-    let rate_limiter = Arc::new(RateLimiter::new(20, std::time::Duration::from_secs(60)));
+    // 20 requests/60s per IP on each bucket — conservative default, not tuned
+    // against real traffic yet. Two independent limiters (C2 fix): public
+    // traffic against /verify-key or binary()'s signature check can never
+    // exhaust the admin endpoint's budget.
+    let public_rate_limiter = Arc::new(RateLimiter::new(20, std::time::Duration::from_secs(60)));
+    let admin_rate_limiter = Arc::new(RateLimiter::new(20, std::time::Duration::from_secs(60)));
 
     let state = Arc::new(AppState {
         releases_dir,
         verify_key,
         revocation_list_path,
         revoked_tokens,
-        rate_limiter,
+        public_rate_limiter,
+        admin_rate_limiter,
     });
 
     let app = build_router(state);
@@ -995,20 +1079,38 @@ mod tests {
             revoked_tokens: Arc::new(RwLock::new(HashSet::new())),
             // Effectively unlimited — existing tests hit handlers repeatedly from
             // the same IP; rate-limit-specific tests construct their own state
-            // with a tight limit via `test_state_with_rate_limit` instead.
-            rate_limiter: Arc::new(RateLimiter::new(
+            // with a tight limit via `test_state_with_admin_rate_limit`/
+            // `test_state_with_public_rate_limit` instead.
+            public_rate_limiter: Arc::new(RateLimiter::new(
+                100_000,
+                std::time::Duration::from_secs(60),
+            )),
+            admin_rate_limiter: Arc::new(RateLimiter::new(
                 100_000,
                 std::time::Duration::from_secs(60),
             )),
         })
     }
 
-    fn test_state_with_rate_limit(
+    fn test_state_with_admin_rate_limit(
         releases_dir: &std::path::Path,
         max_requests: usize,
     ) -> Arc<AppState> {
         let mut state = (*test_state(releases_dir, None, None)).clone();
-        state.rate_limiter = Arc::new(RateLimiter::new(
+        state.admin_rate_limiter = Arc::new(RateLimiter::new(
+            max_requests,
+            std::time::Duration::from_secs(60),
+        ));
+        Arc::new(state)
+    }
+
+    fn test_state_with_public_rate_limit(
+        releases_dir: &std::path::Path,
+        verify_key: Option<VerifyingKey>,
+        max_requests: usize,
+    ) -> Arc<AppState> {
+        let mut state = (*test_state(releases_dir, verify_key, None)).clone();
+        state.public_rate_limiter = Arc::new(RateLimiter::new(
             max_requests,
             std::time::Duration::from_secs(60),
         ));
@@ -1075,6 +1177,7 @@ mod tests {
         let (_, Json(body)) = verify_key_endpoint(
             loopback(),
             State(state),
+            HeaderMap::new(),
             Json(VerifyKeyRequest {
                 license_key_b64: token,
                 product_id: "prod".into(),
@@ -1090,7 +1193,7 @@ mod tests {
         let scratch = scratch_dir("rrl-code");
         let list = scratch.join("revoked.txt");
         fs::write(&list, "").unwrap();
-        let state = test_state_with_rate_limit(&scratch, 1);
+        let state = test_state_with_admin_rate_limit(&scratch, 1);
         let mut state = (*state).clone();
         state.revocation_list_path = Some(list.to_string_lossy().into_owned());
         let state = Arc::new(state);
@@ -1924,6 +2027,7 @@ mod tests {
         let (status, Json(body)) = verify_key_endpoint(
             loopback(),
             State(state),
+            HeaderMap::new(),
             Json(VerifyKeyRequest {
                 license_key_b64: "anything".into(),
                 product_id: "prod".into(),
@@ -1946,6 +2050,7 @@ mod tests {
         let (status, Json(body)) = verify_key_endpoint(
             loopback(),
             State(state.clone()),
+            HeaderMap::new(),
             Json(VerifyKeyRequest {
                 license_key_b64: token,
                 product_id: "prod".into(),
@@ -1963,6 +2068,7 @@ mod tests {
         let (status, Json(body)) = verify_key_endpoint(
             loopback(),
             State(state),
+            HeaderMap::new(),
             Json(VerifyKeyRequest {
                 license_key_b64: token,
                 product_id: "prod".into(),
@@ -2007,22 +2113,107 @@ mod tests {
     async fn verify_key_endpoint_429_when_rate_limited() {
         let scratch = scratch_dir("vke-429");
         let sk = test_signing_key();
-        let mut state = (*test_state(&scratch, Some(sk.verifying_key()), None)).clone();
-        state.rate_limiter = Arc::new(RateLimiter::new(1, std::time::Duration::from_secs(60)));
+        let state = test_state_with_public_rate_limit(&scratch, Some(sk.verifying_key()), 1);
+
+        let req = || VerifyKeyRequest {
+            license_key_b64: "anything".into(),
+            product_id: "prod".into(),
+        };
+        let (first_status, _) = verify_key_endpoint(
+            loopback(),
+            State(state.clone()),
+            HeaderMap::new(),
+            Json(req()),
+        )
+        .await;
+        assert_ne!(first_status, StatusCode::TOO_MANY_REQUESTS);
+
+        let (status, Json(body)) =
+            verify_key_endpoint(loopback(), State(state), HeaderMap::new(), Json(req())).await;
+        assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(body["error"], "rate limited");
+        assert!(body["retry_after_seconds"].as_u64().unwrap() >= 1);
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // C2 regression: binary()'s own signature-verification step (the route
+    // genuinely reachable through this host's nginx, unlike /verify-key) must
+    // also be rate limited, sharing the PUBLIC bucket -- not the admin bucket.
+    #[tokio::test]
+    async fn binary_429_when_rate_limited_before_signature_verification() {
+        let scratch = scratch_dir("binary-429");
+        let sk = test_signing_key();
+        fs::create_dir_all(scratch.join("prod")).unwrap();
+        fs::write(
+            scratch.join("prod/MANIFEST.json"),
+            r#"{"requires_license": true}"#,
+        )
+        .unwrap();
+        let state = test_state_with_public_rate_limit(&scratch, Some(sk.verifying_key()), 1);
+
+        let call = |state: Arc<AppState>| {
+            binary(
+                loopback(),
+                State(state),
+                HeaderMap::new(),
+                Path((
+                    "prod".to_string(),
+                    "1.0.0".to_string(),
+                    "linux-x86_64".to_string(),
+                )),
+                Query(BinaryQuery {
+                    token: Some("anything".to_string()),
+                }),
+            )
+        };
+        let first = call(state.clone()).await;
+        assert_ne!(first.status(), StatusCode::TOO_MANY_REQUESTS);
+
+        let resp = call(state).await;
+        assert_eq!(resp.status(), StatusCode::TOO_MANY_REQUESTS);
+        let body = body_json(resp).await;
+        assert_eq!(body["code"], "rate-limited");
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // C2 regression: exhausting the PUBLIC bucket must never affect the ADMIN
+    // bucket -- this is the exact bug the audit demonstrated live (20x
+    // /verify-key calls made the admin revocation-reload return 429 too).
+    #[tokio::test]
+    async fn public_rate_limit_never_affects_admin_bucket() {
+        let scratch = scratch_dir("c2-buckets-independent");
+        let list = scratch.join("revoked.txt");
+        fs::write(&list, "").unwrap();
+        let sk = test_signing_key();
+        let mut state =
+            (*test_state_with_public_rate_limit(&scratch, Some(sk.verifying_key()), 1)).clone();
+        state.revocation_list_path = Some(list.to_string_lossy().into_owned());
         let state = Arc::new(state);
 
         let req = || VerifyKeyRequest {
             license_key_b64: "anything".into(),
             product_id: "prod".into(),
         };
-        let (first_status, _) =
-            verify_key_endpoint(loopback(), State(state.clone()), Json(req())).await;
-        assert_ne!(first_status, StatusCode::TOO_MANY_REQUESTS);
+        // Exhaust the public bucket.
+        let _ = verify_key_endpoint(
+            loopback(),
+            State(state.clone()),
+            HeaderMap::new(),
+            Json(req()),
+        )
+        .await;
+        let (exhausted, _) = verify_key_endpoint(
+            loopback(),
+            State(state.clone()),
+            HeaderMap::new(),
+            Json(req()),
+        )
+        .await;
+        assert_eq!(exhausted, StatusCode::TOO_MANY_REQUESTS);
 
-        let (status, Json(body)) = verify_key_endpoint(loopback(), State(state), Json(req())).await;
-        assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
-        assert_eq!(body["error"], "rate limited");
-        assert!(body["retry_after_seconds"].as_u64().unwrap() >= 1);
+        // Admin endpoint must be entirely unaffected.
+        let admin_resp = reload_revocation_list(loopback(), State(state)).await;
+        assert_ne!(admin_resp.status(), StatusCode::TOO_MANY_REQUESTS);
         let _ = fs::remove_dir_all(&scratch);
     }
 
@@ -2031,7 +2222,7 @@ mod tests {
         let scratch = scratch_dir("rrl-429");
         let list = scratch.join("revoked.txt");
         fs::write(&list, "").unwrap();
-        let state = test_state_with_rate_limit(&scratch, 1);
+        let state = test_state_with_admin_rate_limit(&scratch, 1);
         // Patch in the revocation list path the generic helper doesn't set.
         let mut state = (*state).clone();
         state.revocation_list_path = Some(list.to_string_lossy().into_owned());
@@ -2051,7 +2242,7 @@ mod tests {
         // Loopback gate must fire first -- an attacker spoofing a non-loopback
         // source shouldn't be able to probe the rate limiter's state at all.
         let scratch = scratch_dir("rrl-loopback-first");
-        let state = test_state_with_rate_limit(&scratch, 1);
+        let state = test_state_with_admin_rate_limit(&scratch, 1);
         let resp = reload_revocation_list(non_loopback(), State(state)).await;
         assert_eq!(resp.status(), StatusCode::FORBIDDEN);
         let _ = fs::remove_dir_all(&scratch);
@@ -2089,6 +2280,7 @@ mod tests {
         let sk = test_signing_key();
         let state = test_state(&scratch, Some(sk.verifying_key()), None);
         let resp = binary(
+            loopback(),
             State(state),
             HeaderMap::new(),
             Path((
@@ -2110,6 +2302,7 @@ mod tests {
         let scratch = scratch_dir("bin-503");
         let state = test_state(&scratch, None, None);
         let resp = binary(
+            loopback(),
             State(state),
             HeaderMap::new(),
             Path((
@@ -2135,6 +2328,7 @@ mod tests {
         fs::write(prod.join("0.0.1/linux-x86_64"), b"binary-bytes").unwrap();
         let state = test_state(&scratch, None, None);
         let resp = binary(
+            loopback(),
             State(state),
             HeaderMap::new(),
             Path((
@@ -2162,6 +2356,7 @@ mod tests {
         fs::write(prod.join("0.0.1/linux-x86_64.sig"), b"detached-sig").unwrap();
         let state = test_state(&scratch, None, None);
         let resp = binary(
+            loopback(),
             State(state),
             HeaderMap::new(),
             Path((
@@ -2183,6 +2378,7 @@ mod tests {
         let state = test_state(&scratch, Some(sk.verifying_key()), None);
         let token = make_token(&sk, &payload_json("prod", "9999-12-31"));
         let resp = binary(
+            loopback(),
             State(state),
             HeaderMap::new(),
             Path((
@@ -2214,6 +2410,7 @@ mod tests {
             .unwrap()
             .insert(token_fingerprint(&token));
         let resp = binary(
+            loopback(),
             State(state),
             HeaderMap::new(),
             Path((
@@ -2240,6 +2437,7 @@ mod tests {
         let router = build_router(state);
         let request = axum::http::Request::builder()
             .uri(uri)
+            .extension(loopback())
             .body(axum::body::Body::empty())
             .unwrap();
         let resp = router.oneshot(request).await.unwrap();
