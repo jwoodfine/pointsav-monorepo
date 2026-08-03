@@ -80,7 +80,26 @@ pub fn load_and_flatten(vault: &Path) -> Vec<TokenTier> {
                 continue;
             }
             let mut entries = Vec::new();
-            flatten(group_val, group_name.clone(), None, &mut entries);
+            // Fable audit finding (2026-08-02): this used to seed the path with
+            // `group_name` alone for every tier, silently dropping `tier_name` --
+            // e.g. a paper-tier leaf got path "primitive.color.ink" instead of
+            // "paper.primitive.color.ink". That broke the homepage Paper/Writing
+            // preview (find_val() calls below use the real tier-inclusive paths, which
+            // could never match), MCP alias resolution (196 of 248 real aliases are
+            // tier-inclusive, e.g. "{paper.primitive.page.margin-standard}"), and
+            // renames.json's path-alias branch. Only the "primitive" tier is meant to
+            // stay bare/group-relative: generate-tokens-export.py's own alias_index
+            // deliberately special-cases pillar=="primitive" to register a bare-path
+            // alias alongside the full one (since every other tier's tokens reference
+            // primitive values without the "primitive." prefix, e.g. theme's
+            // "{color.neutral-100}") -- no such special case exists for any other
+            // tier, so every other tier's real path includes its own tier name.
+            let seed_path = if tier_name == "primitive" {
+                group_name.clone()
+            } else {
+                format!("{tier_name}.{group_name}")
+            };
+            flatten(group_val, seed_path, None, &mut entries);
             if !entries.is_empty() {
                 groups.push(TokenGroup {
                     name: group_name.clone(),
@@ -185,9 +204,17 @@ fn contrast_ratio_vs_white(hex: &str) -> Option<String> {
     if hex.len() != 6 {
         return None;
     }
-    let r = u8::from_str_radix(&hex[0..2], 16).ok()?;
-    let g = u8::from_str_radix(&hex[2..4], 16).ok()?;
-    let b = u8::from_str_radix(&hex[4..6], 16).ok()?;
+    // Fable-audit finding (2026-08-02): `hex.len()` is a byte count, but a `$value`
+    // like "#aéaaa" is 6 bytes with a multi-byte char straddling index 2 -- the old
+    // `&hex[0..2]` byte-slice would panic ("byte index 2 is not a char boundary") on
+    // that input. `load_and_flatten()` runs on every page render, so one malformed
+    // vault token would 500 every request. Vault content is operator-controlled, not
+    // user input, but a typo is still one edit away; `.get()` returns `None` instead
+    // of panicking on a bad boundary or bad UTF-8 slice, same as an unparseable hex
+    // digit already does via `.ok()?` below.
+    let r = u8::from_str_radix(hex.get(0..2)?, 16).ok()?;
+    let g = u8::from_str_radix(hex.get(2..4)?, 16).ok()?;
+    let b = u8::from_str_radix(hex.get(4..6)?, 16).ok()?;
     let lum = relative_luminance(r, g, b);
     let ratio = (1.0 + 0.05) / (lum + 0.05);
     Some(format!("{ratio:.2}:1"))
