@@ -5,6 +5,22 @@ BRIEFs (`.agent/briefs/`) and `.agent/inbox-archive.md`, not duplicated here. Pr
 reorganized 2026-08-02 (prior version was 300 lines, mostly historical narrative and items
 already confirmed resolved — see git history for the full prior text if needed).
 
+## New findings this session (2026-08-02) — real bugs, not yet fixed
+
+- `v1_products`' advertised `download_url` for `os-network-admin` 404s regardless of edition —
+  it points at the version directory (`.../releases/os-network-admin/0.1.0`), not a platform
+  file, missing the `/x86_64` (or `/linux-x86_64`) segment `app-privategit-source`'s
+  `/releases/:product/:version/:platform` route actually requires. The real, working customer
+  path is `install.sh`'s curl-pipe-sh flow, which resolves the platform itself — but the raw
+  JSON API's own advertised field is broken. Found while verifying the version-tag fix below;
+  unclear if this affects other catalog products too (not checked for `app-orchestration-command`/
+  `app-mediakit-knowledge`).
+- Platform-naming inconsistency: `os-network-admin`'s `install.sh` hardcodes `PLATFORM="x86_64"`
+  (matching the real on-disk binary filename), while `product_detail.rs`'s hardcoded download
+  link and this product's own catalog `platform` display field ("Linux x86_64") both assume
+  `"linux-x86_64"`. Two different platform-segment conventions coexist in this crate; not
+  reconciled.
+
 ## Verified resolved this session (2026-08-02) — closed, not tracked further
 
 - Nested `pointsav-monorepo/` sub-clone divergence (was HIGH, 2026-07-13) — confirmed byte-identical
