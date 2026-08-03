@@ -15,7 +15,7 @@ use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
-use std::{fs, path::PathBuf, process::Command, sync::Arc};
+use std::{fs, path::PathBuf, sync::Arc};
 use tower_http::services::ServeDir;
 use tower_http::set_header::SetResponseHeaderLayer;
 
@@ -556,13 +556,18 @@ enum WalletCheck {
 /// external subprocess and classify the result. Consumes tool-wallet's CLI
 /// contract exactly as-is; never modifies it. `bin` is normally `"tool-wallet"`
 /// (PATH-resolved); tests inject a JSON test-double path via it.
-fn run_tool_wallet_check(
+///
+/// Uses `tokio::process::Command` rather than `std::process::Command`: the RPC
+/// round-trip this subprocess performs can take seconds, and a blocking `.output()`
+/// call here would stall the async worker thread it runs on for the duration —
+/// starving every other request being polled on that thread (Fable audit S3).
+async fn run_tool_wallet_check(
     bin: &str,
     tx_hash: &str,
     rpc_url: &str,
     wallet_addr: &str,
 ) -> WalletCheck {
-    let result = Command::new(bin)
+    let result = tokio::process::Command::new(bin)
         .args([
             "check",
             tx_hash,
@@ -571,7 +576,8 @@ fn run_tool_wallet_check(
             "--wallet-address",
             wallet_addr,
         ])
-        .output();
+        .output()
+        .await;
 
     match result {
         Ok(out) if out.status.success() => match serde_json::from_slice::<Value>(&out.stdout) {
@@ -674,7 +680,9 @@ async fn resolve_license(state: &AppState, tx_hash: &str) -> LicenseOutcome {
         tx_hash,
         &state.polygon_rpc_url,
         &state.polygon_wallet_address,
-    ) {
+    )
+    .await
+    {
         WalletCheck::Confirmed(check_json) => {
             let customer_ref = check_json
                 .get("from")
