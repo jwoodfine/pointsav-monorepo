@@ -75,6 +75,24 @@ impl SoftwareSurface {
     /// short trademark-notice sentence is not sourced from it, and home.pointsav.com's
     /// own practice is the concrete precedent to match here. Mark names themselves
     /// (™ terms) stay untranslated — they are proper nouns, same as home.pointsav.com's.
+    ///
+    /// **Cross-checked against `legal-tokens-pointsav.yaml` (2026-08-02):** this text
+    /// is now also verified byte-identical to `factory-release-engineering`'s
+    /// `tokens/legal-tokens-pointsav.yaml` `statement`/`statement_es` fields, fixed in
+    /// that repo's commit `f169e4e` (2026-07-27) to the same full 6-mark form — a third
+    /// independent source (alongside `TRADEMARK.md` and home.pointsav.com's live HTML)
+    /// now agrees. Investigated wiring this crate to read that YAML live instead of
+    /// carrying a hardcoded duplicate (the reason this constant existed as a duplicate
+    /// in the first place — see this project's NEXT.md history): no workspace crate
+    /// anywhere consumes `factory-release-engineering` tokens today, so there's no
+    /// established pattern to follow, and the two real options both carry
+    /// infrastructure cost this session didn't take on unilaterally — a build-time
+    /// `include_str!` would create a fragile absolute cross-repo compile dependency
+    /// (breaks on any machine where `vendor/factory-release-engineering` isn't checked
+    /// out at this exact path), and a runtime read needs the YAML actually deployed
+    /// alongside the production binary, which today's `local-software-marketplace`
+    /// deployment doesn't do. Left as a real follow-up (logged in NEXT.md), not
+    /// silently wired with an unreviewed new deploy step.
     pub fn trademark_line(self, lang: Lang) -> &'static str {
         match lang {
             Lang::En => {
