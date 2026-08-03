@@ -487,6 +487,23 @@ async fn latest_redirect(
         )
             .into_response();
     }
+    // C1 fix: `query.token` used to reach `Redirect::temporary()` completely
+    // unvalidated. axum's Redirect constructors panic if the target isn't a
+    // valid HTTP header value (a percent-decoded newline, say) -- and this
+    // workspace sets `panic = "abort"` in every profile, so that panic took
+    // down the whole process. This route is the one nginx actually proxies
+    // publicly (`location ^~ /releases/`), unlike the equivalent bug class in
+    // the marketplace crate -- reusing `is_safe_segment` since a license token
+    // never legitimately contains `/`, `\`, or control characters either.
+    if let Some(tok) = &query.token {
+        if !is_safe_segment(tok) {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(err_json("invalid-token", "invalid token")),
+            )
+                .into_response();
+        }
+    }
     match latest_version_with_platform(&state.releases_dir, &product, &platform) {
         Some(version) => {
             let target = match &query.token {
@@ -1198,6 +1215,70 @@ mod tests {
         let body_str = body.to_string();
         assert!(!body_str.contains(&file_path.to_string_lossy().to_string()));
         assert_eq!(body["error"], "not found");
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // ── latest_redirect (C1: unauthenticated crash on the one publicly-proxied route) ──
+
+    #[tokio::test]
+    async fn latest_redirect_302s_to_the_highest_version_with_token() {
+        let scratch = scratch_dir("latest-ok");
+        fs::create_dir_all(scratch.join("prod/1.0.0")).unwrap();
+        fs::create_dir_all(scratch.join("prod/2.0.0")).unwrap();
+        fs::write(scratch.join("prod/1.0.0/linux-x86_64"), b"old").unwrap();
+        fs::write(scratch.join("prod/2.0.0/linux-x86_64"), b"new").unwrap();
+        let state = test_state(&scratch, None, None);
+        let resp = latest_redirect(
+            State(state),
+            Path(("prod".to_string(), "linux-x86_64".to_string())),
+            Query(BinaryQuery {
+                token: Some("valid-token-abc123".to_string()),
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::TEMPORARY_REDIRECT);
+        assert_eq!(
+            resp.headers().get(header::LOCATION).unwrap(),
+            "/releases/prod/2.0.0/linux-x86_64?token=valid-token-abc123"
+        );
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    // C1 regression test: a malformed token used to reach Redirect::temporary()
+    // unvalidated, which panics on an invalid header value -- and panic = abort
+    // in this workspace turns that into a full process crash on one request to
+    // the single route nginx actually proxies publicly. Must reject before ever
+    // calling Redirect::temporary, not just return something.
+    #[tokio::test]
+    async fn latest_redirect_rejects_malformed_token_instead_of_panicking() {
+        let scratch = scratch_dir("latest-bad-token");
+        fs::create_dir_all(scratch.join("prod/1.0.0")).unwrap();
+        fs::write(scratch.join("prod/1.0.0/linux-x86_64"), b"data").unwrap();
+        let state = test_state(&scratch, None, None);
+        let resp = latest_redirect(
+            State(state),
+            Path(("prod".to_string(), "linux-x86_64".to_string())),
+            Query(BinaryQuery {
+                token: Some("bad\ntoken\rwith-control-chars".to_string()),
+            }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+        let _ = fs::remove_dir_all(&scratch);
+    }
+
+    #[tokio::test]
+    async fn latest_redirect_404_when_no_version_has_the_platform() {
+        let scratch = scratch_dir("latest-404");
+        fs::create_dir_all(&scratch.join("prod")).unwrap();
+        let state = test_state(&scratch, None, None);
+        let resp = latest_redirect(
+            State(state),
+            Path(("prod".to_string(), "linux-x86_64".to_string())),
+            Query(BinaryQuery { token: None }),
+        )
+        .await;
+        assert_eq!(resp.status(), StatusCode::NOT_FOUND);
         let _ = fs::remove_dir_all(&scratch);
     }
 
