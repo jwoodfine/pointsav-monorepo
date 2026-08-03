@@ -775,6 +775,7 @@ async fn git_stub() -> (StatusCode, Json<Value>) {
         StatusCode::SERVICE_UNAVAILABLE,
         Json(json!({
             "error": "smart-HTTP Git not yet enabled",
+            "code": "not-yet-enabled",
             "see": "https://github.com/pointsav/pointsav-monorepo",
             "arriving": "v0.0.2"
         })),
@@ -2092,6 +2093,7 @@ mod tests {
         let (status, Json(body)) = git_stub().await;
         assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
         assert_eq!(body["error"], "smart-HTTP Git not yet enabled");
+        assert_eq!(body["code"], "not-yet-enabled");
         assert!(body["see"].is_string());
         assert!(body["arriving"].is_string());
     }

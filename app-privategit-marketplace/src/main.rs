@@ -1544,7 +1544,7 @@ async fn v1_products(State(state): State<Arc<AppState>>) -> (StatusCode, Json<Va
             tracing::error!("catalog load failed: {e:#}");
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({"error": "catalog unavailable"})),
+                Json(err_json("catalog-unavailable", "catalog unavailable")),
             )
         }
     }
@@ -1571,6 +1571,7 @@ async fn v1_license(
             StatusCode::ACCEPTED,
             Json(json!({
                 "status": "pending",
+                "code": "payment-pending",
                 "retry_after": retry_after,
                 "message": "Transaction not yet confirmed on Polygon. Retry in 30 seconds."
             })),
@@ -1579,6 +1580,7 @@ async fn v1_license(
             StatusCode::NOT_FOUND,
             Json(json!({
                 "status": "not_found",
+                "code": "tx-not-found",
                 "message": "Transaction not found or not a recognised USDC payment to this address."
             })),
         ),
@@ -2645,6 +2647,7 @@ esac
             v1_license(State(state), Path(test_tx_hash("be", "pendingtx01"))).await;
         assert_eq!(status, StatusCode::ACCEPTED);
         assert_eq!(body["status"], "pending");
+        assert_eq!(body["code"], "payment-pending");
         assert_eq!(body["retry_after"], 30);
 
         let _ = fs::remove_dir_all(&scratch);
@@ -2661,6 +2664,7 @@ esac
             v1_license(State(state), Path(test_tx_hash("00", "unknowntx01"))).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(body["status"], "not_found");
+        assert_eq!(body["code"], "tx-not-found");
 
         let _ = fs::remove_dir_all(&scratch);
     }
@@ -2674,6 +2678,7 @@ esac
             v1_license(State(state), Path(test_tx_hash("00", "anytx01"))).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
         assert_eq!(body["status"], "not_found");
+        assert_eq!(body["code"], "tx-not-found");
 
         let _ = fs::remove_dir_all(&scratch);
     }
@@ -3054,7 +3059,10 @@ esac
 
         let (status, Json(body)) = v1_products(State(state)).await;
         assert_eq!(status, StatusCode::INTERNAL_SERVER_ERROR);
-        assert_eq!(body, json!({"error": "catalog unavailable"}));
+        assert_eq!(
+            body,
+            json!({"error": "catalog unavailable", "code": "catalog-unavailable"})
+        );
 
         let _ = fs::remove_dir_all(&scratch);
     }
