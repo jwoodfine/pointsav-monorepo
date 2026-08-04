@@ -106,6 +106,13 @@ pub struct Heading {
 /// Render a Markdown body to HTML, resolving wikilinks and collecting headings.
 pub fn render(body_md: &str) -> Rendered {
     let with_links = resolve_wikilinks(body_md);
+    // Strip Kramdown/Hugo-style `{#id}` heading attributes before either comrak
+    // or `extract_headings` sees the text — this engine has no extension that
+    // understands that syntax, so left alone it renders as literal text (real
+    // bug: Index Topic content authored with `## Group {#group-count-N}`).
+    // Applying the strip here, not only inside `extract_headings`, keeps the
+    // rendered `<h2>` and the TOC entry in lockstep.
+    let with_links = strip_heading_attrs(&with_links);
 
     let mut opts = Options::default();
     opts.extension.strikethrough = true;
@@ -330,7 +337,12 @@ fn resolve_wikilinks(md: &str) -> String {
                         None => (inner.trim(), inner.trim()),
                     };
                     let href = if let Some(anchor) = target.strip_prefix('#') {
-                        format!("#{}", slugify(anchor))
+                        // A throwaway Anchorizer, not the shared one `extract_headings`
+                        // uses — this can't perfectly replicate cross-document dedup
+                        // numbering for a same-page link targeting the *second* of two
+                        // identically-worded headings, but neither did the old
+                        // `slugify`-based version; no regression, just not a new fix.
+                        format!("#{}", comrak::Anchorizer::new().anchorize(anchor))
                     } else {
                         format!("/wiki/{}", target)
                     };
@@ -442,6 +454,38 @@ fn strip_tags(html: &str) -> String {
     out
 }
 
+/// Strip a trailing Kramdown/Hugo-style heading-attribute (`{#some-id}`) from
+/// every ATX heading line in `md`, skipping fenced code blocks. This engine
+/// has no extension that understands that syntax — comrak doesn't support it
+/// and `header_ids` only auto-generates ids from heading text — so left alone
+/// it renders as literal text in both the heading and the TOC.
+fn strip_heading_attrs(md: &str) -> String {
+    let mut out = String::with_capacity(md.len());
+    let mut in_fence = false;
+    for line in md.lines() {
+        let t = line.trim_start();
+        if t.starts_with("```") || t.starts_with("~~~") {
+            in_fence = !in_fence;
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        }
+        if in_fence {
+            out.push_str(line);
+            out.push('\n');
+            continue;
+        }
+        let level = t.bytes().take_while(|&b| b == b'#').count();
+        if (1..=6).contains(&level) && t.as_bytes().get(level) == Some(&b' ') {
+            out.push_str(&strip_trailing_heading_attr(line));
+        } else {
+            out.push_str(line);
+        }
+        out.push('\n');
+    }
+    out
+}
+
 /// Decode the small set of HTML entities comrak actually emits in text nodes.
 fn decode_entities(s: &str) -> String {
     s.replace("&amp;", "&")
@@ -449,6 +493,31 @@ fn decode_entities(s: &str) -> String {
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
         .replace("&#39;", "'")
+}
+
+/// If `line` ends with `{#id}` (id: ASCII alphanumerics/`_`/`-` only), strip it
+/// and any whitespace immediately before it. Otherwise returns `line` as-is —
+/// in particular, a heading that merely *mentions* `` `{#id}` `` inside
+/// backticks is untouched (the line ends with a backtick, not `}`).
+/// `pub(super)`: also used by `index_topic::parse_index_topic` to clean a
+/// group heading's title independently of the shared `render()` pipeline.
+pub(super) fn strip_trailing_heading_attr(line: &str) -> String {
+    let trimmed_end = line.trim_end();
+    if !trimmed_end.ends_with('}') {
+        return line.to_string();
+    }
+    let Some(open) = trimmed_end.rfind("{#") else {
+        return line.to_string();
+    };
+    let id_part = &trimmed_end[open + 2..trimmed_end.len() - 1];
+    let valid_id = !id_part.is_empty()
+        && id_part
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-');
+    if !valid_id {
+        return line.to_string();
+    }
+    trimmed_end[..open].trim_end().to_string()
 }
 
 /// Lowercase ASCII slug: alphanumerics kept, runs of other chars → single `-`.
@@ -716,5 +785,49 @@ mod tests {
         };
         let r = render_journal_doc(&doc, &registry);
         assert!(!r.html.contains("References"));
+    }
+
+    #[test]
+    fn spanish_heading_gets_a_real_anchor_not_a_dead_one() {
+        // The bug this fixes: the old hand-rolled `slugify` collapsed accented
+        // letters differently than comrak's own anchor generator, so a TOC
+        // link computed by this engine didn't match the id comrak actually put
+        // on the rendered `<h2>` — every Spanish-language heading was a dead
+        // anchor. `Anchorizer` keeps Unicode letters, so `<h2 id=...>` (comrak's
+        // own output, via `header_ids`) and our TOC `Heading.id` must now agree.
+        let r = render("## Estándares editoriales\n");
+        assert_eq!(r.headings[0].id, "estándares-editoriales");
+        assert!(
+            r.html.contains(r#"id="estándares-editoriales""#),
+            "comrak's own rendered anchor: {}",
+            r.html
+        );
+    }
+
+    #[test]
+    fn strips_group_count_heading_attribute() {
+        let r = render("## Identity and permissions {#group-count-5}\n\nBody.\n");
+        assert_eq!(r.headings[0].text, "Identity and permissions");
+        assert!(!r.html.contains("group-count-5"));
+        assert!(r.html.contains("Identity and permissions"));
+    }
+
+    #[test]
+    fn heading_attr_strip_ignores_fenced_examples() {
+        let r = render("## Real {#real}\n\n```\n## Not a heading {#fake}\n```\n");
+        assert_eq!(r.headings.len(), 1);
+        assert_eq!(r.headings[0].text, "Real");
+        assert!(r.html.contains("Not a heading {#fake}"));
+    }
+
+    #[test]
+    fn heading_attr_strip_spares_backticked_mentions() {
+        // A heading that documents the syntax in backticks (no bare trailing
+        // `}`) is left alone — the line doesn't end with `}` at all.
+        let r = render("## The heading-attribute syntax `{#id}` explained\n");
+        assert_eq!(
+            r.headings[0].text,
+            "The heading-attribute syntax `{#id}` explained"
+        );
     }
 }
