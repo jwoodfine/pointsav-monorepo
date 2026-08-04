@@ -143,7 +143,17 @@ fn is_indexable_md(path: &Path) -> bool {
     path.is_file() && lossy.ends_with(".md") && !lossy.ends_with(".es.md")
 }
 
-async fn reindex_file(path: &Path, _vault: &Path, index: &Arc<RwLock<InvertedIndex>>) {
+async fn reindex_file(path: &Path, vault: &Path, index: &Arc<RwLock<InvertedIndex>>) {
+    // Live edits to a gated section (e.g. research/) must not silently re-enter the
+    // search index -- populate_index already skips these at startup; this is the same
+    // rule applied to the fs-watcher's incremental path so the two can't drift apart.
+    if let Ok(rel) = path.strip_prefix(vault) {
+        if let Some(section) = rel.components().next().and_then(|c| c.as_os_str().to_str()) {
+            if !vault::is_publicly_reachable(section) {
+                return;
+            }
+        }
+    }
     let Ok(content) = tokio::fs::read_to_string(path).await else {
         return;
     };
@@ -193,6 +203,9 @@ fn index_markdown_file(idx: &mut InvertedIndex, path: &Path, name: &str) {
 async fn populate_index(vault: &Path, index: &Arc<RwLock<InvertedIndex>>) {
     let mut idx = index.write().await;
     for (section, _, layout) in SECTIONS {
+        if !vault::is_publicly_reachable(section) {
+            continue;
+        }
         let sec_dir = vault.join(section);
         let Ok(entries) = std::fs::read_dir(&sec_dir) else {
             continue;
