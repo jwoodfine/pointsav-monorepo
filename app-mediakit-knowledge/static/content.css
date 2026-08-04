@@ -172,6 +172,24 @@
   border-bottom: 1px solid var(--k-heading-rule);
 }
 
+/* Content-type badge next to an article H1 — currently only "Index"/"Índice"
+   for Index Topics. No icon, no color block — matches the site's
+   understated register (plain text, same visual weight as a small eyebrow). */
+.k-content-badge {
+  display: inline-block;
+  margin-left: var(--k-space-3);
+  padding: 0.15em 0.5em;
+  vertical-align: middle;
+  font-family: var(--k-font-sans);
+  font-size: var(--k-text-2xs);
+  font-weight: var(--k-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--k-tracking-caps);
+  color: var(--k-ink-muted);
+  border: 1px solid var(--k-border-light);
+  border-radius: var(--k-radius-sm);
+}
+
 /* --- Prose column --------------------------------------------------------- */
 /* Fills the content column (Wikipedia-style full width). A measure is applied
    only to running paragraphs for readability, not to tables/code/figures. */
@@ -509,6 +527,109 @@
   color: var(--k-accent);
   margin-bottom: var(--k-space-1);
 }
+
+/* ========================================================================== */
+/* Index Topic — curated category hub (Wikipedia Portal-namespace "selected    */
+/* article" register: one highlighted pick + calm annotated link lists, not   */
+/* a second homepage).                                                        */
+/* ========================================================================== */
+
+/* Safety-net link back to the flat article list (`?view=all`) — always
+   present so drift between the curated groups and the category's real
+   membership can never make an article unreachable by browsing. */
+.k-index-topic__see-all {
+  margin: 0 0 var(--k-space-5);
+  font-family: var(--k-font-sans);
+  font-size: var(--k-text-sm);
+  color: var(--k-ink-muted);
+}
+.k-index-topic__see-all a { color: var(--k-ink-secondary); }
+.k-index-topic__see-all a:hover { color: var(--k-accent); }
+
+.k-index-topic__start-here {
+  display: block;
+  margin: var(--k-space-5) 0 var(--k-space-6);
+  padding: var(--k-space-4) var(--k-space-5);
+  border: 1px solid var(--k-border-light);
+  border-left: 3px solid var(--k-accent);
+  border-radius: var(--k-radius-md);
+  background: var(--k-surface-sunken);
+}
+.k-index-topic__start-here-eyebrow {
+  display: block;
+  font-family: var(--k-font-sans);
+  font-size: var(--k-text-2xs);
+  font-weight: var(--k-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: var(--k-tracking-caps);
+  color: var(--k-accent);
+  margin-bottom: var(--k-space-2);
+}
+.k-index-topic__start-here .k-prose { margin: 0; }
+
+.k-index-group {
+  margin-top: var(--k-space-7);
+  padding-top: var(--k-space-5);
+  border-top: 1px solid var(--k-border-subtle);
+}
+.k-index-group:first-of-type {
+  margin-top: var(--k-space-6);
+  padding-top: 0;
+  border-top: none;
+}
+.k-index-group__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--k-space-2);
+  margin-bottom: var(--k-space-2);
+}
+.k-index-group__title {
+  font-family: var(--k-title-font);
+  font-size: var(--k-h2-fs);
+  font-weight: var(--k-weight-semibold);
+  color: var(--k-ink);
+  margin: 0;
+}
+.k-index-group__count {
+  font-family: var(--k-font-sans);
+  font-size: var(--k-text-xs);
+  color: var(--k-ink-muted);
+  white-space: nowrap;
+}
+.k-index-group__intro {
+  margin-bottom: var(--k-space-3);
+  color: var(--k-ink-secondary);
+}
+
+/* Annotated member link list — calm and editorial, not a SaaS list
+   component: generous line-height, a subtle rule between entries, an
+   understated hover state. */
+.k-index-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.k-index-list__item {
+  padding: var(--k-space-3) 0;
+  border-bottom: 1px solid var(--k-border-subtle);
+  line-height: var(--k-leading-normal);
+}
+.k-index-list__item:last-child { border-bottom: none; }
+.k-index-list__link {
+  font-family: var(--k-font-sans);
+  font-size: var(--k-text-md);
+  font-weight: var(--k-weight-medium);
+  color: var(--k-ink);
+}
+.k-index-list__link:hover { color: var(--k-accent); text-decoration: underline; }
+.k-index-list__annotation {
+  display: block;
+  margin-top: var(--k-space-1);
+  color: var(--k-ink-muted);
+  font-size: var(--k-text-sm);
+}
+
+.k-index-topic__tail { margin-top: var(--k-space-7); }
 
 /* --- Search page ---------------------------------------------------------- */
 /* No on-page search form — the header search bar carries the query (it echoes

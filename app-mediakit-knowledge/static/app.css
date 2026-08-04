@@ -185,6 +185,38 @@ button:disabled { cursor: default; }
   color: var(--k-ink-muted);
 }
 
+/* Reading-page sidebar collapse (Vector 2022 pattern). `.k-sidebar--reading`
+   is set server-side (see `sidebar()` in layout.rs) on the current-article
+   and as-of-revision views only — every other page type, including Index
+   Topic and category-landing pages, "earns its width" as a browsing surface
+   and never gets this class, so the browse nav stays open there unchanged.
+   Collapsed is the CSS default (no flash on the common path, the opposite of
+   the k-theme guard's problem); the pre-paint guard in doc_head() only
+   matters for a reader who explicitly chose "open" (localStorage key
+   `k-nav`, same fail-open idiom as `k-theme` — see app.js initNavCollapse). */
+.k-nav-toggle {
+  display: none;
+}
+.k-sidebar--reading .k-nav-toggle {
+  display: block;
+  width: 100%;
+  text-align: left;
+  margin-top: var(--k-space-5);
+  padding: var(--k-space-1) 0 var(--k-space-1) 2px;
+  font-family: var(--k-font-sans);
+  font-size: var(--k-text-2xs);
+  font-weight: var(--k-weight-semibold);
+  letter-spacing: var(--k-tracking-caps);
+  text-transform: uppercase;
+  color: var(--k-ink-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.k-sidebar--reading .k-nav-toggle:hover { color: var(--k-accent); }
+.k-sidebar--reading .k-sidenav__browse { display: none; }
+html[data-nav="open"] .k-sidebar--reading .k-sidenav__browse { display: block; }
+
 /* Below the drawer breakpoint the off-canvas nav takes over; collapse to one
    column. Kept in step with the hamburger (≤768px) so there is never a width
    band with neither a sidebar nor a menu button. */
