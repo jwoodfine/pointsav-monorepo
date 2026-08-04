@@ -256,9 +256,16 @@ fn humanize(slug: &str) -> String {
         .join(" ")
 }
 
-/// Ordered `(slug, label)` category list for the sidebar nav — the configured
-/// order when set, else discovered categories. Mirrors the home-grid ordering.
-fn nav_cats(state: &AppState) -> Vec<(String, String)> {
+/// Ordered `(slug, label, kind)` category list for the sidebar nav — the
+/// configured order when set, else discovered categories. Mirrors the
+/// home-grid ordering. `kind` is `"topic"` or `"guide"` (see
+/// `sitedata::Category`) — the sidebar's Topics/Guides section split. The
+/// fallback path (no `categories.yaml`) has no `kind` data at all; every
+/// wiki with a real `how-to`/guide category has a `categories.yaml` (the
+/// only ones that don't — corporate/projects — never serve guides at all,
+/// see `Tenant::serves_guides`), so defaulting the fallback path to `"topic"`
+/// uniformly never actually hides a real guide category from its section.
+fn nav_cats(state: &AppState) -> Vec<(String, String, String)> {
     let counts = &state.category_counts;
     // Prefer the canonical categories.yaml (id → route, name → display, order),
     // showing only categories that currently have content.
@@ -273,20 +280,20 @@ fn nav_cats(state: &AppState) -> Vec<(String, String)> {
                 } else {
                     c.name.clone()
                 };
-                (c.id.clone(), name)
+                (c.id.clone(), name, c.kind.clone())
             })
             .collect();
     }
     // Fallback: knowledge.toml categories, else discovered.
-    let mut cats: Vec<(String, String)> = Vec::new();
+    let mut cats: Vec<(String, String, String)> = Vec::new();
     if state.config.site.categories.is_empty() {
         for slug in counts.keys() {
-            cats.push((slug.clone(), humanize(slug)));
+            cats.push((slug.clone(), humanize(slug), "topic".to_string()));
         }
     } else {
         for slug in &state.config.site.categories {
             if counts.contains_key(slug) {
-                cats.push((slug.clone(), humanize(slug)));
+                cats.push((slug.clone(), humanize(slug), "topic".to_string()));
             }
         }
     }
@@ -381,9 +388,14 @@ async fn home(State(state): State<AppState>) -> Response {
     // Was computed twice per home-page request (here + again inside
     // nav_cats); both now read the one value memoized in AppState::build.
     let counts = &state.category_counts;
-    let cats: Vec<(String, String, usize)> = nav_cats(&state)
+    // Computed once — `nav` (sidebar, needs `kind`) and `cats` (home-grid
+    // cards, needs a count) are both derived from this single call rather
+    // than calling `nav_cats` twice.
+    let raw_cats = nav_cats(&state);
+    let nav: Vec<(String, String, String)> = raw_cats.clone();
+    let cats: Vec<(String, String, usize)> = raw_cats
         .into_iter()
-        .map(|(id, name)| {
+        .map(|(id, name, _kind)| {
             let n = counts.get(&id).copied().unwrap_or(0);
             (id, name, n)
         })
@@ -410,10 +422,6 @@ async fn home(State(state): State<AppState>) -> Response {
         Vec::new()
     };
 
-    let nav: Vec<(String, String)> = cats
-        .iter()
-        .map(|(s, l, _)| (s.clone(), l.clone()))
-        .collect();
     let body = ui::home_page(tenant, &lede, total, &cats, &guides);
     let head = ui::doc_head(tenant.home_label(), &description, tenant, "/", false);
     Html(
