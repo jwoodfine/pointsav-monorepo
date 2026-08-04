@@ -534,6 +534,15 @@
 /* a second homepage).                                                        */
 /* ========================================================================== */
 
+/* .k-index-topic is the real outer container on this page — .k-catpage only
+   survives as the small eyebrow label above it, not the wrapper — so the
+   bottom-spacing convention .k-home/.k-catpage get (padding-block, 48px
+   bottom) needs its own rule here, or content bleeds straight into the
+   Important Information band with no breathing room. */
+.k-index-topic {
+  padding-block-end: var(--k-space-7);
+}
+
 /* Safety-net link back to the flat article list (`?view=all`) — always
    present so drift between the curated groups and the category's real
    membership can never make an article unreachable by browsing. */
@@ -619,7 +628,7 @@
   font-family: var(--k-font-sans);
   font-size: var(--k-text-md);
   font-weight: var(--k-weight-medium);
-  color: var(--k-ink);
+  color: var(--k-link);
 }
 .k-index-list__link:hover { color: var(--k-accent); text-decoration: underline; }
 .k-index-list__annotation {

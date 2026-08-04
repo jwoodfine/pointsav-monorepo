@@ -882,21 +882,34 @@ fn toc_nav(toc: &[Heading]) -> Markup {
 }
 
 /// The left navigation column (Wikipedia Vector 2022 pattern): Main page,
-/// [Contents], Browse-by-area, Guides. Sticky on desktop; hidden below the
-/// tablet breakpoint where the off-canvas drawer covers navigation. `cats` is
-/// `(slug, label)`.
+/// [Contents], Topics, Guides. Sticky on desktop; hidden below the tablet
+/// breakpoint where the off-canvas drawer covers navigation. `cats` is
+/// `(slug, label, kind)` — `kind` (`"topic"`/`"guide"`, from
+/// `categories.yaml`, see `sitedata::Category`) is the section a category
+/// renders under. Reading it structurally, rather than hardcoding a
+/// `how-to`-id special case (the previous approach), fixes a real duplicate —
+/// `how-to` used to render both in the flat category list AND in a separate
+/// hardcoded "Guides" block — and means a future guide-category split needs
+/// zero engine change: a new category just carries `kind: guide` and appears
+/// in the right section automatically. Anything not `"guide"` renders under
+/// Topics (not just `"topic"` exactly) so a missing/malformed `kind` value
+/// never silently drops a category from the nav.
 ///
 /// A page with a non-empty `toc` is a "reading page" (the current-article and
 /// as-of-revision views — every other page type passes `&[]`, and Index Topic
 /// pages do too, deliberately, so they keep the full browse sidebar "for
 /// free" as a browsing surface). On a reading page: the TOC renders first
 /// (the article's own contents, not buried under the full category list), a
-/// `.k-sidebar--reading` marker class is added, and the "Browse by area"/
-/// "Guides" nav is CSS-default-collapsed behind a toggle button — see
-/// `.k-sidebar--reading` in `app.css` and `initNavCollapse()` in `app.js`.
-fn sidebar(tenant: Tenant, cats: &[(String, String)], toc: &[Heading]) -> Markup {
+/// `.k-sidebar--reading` marker class is added, and the Topics/Guides nav is
+/// CSS-default-collapsed behind a toggle button — see `.k-sidebar--reading`
+/// in `app.css` and `initNavCollapse()` in `app.js`.
+fn sidebar(cats: &[(String, String, String)], toc: &[Heading]) -> Markup {
     let reading = !toc.is_empty();
-    let has_browse = !cats.is_empty() || tenant.serves_guides();
+    let topics: Vec<&(String, String, String)> =
+        cats.iter().filter(|(_, _, kind)| kind != "guide").collect();
+    let guides: Vec<&(String, String, String)> =
+        cats.iter().filter(|(_, _, kind)| kind == "guide").collect();
+    let has_browse = !cats.is_empty();
     html! {
         aside."k-sidebar"."k-sidebar--reading"[reading] aria-label="Site navigation" {
             nav."k-sidenav" {
@@ -908,21 +921,23 @@ fn sidebar(tenant: Tenant, cats: &[(String, String)], toc: &[Heading]) -> Markup
                         "Browse"
                     }
                     nav."k-sidenav__browse" #"k-sidenav-browse" {
-                        @if !cats.is_empty() {
+                        @if !topics.is_empty() {
                             div."k-sidenav__group" {
-                                h2."k-sidenav__heading" { "Browse by area" }
+                                h2."k-sidenav__heading" { "Topics" }
                                 ul."k-sidenav__list" {
-                                    @for (slug, label) in cats {
+                                    @for (slug, label, _) in &topics {
                                         li { a."k-sidenav__link" href={ "/category/" (slug) } { (label) } }
                                     }
                                 }
                             }
                         }
-                        @if tenant.serves_guides() {
+                        @if !guides.is_empty() {
                             div."k-sidenav__group" {
                                 h2."k-sidenav__heading" { "Guides" }
                                 ul."k-sidenav__list" {
-                                    li { a."k-sidenav__link" href="/category/how-to" { "How-to guides" } }
+                                    @for (slug, label, _) in &guides {
+                                        li { a."k-sidenav__link" href={ "/category/" (slug) } { (label) } }
+                                    }
                                 }
                             }
                         }
@@ -1251,7 +1266,7 @@ pub fn page(
     lang: &str,
     head: Markup,
     body: Markup,
-    cats: &[(String, String)],
+    cats: &[(String, String, String)],
     toc: &[Heading],
     query: &str,
     disclaimer: Option<&str>,
@@ -1271,7 +1286,7 @@ pub fn page(
                     (utility_bar(tenant))
                     (header(tenant, lang, query))
                     div."k-shell" {
-                        (sidebar(tenant, cats, toc))
+                        (sidebar(cats, toc))
                         main."k-page__body" #"k-main" tabindex="-1" { (body) }
                     }
                     (compliance_band(tenant, disclaimer))
