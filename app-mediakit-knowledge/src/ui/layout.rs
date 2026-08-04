@@ -15,6 +15,7 @@ use serde_json::json;
 use super::tenant::Tenant;
 use crate::content::frontmatter::Author;
 use crate::content::render::Heading;
+use crate::content::IndexTopic;
 use crate::history::{FileDiff, Revision};
 use crate::legal::LegalTokens;
 
@@ -123,6 +124,21 @@ pub fn doc_head(title: &str, description: &str, tenant: Tenant, path: &str, noin
         // Key 'k-theme' is shared with app.js.
         script {
             (PreEscaped(r#"(function(){try{var t=localStorage.getItem('k-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();"#))
+        }
+        // Pre-paint nav-collapse guard — mirrors the theme guard above, but in
+        // the opposite direction: collapsed is the CSS *default* (no rule to
+        // race), so this only matters for a reader who previously chose
+        // "open" (key 'k-nav', shared with app.js's initNavCollapse()).
+        script {
+            (PreEscaped(r#"(function(){try{if(localStorage.getItem('k-nav')==='open'){document.documentElement.setAttribute('data-nav','open');}}catch(e){}})();"#))
+        }
+        // No-JS fallback: without JavaScript there is no way to reach the
+        // toggle button, so the browse nav must stay reachable regardless —
+        // force it open and hide the now-inert (non-functional) toggle.
+        noscript {
+            style {
+                ".k-sidebar--reading .k-sidenav__browse{display:block}.k-sidebar--reading .k-nav-toggle{display:none}"
+            }
         }
     }
 }
@@ -461,6 +477,12 @@ fn tab_bar(slug: &str, active: &str) -> Markup {
 /// `sha` is the short commit hash the render is drawn from (provenance line);
 /// `asof` is set only for the point-in-time view (a historical revision) and
 /// carries that revision's date, which switches the meta label + shows a banner.
+/// `badge` is a plain-text content-type label next to the H1 (currently only
+/// "Index"/"Índice" for Index Topics — ordinary TOPIC/GUIDE articles pass
+/// `None`; there's no icon or color block, matching the site's understated
+/// register). The caller resolves the exact label string (language included)
+/// since it already knows which language the loaded file actually is.
+#[allow(clippy::too_many_arguments)]
 pub fn article(
     title: &str,
     slug: &str,
@@ -468,6 +490,7 @@ pub fn article(
     sha: Option<&str>,
     asof: Option<&str>,
     alt_lang: Option<(&str, &str)>,
+    badge: Option<&str>,
     body_html: &str,
 ) -> Markup {
     html! {
@@ -499,7 +522,12 @@ pub fn article(
                     a."k-asof__link" href={ "/wiki/" (slug) } { "View the current record \u{2192}" }
                 }
             }
-            h1."k-article__title" { (title) }
+            h1."k-article__title" {
+                (title)
+                @if let Some(b) = badge {
+                    span."k-content-badge" { (b) }
+                }
+            }
             div."k-prose" { (PreEscaped(body_html)) }
             @if asof.is_none() {
                 // Print-only citation stamp (Phase 9 — .k-print-citation is
@@ -693,6 +721,80 @@ pub fn category_index(label: &str, docs: &[(String, String, String)]) -> Markup 
     }
 }
 
+/// The header above an Index Topic rendered at its category's own
+/// `/category/{slug}` URL: the area's H1 plus a "See all N articles" safety-
+/// net link to the flat list (`?view=all`) — so drift between the curated
+/// groups and the category's real membership can never make an article
+/// unreachable by browsing. `total` is the category's real article count
+/// (`ContentIndex::in_category(name).len()`), not the sum of the Index
+/// Topic's own group counts — the two can legitimately differ.
+pub fn index_topic_header(label: &str, total: usize, category_slug: &str) -> Markup {
+    html! {
+        div."k-catpage__eyebrow" { "Category" }
+        h1."k-article__title" { (label) }
+        p."k-index-topic__see-all" {
+            a href={ "/category/" (category_slug) "?view=all" } {
+                "See all " (total) " " (count_word(total)) " in " (label) " \u{2192}"
+            }
+        }
+    }
+}
+
+/// An Index Topic's body: the highlighted "start here" pick, each curated
+/// group with a live member-count pill and calm annotated link list, then any
+/// trailing prose ("What this is not", "See also") as authored.
+///
+/// The "start here" block is rendered as a styled card containing its
+/// `prose_html` as-is — deliberately *not* also wrapped in a separate `<a
+/// href=(sh.href)>`: `prose_html` already contains its own inline link (the
+/// wikilink resolved as part of "**Start here:** [[...]]..."), and wrapping
+/// that in another anchor would nest `<a>` inside `<a>` — invalid HTML and an
+/// ambiguous click target. `StartHere.href`/`.label` exist for callers that
+/// need the target structurally (e.g. future structured data), not for this
+/// render.
+///
+/// Each member's wikilink, by contrast, *is* rendered as a distinct link
+/// (`m.href`/`m.label`) followed by `annotation_html` — `parse_index_topic`
+/// already strips the wikilink out of the annotation text, so there's no
+/// duplication risk there.
+pub fn index_topic_body(topic: &IndexTopic) -> Markup {
+    html! {
+        div."k-index-topic" {
+            @if !topic.intro_html.is_empty() {
+                div."k-prose" { (PreEscaped(topic.intro_html.clone())) }
+            }
+            @if let Some(sh) = &topic.start_here {
+                aside."k-index-topic__start-here" aria-label="Start here" {
+                    span."k-index-topic__start-here-eyebrow" { "Start here" }
+                    div."k-prose" { (PreEscaped(sh.prose_html.clone())) }
+                }
+            }
+            @for group in &topic.groups {
+                section."k-index-group" {
+                    div."k-index-group__head" {
+                        h2."k-index-group__title" { (group.title) }
+                        span."k-index-group__count" { (group.count()) " " (count_word(group.count())) }
+                    }
+                    @if let Some(intro) = &group.intro_html {
+                        div."k-prose k-index-group__intro" { (PreEscaped(intro.clone())) }
+                    }
+                    ul."k-index-list" {
+                        @for m in &group.members {
+                            li."k-index-list__item" {
+                                a."k-index-list__link" href=(m.href) { (m.label) }
+                                span."k-index-list__annotation" { (PreEscaped(m.annotation_html.clone())) }
+                            }
+                        }
+                    }
+                }
+            }
+            @if !topic.tail_html.is_empty() {
+                div."k-prose k-index-topic__tail" { (PreEscaped(topic.tail_html.clone())) }
+            }
+        }
+    }
+}
+
 /// A generic index page — "Index of record" (A–Z all articles) and "Recent
 /// changes". `items` is `(slug, title, meta)`; `meta` is a description or a date.
 pub fn special_list(heading: &str, eyebrow: &str, items: &[(String, String, String)]) -> Markup {
@@ -759,40 +861,68 @@ pub fn search_results(query: &str, results: &[(String, String, String)]) -> Mark
     }
 }
 
-/// The left navigation column (Wikipedia Vector 2022 pattern): Main page,
-/// Browse-by-area, Guides. Sticky on desktop; hidden below the tablet breakpoint
-/// where the off-canvas drawer covers navigation. `cats` is `(slug, label)`.
-fn sidebar(tenant: Tenant, cats: &[(String, String)], toc: &[Heading]) -> Markup {
+/// Article table of contents — a `k-sidenav__group` on its own, present only
+/// on pages with headings. Extracted so `sidebar()` can place it either above
+/// or below the browse nav depending on whether this is a "reading page".
+fn toc_nav(toc: &[Heading]) -> Markup {
     html! {
-        aside."k-sidebar" aria-label="Site navigation" {
+        @if !toc.is_empty() {
+            nav."k-sidenav__group k-toc" aria-label="Contents" {
+                h2."k-sidenav__heading" { "Contents" }
+                ul."k-toc__list" {
+                    @for h in toc {
+                        li."k-toc__item"."k-toc__item--sub"[h.level == 3] {
+                            a."k-toc__link" href={ "#" (h.id) } { (h.text) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// The left navigation column (Wikipedia Vector 2022 pattern): Main page,
+/// [Contents], Browse-by-area, Guides. Sticky on desktop; hidden below the
+/// tablet breakpoint where the off-canvas drawer covers navigation. `cats` is
+/// `(slug, label)`.
+///
+/// A page with a non-empty `toc` is a "reading page" (the current-article and
+/// as-of-revision views — every other page type passes `&[]`, and Index Topic
+/// pages do too, deliberately, so they keep the full browse sidebar "for
+/// free" as a browsing surface). On a reading page: the TOC renders first
+/// (the article's own contents, not buried under the full category list), a
+/// `.k-sidebar--reading` marker class is added, and the "Browse by area"/
+/// "Guides" nav is CSS-default-collapsed behind a toggle button — see
+/// `.k-sidebar--reading` in `app.css` and `initNavCollapse()` in `app.js`.
+fn sidebar(tenant: Tenant, cats: &[(String, String)], toc: &[Heading]) -> Markup {
+    let reading = !toc.is_empty();
+    let has_browse = !cats.is_empty() || tenant.serves_guides();
+    html! {
+        aside."k-sidebar"."k-sidebar--reading"[reading] aria-label="Site navigation" {
             nav."k-sidenav" {
                 a."k-sidenav__home" href="/" { "Main page" }
-                @if !cats.is_empty() {
-                    div."k-sidenav__group" {
-                        h2."k-sidenav__heading" { "Browse by area" }
-                        ul."k-sidenav__list" {
-                            @for (slug, label) in cats {
-                                li { a."k-sidenav__link" href={ "/category/" (slug) } { (label) } }
+                (toc_nav(toc))
+                @if has_browse {
+                    button."k-nav-toggle" type="button"
+                        aria-expanded="false" aria-controls="k-sidenav-browse" {
+                        "Browse"
+                    }
+                    nav."k-sidenav__browse" #"k-sidenav-browse" {
+                        @if !cats.is_empty() {
+                            div."k-sidenav__group" {
+                                h2."k-sidenav__heading" { "Browse by area" }
+                                ul."k-sidenav__list" {
+                                    @for (slug, label) in cats {
+                                        li { a."k-sidenav__link" href={ "/category/" (slug) } { (label) } }
+                                    }
+                                }
                             }
                         }
-                    }
-                }
-                @if tenant.serves_guides() {
-                    div."k-sidenav__group" {
-                        h2."k-sidenav__heading" { "Guides" }
-                        ul."k-sidenav__list" {
-                            li { a."k-sidenav__link" href="/category/how-to" { "How-to guides" } }
-                        }
-                    }
-                }
-                // Article table of contents (present only on pages with headings).
-                @if !toc.is_empty() {
-                    nav."k-sidenav__group k-toc" aria-label="Contents" {
-                        h2."k-sidenav__heading" { "Contents" }
-                        ul."k-toc__list" {
-                            @for h in toc {
-                                li."k-toc__item"."k-toc__item--sub"[h.level == 3] {
-                                    a."k-toc__link" href={ "#" (h.id) } { (h.text) }
+                        @if tenant.serves_guides() {
+                            div."k-sidenav__group" {
+                                h2."k-sidenav__heading" { "Guides" }
+                                ul."k-sidenav__list" {
+                                    li { a."k-sidenav__link" href="/category/how-to" { "How-to guides" } }
                                 }
                             }
                         }
