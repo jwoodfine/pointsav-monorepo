@@ -23,6 +23,7 @@
   var STORAGE_KEY = "k-theme";
   var THEME_LIGHT = "light";
   var THEME_DARK = "dark";
+  var NAV_STORAGE_KEY = "k-nav";
   var SCROLL_LOCK_CLASS = "k-scroll-lock";
   var OPEN_CLASS = "is-open";
 
@@ -103,6 +104,43 @@
       if (mq.addEventListener) mq.addEventListener("change", onOsChange);
       else if (mq.addListener) mq.addListener(onOsChange); /* Safari <14 */
     }
+  }
+
+  function readStoredNav() {
+    try { return window.localStorage.getItem(NAV_STORAGE_KEY); }
+    catch (e) { return null; }
+  }
+  function writeStoredNav(value) {
+    try { window.localStorage.setItem(NAV_STORAGE_KEY, value); }
+    catch (e) { /* private mode / disabled storage — non-fatal */ }
+  }
+
+  /* ------------------------------------------------------------------------ *
+   * 1b. Reading-page sidebar collapse (Vector 2022 pattern)
+   * ------------------------------------------------------------------------ *
+   * Independent of the mobile drawer below — invisible under it (.k-sidebar
+   * is already display:none at the drawer breakpoint). Collapsed is the CSS
+   * default (.k-sidebar--reading .k-sidenav__browse{display:none} in
+   * app.css); a reader who explicitly opens it gets that choice persisted
+   * (localStorage 'k-nav') and pre-painted via the <head> guard in
+   * doc_head(), mirroring initTheme's fail-open try/catch idiom above. A
+   * no-op when the toggle isn't on the page (every page except a reading
+   * page with a browse nav to collapse — see sidebar() in layout.rs).
+   */
+  function initNavCollapse() {
+    var toggle = qs(".k-nav-toggle");
+    if (!toggle) return;
+    var setOpen = function (open) {
+      if (open) root.setAttribute("data-nav", "open");
+      else root.removeAttribute("data-nav");
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    };
+    setOpen(readStoredNav() === "open");
+    on(toggle, "click", function () {
+      var open = root.getAttribute("data-nav") === "open";
+      setOpen(!open);
+      writeStoredNav(!open ? "open" : "collapsed");
+    });
   }
 
   /* ------------------------------------------------------------------------ *
@@ -338,6 +376,7 @@
    * ------------------------------------------------------------------------ */
   function boot() {
     initTheme();
+    initNavCollapse();
     initDrawer();
     initCodeCopy();
     initTables();
