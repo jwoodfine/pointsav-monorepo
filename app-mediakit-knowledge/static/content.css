@@ -524,8 +524,18 @@
   font-weight: var(--k-weight-semibold);
   text-transform: uppercase;
   letter-spacing: var(--k-tracking-caps);
-  color: var(--k-accent);
-  margin-bottom: var(--k-space-1);
+  color: var(--k-ink-muted);
+  margin-bottom: var(--k-space-2);
+}
+/* index_topic_header() (layout.rs) returns a bare fragment with no
+   .k-catpage wrapper — this page type otherwise loses the top padding every
+   other page type gets via `.k-home, .k-catpage { padding-block: ... }`
+   (the matching *bottom* padding was already re-added for the same reason,
+   see the .k-index-topic rule above). Child-combinator-scoped deliberately:
+   on every other page type the eyebrow is nested inside .k-catpage, which
+   already has its own top padding, so this must not double up there. */
+.k-page__body > .k-catpage__eyebrow {
+  margin-top: var(--k-space-5);
 }
 
 /* ========================================================================== */
