@@ -753,11 +753,28 @@ async fn render_index_topic_category(
         .into_iter()
         .filter(not_own_index_topic(name))
         .count();
+    // Provenance line, same mechanism `serve_article` uses: the short hash
+    // of the _index.md file's own most recent commit — real history, since
+    // an Index Topic is a real committed file, unified chrome per the
+    // 2026-08-05 header-unification round.
+    let repo_root = &state.mounts.mounts[index_doc.mount_index].path;
+    let rel = index_doc.path.strip_prefix(repo_root).unwrap_or(&index_doc.path);
+    let prov = crate::history::file_history(repo_root, rel, 1);
+    let sha = prov.first().map(|r| r.short_sha.as_str());
     let trail = vec![("/".to_string(), tenant.home_label().to_string())];
     let body = html! {
         (ui::breadcrumb(&trail, label))
-        (ui::index_topic_header(label, total, name))
-        (ui::index_topic_body(&topic))
+        article."k-article" {
+            (ui::index_topic_header(
+                label,
+                total,
+                name,
+                &index_doc.slug,
+                raw.frontmatter.last_edited.as_deref(),
+                sha,
+            ))
+            (ui::index_topic_body(&topic))
+        }
     };
     let description = raw
         .frontmatter
