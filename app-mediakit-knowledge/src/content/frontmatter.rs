@@ -239,7 +239,9 @@ mod tests {
 
     #[test]
     fn preserves_comment_syntax_inside_code_fence() {
-        let doc = parse("---\ntitle: T\n---\nExample:\n\n```html\n<!-- this is a real example -->\n```\n");
+        let doc = parse(
+            "---\ntitle: T\n---\nExample:\n\n```html\n<!-- this is a real example -->\n```\n",
+        );
         assert!(doc.body_md.contains("<!-- this is a real example -->"));
     }
 
@@ -308,7 +310,10 @@ mod tests {
         assert_eq!(fm.state.as_deref(), Some("draft"));
         assert_eq!(fm.version.as_deref(), Some("0.4.0"));
         assert_eq!(fm.paper_class.as_deref(), Some("standard"));
-        assert_eq!(fm.abstract_text.as_deref(), Some("A short abstract spanning\ntwo lines.\n"));
+        assert_eq!(
+            fm.abstract_text.as_deref(),
+            Some("A short abstract spanning\ntwo lines.\n")
+        );
         assert_eq!(fm.license.as_deref(), Some("CC BY 4.0"));
         assert_eq!(fm.cite_as.as_deref(), Some("Woodfine (2026)"));
         assert_eq!(fm.preprint_posted_date.as_deref(), Some("2026-07-02"));
@@ -319,7 +324,10 @@ mod tests {
         assert_eq!(fm.cites, vec!["rfc-9162", "c2sp-signed-note"]);
         assert_eq!(fm.authors.len(), 1);
         assert_eq!(fm.authors[0].name.as_deref(), Some("J. Woodfine"));
-        assert_eq!(fm.authors[0].credit_roles, vec!["Writing", "Conceptualization"]);
+        assert_eq!(
+            fm.authors[0].credit_roles,
+            vec!["Writing", "Conceptualization"]
+        );
     }
 
     #[test]

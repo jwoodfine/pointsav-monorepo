@@ -338,7 +338,21 @@ async fn home(State(state): State<AppState>) -> Response {
         .collect();
     let body = ui::home_page(tenant, &lede, total, &cats, &guides);
     let head = ui::doc_head(tenant.home_label(), &description, tenant, "/", false);
-    Html(ui::page(tenant, "en", head, body, &nav, &[], "", state.important_info.as_deref(), &state.legal).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav,
+            &[],
+            "",
+            state.important_info.as_deref(),
+            &state.legal,
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 /// Category listing page — every article in one category.
@@ -363,7 +377,11 @@ async fn category_page(State(state): State<AppState>, Path(name): Path<String>) 
     // Avoid "Articles in the The Buildings area." when a category's display
     // name already leads with an article (a real finding: 2 of 3 wikis had
     // this doubled verbatim in search snippets).
-    let description = if label.split_whitespace().next().is_some_and(|w| w.eq_ignore_ascii_case("the")) {
+    let description = if label
+        .split_whitespace()
+        .next()
+        .is_some_and(|w| w.eq_ignore_ascii_case("the"))
+    {
         format!("Articles in {label}.")
     } else {
         format!("Articles in the {label} area.")
@@ -379,7 +397,21 @@ async fn category_page(State(state): State<AppState>, Path(name): Path<String>) 
     ];
     let head = ui::doc_head(&label, &description, tenant, &path, false);
     let head = html! { (head) (ui::breadcrumb_jsonld(&jsonld_trail)) };
-    Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref(), &state.legal).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            "",
+            state.important_info.as_deref(),
+            &state.legal,
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -419,7 +451,21 @@ async fn search_page(State(state): State<AppState>, Query(params): Query<SearchQ
     // useful for a crawler to discover the search feature exists) but
     // shouldn't be indexed page-by-page-per-query.
     let head = ui::doc_head(&title, &desc, tenant, "/search", true);
-    Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], &q, state.important_info.as_deref(), &state.legal).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            &q,
+            state.important_info.as_deref(),
+            &state.legal,
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -458,8 +504,21 @@ async fn history_page(
             &format!("/history/{}", doc.slug),
             false,
         );
-        return Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref(), &state.legal).into_string())
-            .into_response();
+        return Html(
+            ui::page(
+                tenant,
+                "en",
+                head,
+                body,
+                &nav_cats(&state),
+                &[],
+                "",
+                state.important_info.as_deref(),
+                &state.legal,
+            )
+            .into_string(),
+        )
+        .into_response();
     }
 
     let revs = crate::history::file_history(repo_root, rel, 50);
@@ -471,7 +530,21 @@ async fn history_page(
         &format!("/history/{}", doc.slug),
         false,
     );
-    Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref(), &state.legal).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            "",
+            state.important_info.as_deref(),
+            &state.legal,
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 /// "Index of record" — every article A–Z (the auditor's completeness check).
@@ -497,7 +570,21 @@ async fn special_all_pages(State(state): State<AppState>) -> Response {
         "/special/all-pages",
         false,
     );
-    Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref(), &state.legal).into_string()).into_response()
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            "",
+            state.important_info.as_deref(),
+            &state.legal,
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 /// "Recent changes" — records most recently updated (the site-wide delta view).
@@ -517,8 +604,28 @@ async fn special_recent(State(state): State<AppState>) -> Response {
         })
         .collect();
     let body = ui::special_list("Recent changes", "Recent changes", &items);
-    let head = ui::doc_head("Recent changes", "Records most recently updated.", tenant, "/special/recent-changes", false);
-    Html(ui::page(tenant, "en", head, body, &nav_cats(&state), &[], "", state.important_info.as_deref(), &state.legal).into_string()).into_response()
+    let head = ui::doc_head(
+        "Recent changes",
+        "Records most recently updated.",
+        tenant,
+        "/special/recent-changes",
+        false,
+    );
+    Html(
+        ui::page(
+            tenant,
+            "en",
+            head,
+            body,
+            &nav_cats(&state),
+            &[],
+            "",
+            state.important_info.as_deref(),
+            &state.legal,
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 // --- Discovery surfaces (robots / sitemap / feeds / llms.txt) ---------------
@@ -557,7 +664,12 @@ async fn sitemap(State(state): State<AppState>) -> Response {
 }
 
 async fn feed_atom(State(state): State<AppState>) -> Response {
-    let docs: Vec<_> = state.index.recent(20).into_iter().filter(|d| d.slug != "index").collect();
+    let docs: Vec<_> = state
+        .index
+        .recent(20)
+        .into_iter()
+        .filter(|d| d.slug != "index")
+        .collect();
     let body = discovery::atom_feed(&site_base(&state), &state.config.site.title, &docs);
     (
         [(header::CONTENT_TYPE, "application/atom+xml; charset=utf-8")],
@@ -646,10 +758,24 @@ async fn serve_article(
             .clone()
             .unwrap_or_else(|| doc.title.clone());
         let short = rev.chars().take(8).collect::<String>();
-        let body = ui::article(&title, &doc.slug, None, Some(&short), Some(&date), None, &rendered.html);
+        let body = ui::article(
+            &title,
+            &doc.slug,
+            None,
+            Some(&short),
+            Some(&date),
+            None,
+            &rendered.html,
+        );
         // Canonical points at the CURRENT version, not this historical snapshot —
         // an as-of view shouldn't compete with the live article for indexing.
-        let head = ui::doc_head(&format!("{title} (as of {date})"), "", tenant, &format!("{prefix}/wiki/{}", doc.slug), false);
+        let head = ui::doc_head(
+            &format!("{title} (as of {date})"),
+            "",
+            tenant,
+            &format!("{prefix}/wiki/{}", doc.slug),
+            false,
+        );
         return Html(
             ui::page(
                 tenant,
@@ -718,7 +844,11 @@ async fn serve_article(
     // Breadcrumb — a real finding: no page anywhere had one. Home -> Category
     // (when the article has one) -> current article (not a link).
     let mut trail = vec![("/".to_string(), tenant.home_label().to_string())];
-    if let Some(cat) = doc.category.as_deref().filter(|c| !c.is_empty() && *c != "root") {
+    if let Some(cat) = doc
+        .category
+        .as_deref()
+        .filter(|c| !c.is_empty() && *c != "root")
+    {
         trail.push((format!("/category/{cat}"), category_label(&state, cat)));
     }
     let body = html! { (ui::breadcrumb(&trail, &title)) (article_body) };
@@ -754,8 +884,21 @@ async fn serve_article(
         (ui::article_jsonld(tenant, &title, &description, &current_url, parsed.frontmatter.last_edited.as_deref()))
         (ui::breadcrumb_jsonld(&jsonld_trail))
     };
-    Html(ui::page(tenant, lang_code, head, body, &nav_cats(&state), &rendered.headings, "", state.important_info.as_deref(), &state.legal).into_string())
-        .into_response()
+    Html(
+        ui::page(
+            tenant,
+            lang_code,
+            head,
+            body,
+            &nav_cats(&state),
+            &rendered.headings,
+            "",
+            state.important_info.as_deref(),
+            &state.legal,
+        )
+        .into_string(),
+    )
+    .into_response()
 }
 
 /// Serve an embedded static asset by path.

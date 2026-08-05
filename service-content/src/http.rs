@@ -1157,7 +1157,10 @@ async fn capability_gate(
     }
 
     let endpoint = req.uri().path().to_string();
-    if let Err(e) = state.capability_audit.record(&endpoint, &verified, trust_source) {
+    if let Err(e) = state
+        .capability_audit
+        .record(&endpoint, &verified, trust_source)
+    {
         eprintln!("[HTTP] interface-audit write failed: {e}");
     }
 

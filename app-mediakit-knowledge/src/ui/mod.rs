@@ -10,7 +10,7 @@ pub mod tenant;
 
 pub use layout::{
     article, article_jsonld, breadcrumb, breadcrumb_jsonld, category_index, diff_page, doc_head,
-    footer, header, hreflang_links, history_page, home_page, mobile_nav, page, search_results,
+    footer, header, history_page, home_page, hreflang_links, mobile_nav, page, search_results,
     simple_message, special_list, utility_bar,
 };
 pub use tenant::{SiblingWiki, Tenant};
