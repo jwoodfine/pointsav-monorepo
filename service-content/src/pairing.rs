@@ -848,7 +848,8 @@ mod tests {
             peer_type: "orchestration".into(),
             forwarded_for: None,
         };
-        log.record("/v1/graph/mutate", &payload, "direct").expect("record");
+        log.record("/v1/graph/mutate", &payload, "direct")
+            .expect("record");
         let content = std::fs::read_to_string(d.path().join("interface-audit.jsonl")).unwrap();
         assert_eq!(content.lines().count(), 1);
         assert!(content.contains("capability_verified"));
@@ -878,8 +879,11 @@ mod tests {
     fn load_command_pairings_malformed_yaml_returns_empty() {
         let d = tmp_dir();
         let path = d.path().join("user-pairings.yaml");
-        std::fs::write(&path, "not: [valid, yaml: structure for Vec<CommandPairedPeer>")
-            .expect("write");
+        std::fs::write(
+            &path,
+            "not: [valid, yaml: structure for Vec<CommandPairedPeer>",
+        )
+        .expect("write");
         assert!(load_command_pairings(&path).is_empty());
     }
 
@@ -937,7 +941,9 @@ mod tests {
                 node_label: "console-1".into(),
             }],
         );
-        let resolved = store.resolve_public_key("console-1").expect("resolved via command");
+        let resolved = store
+            .resolve_public_key("console-1")
+            .expect("resolved via command");
         assert_eq!(resolved.public_key(), "pk-cmd");
         assert_eq!(resolved.source_label(), "command");
         assert!(matches!(resolved, ResolvedPeer::ViaCommand { .. }));
@@ -998,7 +1004,9 @@ mod tests {
         let store = PairingStore::load(store_dir.path().to_str().unwrap()).expect("load");
         std::env::remove_var("COMMAND_USER_PAIRINGS_PATH");
 
-        let resolved = store.resolve_public_key("env-node").expect("resolved via env-configured path");
+        let resolved = store
+            .resolve_public_key("env-node")
+            .expect("resolved via env-configured path");
         assert_eq!(resolved.public_key(), "pk-env");
         assert_eq!(resolved.source_label(), "command");
     }

@@ -421,8 +421,8 @@ pub fn run() -> NotifyResult<()> {
     })?;
     let graph_db_path = format!("{}/entities.lbug", graph_dir);
 
-    let graph_store: Arc<dyn GraphStore> = Arc::new(LbugGraphStore::new(&graph_db_path).map_err(
-        |e| {
+    let graph_store: Arc<dyn GraphStore> =
+        Arc::new(LbugGraphStore::new(&graph_db_path).map_err(|e| {
             eprintln!(
                 "[FATAL] Failed to open LadybugDB graph store {:?}: {e}",
                 graph_db_path
@@ -430,8 +430,7 @@ pub fn run() -> NotifyResult<()> {
             notify::Error::generic(&format!(
                 "failed to open LadybugDB graph store {graph_db_path:?}: {e}"
             ))
-        },
-    )?);
+        })?);
     graph_store.init_schema().map_err(|e| {
         eprintln!("[FATAL] Failed to initialise graph schema: {e}");
         notify::Error::generic(&format!("failed to initialise graph schema: {e}"))

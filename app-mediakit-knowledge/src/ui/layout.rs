@@ -47,7 +47,13 @@ fn count_word(n: usize) -> &'static str {
 /// emits `<meta name="robots" content="noindex">` — for surfaces with an
 /// unbounded/query-driven URL space (search) that shouldn't be crawled even
 /// though they're reachable and carry a canonical URL.
-pub fn doc_head(title: &str, description: &str, tenant: Tenant, path: &str, noindex: bool) -> Markup {
+pub fn doc_head(
+    title: &str,
+    description: &str,
+    tenant: Tenant,
+    path: &str,
+    noindex: bool,
+) -> Markup {
     // Don't double-brand when the page title already is the site name (home).
     let full_title = if title == tenant.home_label() {
         title.to_string()
@@ -943,7 +949,13 @@ mod tests {
 
     #[test]
     fn breadcrumb_renders_trail_and_current_as_plain_text() {
-        let trail = vec![("/".to_string(), "PointSav Documentation".to_string()), ("/category/architecture".to_string(), "Architecture".to_string())];
+        let trail = vec![
+            ("/".to_string(), "PointSav Documentation".to_string()),
+            (
+                "/category/architecture".to_string(),
+                "Architecture".to_string(),
+            ),
+        ];
         let html = breadcrumb(&trail, "Zero-container inference").into_string();
         assert!(html.contains(r#"href="/""#));
         assert!(html.contains(r#"href="/category/architecture""#));
@@ -970,14 +982,24 @@ mod tests {
     #[test]
     fn breadcrumb_jsonld_emits_positioned_list() {
         let items = vec![
-            ("https://documentation.pointsav.com/".to_string(), "PointSav Documentation".to_string()),
-            ("https://documentation.pointsav.com/category/architecture".to_string(), "Architecture".to_string()),
-            ("https://documentation.pointsav.com/wiki/foo".to_string(), "Foo".to_string()),
+            (
+                "https://documentation.pointsav.com/".to_string(),
+                "PointSav Documentation".to_string(),
+            ),
+            (
+                "https://documentation.pointsav.com/category/architecture".to_string(),
+                "Architecture".to_string(),
+            ),
+            (
+                "https://documentation.pointsav.com/wiki/foo".to_string(),
+                "Foo".to_string(),
+            ),
         ];
         let html = breadcrumb_jsonld(&items).into_string();
         let json_start = html.find('{').unwrap();
         let json_end = html.rfind('}').unwrap() + 1;
-        let parsed: serde_json::Value = serde_json::from_str(&html[json_start..json_end]).expect("valid JSON-LD");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&html[json_start..json_end]).expect("valid JSON-LD");
         assert_eq!(parsed["@type"], "BreadcrumbList");
         let list = parsed["itemListElement"].as_array().unwrap();
         assert_eq!(list.len(), 3);
@@ -986,7 +1008,10 @@ mod tests {
         assert_eq!(list[2]["name"], "Foo");
         // The last entry (current page) must still carry `item` — a real
         // finding the schema requires it even for non-linked breadcrumb steps.
-        assert_eq!(list[2]["item"], "https://documentation.pointsav.com/wiki/foo");
+        assert_eq!(
+            list[2]["item"],
+            "https://documentation.pointsav.com/wiki/foo"
+        );
     }
 
     #[test]
@@ -1001,23 +1026,43 @@ mod tests {
         .into_string();
         let json_start = html.find('{').unwrap();
         let json_end = html.rfind('}').unwrap() + 1;
-        let parsed: serde_json::Value = serde_json::from_str(&html[json_start..json_end]).expect("valid JSON-LD");
+        let parsed: serde_json::Value =
+            serde_json::from_str(&html[json_start..json_end]).expect("valid JSON-LD");
         assert_eq!(parsed["@type"], "TechArticle");
         assert_eq!(parsed["headline"], "Zero-container inference");
-        assert_eq!(parsed["author"]["@id"], "https://pointsav.com/#organization");
-        assert!(parsed["author"].get("name").is_none(), "author must be an @id reference, not an inline Organization");
+        assert_eq!(
+            parsed["author"]["@id"],
+            "https://pointsav.com/#organization"
+        );
+        assert!(
+            parsed["author"].get("name").is_none(),
+            "author must be an @id reference, not an inline Organization"
+        );
         assert_eq!(parsed["dateModified"], "2026-06-01");
     }
 
     #[test]
     fn jsonld_neutralizes_script_breakout() {
-        let evil = article_jsonld(Tenant::Corporate, "</script><script>alert(1)</script>", "", "https://corporate.woodfinegroup.com/wiki/x", None).into_string();
-        assert!(!evil.contains("</script><script>alert"), "raw script-breakout sequence must not survive into the HTML: {evil}");
+        let evil = article_jsonld(
+            Tenant::Corporate,
+            "</script><script>alert(1)</script>",
+            "",
+            "https://corporate.woodfinegroup.com/wiki/x",
+            None,
+        )
+        .into_string();
+        assert!(
+            !evil.contains("</script><script>alert"),
+            "raw script-breakout sequence must not survive into the HTML: {evil}"
+        );
     }
 
     #[test]
     fn demote_heading_shifts_h1_to_h2() {
-        assert_eq!(demote_heading("<h1>Important Information</h1>"), "<h2>Important Information</h2>");
+        assert_eq!(
+            demote_heading("<h1>Important Information</h1>"),
+            "<h2>Important Information</h2>"
+        );
         assert_eq!(
             demote_heading(r#"<h1 id="important-information">Text</h1><p>Body</p>"#),
             r#"<h2 id="important-information">Text</h2><p>Body</p>"#

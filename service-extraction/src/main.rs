@@ -47,8 +47,7 @@ fn main() -> NotifyResult<()> {
 
     // No hardcoded default (2026-07-30 GitHub-exposure remediation) — fail
     // loudly rather than silently defaulting to a real, non-portable path.
-    let base_dir =
-        std::env::var("EXTRACTION_BASE_DIR").expect("EXTRACTION_BASE_DIR must be set");
+    let base_dir = std::env::var("EXTRACTION_BASE_DIR").expect("EXTRACTION_BASE_DIR must be set");
     let watch_dir = std::env::var("EXTRACTION_WATCH_DIR").unwrap_or_else(|_| {
         format!(
             "{}/cluster-totebox-personnel-1/service-fs/data/service-people/source",
