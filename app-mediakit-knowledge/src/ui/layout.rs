@@ -455,13 +455,25 @@ fn format_date(iso: &str) -> String {
 /// "article" or "history"; the current one is a non-link span, the other links.
 /// (No "Notes" placeholder — a reviewer-annotation channel ships as a real tab or
 /// not at all; no dead controls in front of auditors.)
-fn tab_bar(slug: &str, active: &str) -> Markup {
+/// `active` is "article" or "history" — the current one is a non-link span,
+/// the other links. `slug` is always the *content's own file slug* (used for
+/// the History link regardless of `hub`; an Index Topic's own slug, e.g.
+/// `security-index`, not its category id). `hub`, when `Some(category_slug)`,
+/// is what makes this the Index Topic variant: the first tab reads
+/// "Overview" and links to `/category/{category_slug}` — the canonical hub
+/// URL a reader should land back on — instead of "Article" →
+/// `/wiki/{slug}`. `None` is the ordinary-article behavior, unchanged.
+fn tab_bar(slug: &str, active: &str, hub: Option<&str>) -> Markup {
+    let (first_label, first_href) = match hub {
+        Some(category_slug) => ("Overview", format!("/category/{category_slug}")),
+        None => ("Article", format!("/wiki/{slug}")),
+    };
     html! {
         nav."k-tabs" aria-label="Views" {
             @if active == "article" {
-                span."k-tab k-tab--active" aria-current="page" { "Article" }
+                span."k-tab k-tab--active" aria-current="page" { (first_label) }
             } @else {
-                a."k-tab" href={ "/wiki/" (slug) } { "Article" }
+                a."k-tab" href=(first_href) { (first_label) }
             }
             @if active == "history" {
                 span."k-tab k-tab--active" aria-current="page" { "History" }
@@ -496,7 +508,7 @@ pub fn article(
     html! {
         article."k-article" {
             div."k-article-nav" {
-                (tab_bar(slug, "article"))
+                (tab_bar(slug, "article", None))
                 @if updated.is_some() || asof.is_some() || sha.is_some() {
                     p."k-article__meta" {
                         @if let Some(d) = asof {
@@ -554,7 +566,7 @@ pub fn article(
 pub fn history_page(title: &str, slug: &str, issuer: &str, revs: &[Revision]) -> Markup {
     html! {
         article."k-article" {
-            div."k-article-nav" { (tab_bar(slug, "history")) }
+            div."k-article-nav" { (tab_bar(slug, "history", None)) }
             h1."k-article__title" { (title) }
             div."k-home__stat" { strong { (revs.len()) } " " (count_word_rev(revs.len())) }
             p."k-history__note" {
@@ -603,7 +615,7 @@ fn diff_line_class(origin: char) -> &'static str {
 pub fn diff_page(title: &str, slug: &str, issuer: &str, diff: &FileDiff) -> Markup {
     html! {
         article."k-article" {
-            div."k-article-nav" { (tab_bar(slug, "history")) }
+            div."k-article-nav" { (tab_bar(slug, "history", None)) }
             h1."k-article__title" { (title) }
             div."k-diff__head" {
                 a."k-diff__back" href={ "/history/" (slug) } { "\u{2190} All revisions" }
@@ -721,16 +733,49 @@ pub fn category_index(label: &str, docs: &[(String, String, String)]) -> Markup 
     }
 }
 
-/// The header above an Index Topic rendered at its category's own
-/// `/category/{slug}` URL: the area's H1 plus a "See all N articles" safety-
-/// net link to the flat list (`?view=all`) — so drift between the curated
-/// groups and the category's real membership can never make an article
-/// unreachable by browsing. `total` is the category's real article count
+/// The header + chrome above an Index Topic rendered at its category's own
+/// `/category/{slug}` URL. Unified with the ordinary Article chrome — tab
+/// bar (Overview/History) + "Last updated · sha" — rather than the plain
+/// `.k-catpage__eyebrow` label: an Index Topic is real, file-backed,
+/// human-authored content with real git history, same as any other article,
+/// so a plain metadata eyebrow with no history/provenance would be
+/// dishonest chrome. The eyebrow itself is untouched and still used by
+/// every category that does *not* have `index_type:` set — those are
+/// genuinely engine-synthesized listings with no file/history/sha behind
+/// them (see `category_index()`) — this is a deliberate scope boundary
+/// ("chrome follows provenance"), not an inconsistency.
+///
+/// `index_slug` is the `_index.md` file's own slug (e.g. `security-index`)
+/// — used for the History tab's link, since that resolves against the
+/// file's real slug, not the category id. `category_slug` is only used for
+/// the Overview tab's link and the safety-net link — the canonical URL a
+/// reader should land back on is the category page, not the raw file route.
+/// `total` is the category's real article count
 /// (`ContentIndex::in_category(name).len()`), not the sum of the Index
 /// Topic's own group counts — the two can legitimately differ.
-pub fn index_topic_header(label: &str, total: usize, category_slug: &str) -> Markup {
+pub fn index_topic_header(
+    label: &str,
+    total: usize,
+    category_slug: &str,
+    index_slug: &str,
+    updated: Option<&str>,
+    sha: Option<&str>,
+) -> Markup {
     html! {
-        div."k-catpage__eyebrow" { "Category" }
+        div."k-article-nav" {
+            (tab_bar(index_slug, "article", Some(category_slug)))
+            @if updated.is_some() || sha.is_some() {
+                p."k-article__meta" {
+                    @if let Some(d) = updated.filter(|s| !s.trim().is_empty()) {
+                        "Last updated "
+                        time."k-article__date" datetime=(d) { (format_date(d)) }
+                    }
+                    @if let Some(s) = sha {
+                        " \u{00b7} " code."k-article__sha" { (s) }
+                    }
+                }
+            }
+        }
         h1."k-article__title" { (label) }
         p."k-index-topic__see-all" {
             a href={ "/category/" (category_slug) "?view=all" } {
