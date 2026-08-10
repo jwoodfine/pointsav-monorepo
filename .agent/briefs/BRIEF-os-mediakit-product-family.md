@@ -6,7 +6,7 @@ title: "os-mediakit + app-mediakit-* — product-family architecture and develop
 status: active
 owner: project-knowledge
 created: 2026-08-06
-updated: 2026-08-10 (smoke-test defect found)
+updated: 2026-08-10 (build-out plan added)
 related_briefs:
   - command-os-product-family
 cites:
@@ -128,22 +128,36 @@ first draft, converging on the same fix in D3 especially. See Work log.**
      doctrine is the more likely stale one given the article was written same-day against
      live verification, but this needs Command's confirmation, not this BRIEF's guess.
 
-4. **Sequencing — rewritten. The original gate ("wait for another app-mediakit-* product to
-   be real") had a false premise per D3's correction — marketing is already real. Both
-   reviewers independently converged on a different, better-grounded set of reasons to
-   still hold off Phase 3 right now:**
-   - No confirmed KVM/hardware-virtualization on the host(s) that would run this — Pattern
-     A's proven track (`os-totebox`) developed and tests under QEMU/TCG software emulation
-     specifically *because* AArch64 needs no hardware-virt extension; a public web-serving
-     appliance under TCG-emulated seL4 may be performance-prohibitive. Verify actual
-     `foundry-prod` virtualization capability before committing to a timeline.
-   - MBA/gateway data-path wiring is confirmed absent for every `media-*` instance today
-     (the wiki article says so itself; doctrine §R.4 leaves it ambiguous) — migrating into
-     frozen seL4 guest images before that path exists would bake in the current workaround
-     rather than fix it.
-   - The shared `vendor-libvmm/examples/virtio/build/` directory (item 6 below) is a live
-     hazard that should be hardened *before* `os-mediakit` becomes its fourth consumer, not
-     after.
+4. ~~**Sequencing — the original gate ("wait for another app-mediakit-* product to be real")
+   had a false premise per D3's correction — marketing is already real. Both reviewers
+   independently converged on a different, better-grounded set of reasons to still hold
+   off Phase 3 right now**~~ **HOLD LIFTED 2026-08-10, operator-directed.** Of the three
+   reasons below, the first is now resolved by direct precedent; the other two are real
+   and unresolved but are being tracked as ongoing coordination with project-totebox, not
+   treated as blockers — see the new **Build-out plan** section below for the actual
+   phased list this unblocks.
+   - ~~No confirmed KVM/hardware-virtualization on the host(s) that would run this~~
+     **RESOLVED BY PRECEDENT 2026-08-10**: direct research into project-totebox's
+     `os-totebox`/`app-orchestration-command`/`app-orchestration-slm` — all three boot and
+     pass their full G1→G4/SIGTERM gate ladder under plain `qemu-system-aarch64` TCG
+     software emulation, no `/dev/kvm` anywhere, even though the guest architecture
+     (AArch64) differs from this host's own (x86_64). KVM was never actually required for
+     the boot/dev-verification gates that matter here. (Whether a real production
+     public-web-traffic deployment eventually wants KVM/nested-virt for performance is a
+     separate, later question — not a gate blocker.)
+   - **STILL OPEN, tracked not blocking**: MBA/gateway data-path wiring is confirmed absent
+     for every `media-*` instance today (the wiki article says so itself; doctrine §R.4
+     leaves it ambiguous) — migrating into frozen seL4 guest images before that path exists
+     would bake in the current workaround rather than fix it. Operator instruction: check
+     in periodically with project-totebox's own BRIEFs for how/whether they resolve this for
+     their products, and adopt their fix rather than re-solving it independently here.
+   - **STILL OPEN, tracked not blocking**: the shared `vendor-libvmm/examples/virtio/build/`
+     directory (item 6 below) is a live hazard, confirmed to have caused two real production
+     incidents in project-totebox already (wrong image deployed once; caught by a health-check
+     timeout the second time). Same operator instruction: os-mediakit builds in its own
+     per-product `BUILD_DIR` isolation from day one (see Build-out plan, Phase 0) rather than
+     waiting for project-totebox's fix — but keep checking their BRIEFs in case their eventual
+     fix is worth adopting fleet-wide instead of maintaining a second parallel workaround.
    - ~~**Cheap, valuable, and not gated on any of the above**: the existing Ubuntu 24.04
      `build-image.sh` appliance has apparently never been booted/smoke-tested end-to-end~~
      **DONE 2026-08-10 — and the suspicion was correct, worse than expected.** First real
@@ -175,7 +189,10 @@ first draft, converging on the same fix in D3 especially. See Work log.**
    outage that has already fired once (project-totebox's own incident). The real fix
    (per-product build subdirectories, already flagged as a follow-up in project-totebox's
    own BRIEF) should land before `os-mediakit` becomes a fourth consumer, not be worked
-   around indefinitely.
+   around indefinitely. **Operator-directed 2026-08-10**: rather than wait for
+   project-totebox's fix, os-mediakit builds its own per-product `BUILD_DIR` isolation from
+   the start (Build-out plan, Phase 0) — verify the vendored Makefile's `BUILD_DIR` support
+   directly before relying on it, don't assume.
 
 7. **NEW 2026-08-10 — `os-mediakit.qcow2` (Format B) does not boot to a working state;
    root cause not isolated.** First real end-to-end smoke test (this session): booted
@@ -200,6 +217,144 @@ first draft, converging on the same fix in D3 especially. See Work log.**
    listing going live on software.pointsav.com, not evidence anyone booted the image
    end-to-end. Real customer impact if uninvestigated: BETA customers downloading Format B
    today may hit this same emergency-mode hang.
+
+## Build-out plan — bootable seL4/Microkit os-mediakit running app-mediakit-knowledge
+
+**Added 2026-08-10, operator-directed.** Structured the same way project-totebox's
+`os-totebox` and `os-orchestration` (`app-orchestration-command`/`-slm`) are built — this
+section is grounded in directly reading those products' real scripts, Cargo.tomls, and
+source code (not just their BRIEFs), plus this archive's own live nginx/certbot config, not
+inferred. Supersedes the old Decisions-open #4 hold above.
+
+### The real architecture pattern (verified, not inferred)
+
+```
+seL4 microkernel (aarch64/qemu-arm-virt, EL2 hypervisor mode)
+  └─ VMM component (vendor-libvmm, seL4 protection domain, unverified userspace)
+        └─ Linux guest VM (unmodified kernel + minimal debootstrap rootfs)
+              └─ product binary (unmodified — no seL4/no_std changes) as guest init's child
+```
+
+Zero Microkit/seL4/libvmm Rust crate dependency in any of `os-totebox`'s or
+`app-orchestration-{command,slm}`'s Cargo.tomls (confirmed by grep) — the integration is
+entirely shell-script + a vendored C Makefile, not a compile-time dependency.
+`app-mediakit-knowledge` needs **zero source changes** for this pattern to apply.
+
+### Where the scripts live — os-mediakit is structurally closer to app-orchestration-command
+than to os-totebox
+
+`os-totebox` is the odd one out in project-totebox's own fleet: it has its own real `[[bin]]`
+(a wrapper binary spawning `service-content` + `slm-doorman-server` as one process), and
+that's where its `scripts/`+`systemd/` live. **`os-mediakit` has no `[[bin]]` target at all**
+(confirmed — `os-mediakit/Cargo.toml` has no dependencies and no `[[bin]]` section) — the real
+binary is `app-mediakit-knowledge`, exactly mirroring how `app-orchestration-command`/`-slm`
+each carry their own `scripts/build-guest-rootfs.sh`, `scripts/deploy-loader-img.sh`,
+`scripts/qmp-shutdown.py`, `systemd/*.service` (there is no shared base crate anywhere in this
+fleet's convention — every product hand-ports its own copy from the last one). **New scripts
+go in `app-mediakit-knowledge/scripts/` and `app-mediakit-knowledge/systemd/`, ported from
+`app-orchestration-command`'s copies** (closest analog: one managed service, not a multi-binary
+bundle like os-totebox).
+
+### Hard constraint: AArch64 only
+
+Microkit 2.2 targets AArch64, not x86_64 — every precedent product cross-compiles to
+`aarch64-unknown-linux-gnu`. This is additive to, not a replacement for, the existing BETA
+Format A/B (`x86_64-unknown-linux-gnu`, already declared in `.agent/binary-targets.yaml`) —
+matches how `BRIEF-binary-distribution.md` already frames "seL4 AArch64 system image" as a
+future third download option.
+
+**Known cross-compile risk, checked directly against `app-mediakit-knowledge/Cargo.toml`**:
+`git2 = "0.20"` (binds `libgit2`, a C library) and `syntect = "5"` (default features may pull
+in `onig`, a C Oniguruma binding, unless built with `regex-fancy` instead) — both candidates
+for the same class of FFI/C-dependency pain that cost project-totebox's own build a
+multi-bug cross-compile saga on `LadybugDB`. Check these **first** (Phase 0), don't discover
+them mid-build. Also reconcile a real apparent gap: `conventions/soft-distribution-pipeline.md`
+§4 lists `aarch64-unknown-linux-gnu` as fleet-wide "Planned — requires Docker + `cross`,
+operator decision pending," yet project-totebox clearly has *something* working already (real,
+built, deployed aarch64 binaries) — find out whether their toolchain is directly reusable
+before assuming a fresh one is needed.
+
+### TLS/ACME — new ground, designed in from the start (operator: "this is unique to
+os-mediakit so we need to get it right")
+
+Neither `os-totebox` nor `os-orchestration` is a public TLS-terminating web server, so there is
+no precedent for this part. `app-mediakit-knowledge` itself has **zero TLS/rustls/native-tls
+dependencies** (confirmed by grep) — it always expects to sit behind a TLS-terminating proxy,
+matching D2's OS/app boundary contract (this is `os-mediakit`'s job, not the app's). The real
+bare-host mechanism, read directly from the live `documentation.pointsav.com` nginx vhost
+(`certbot --nginx`-managed): reverse-proxy to `127.0.0.1:9090`, ACME HTTP-01 via
+`/.well-known/acme-challenge/` served from `/var/www/letsencrypt`, certs at
+`/etc/letsencrypt/live/<domain>/`, auto-renewal. **Inside the guest this becomes**: nginx +
+certbot in the debootstrap rootfs, reverse-proxying to the app on guest-loopback, the same
+ACME HTTP-01 challenge path, certs persisted on the guest's `/data` disk (survives restarts).
+Real consequence: the guest needs actual public :80/:443 reachability (a bridged network
+interface), not the dev-time `hostfwd`/user-mode NAT used for local boot testing — this
+connects directly to Decisions-open #2 above (host-ingress ownership, still unresolved); flag
+that dependency explicitly when this phase starts rather than assuming it resolves itself.
+
+### The gate ladder (reusing project-totebox's real, live-proven ladder — not the earlier,
+abandoned H0–H8 native-PD track)
+
+- **Phase F — Format B (existing plain-QCOW2) root cause + fix.** Independent of the seL4
+  track, can run in parallel. Root-cause without booting first: mount `os-mediakit.qcow2`
+  via `qemu-nbd` and inspect the `/boot`/`/boot/efi` partition table/labels directly (cheaper
+  than repeated boot-cycle guessing) to settle Decisions-open #7's open question — real
+  artifact defect vs. TCG/udev timing artifact. Fix, then re-verify with a real boot (same
+  method as the 2026-08-10 smoke test: `-snapshot`, alternate host ports).
+
+- **Phase 0 — Preflight.** Confirm the vendored Makefile's `BUILD_DIR` support (per-product
+  isolation from day one, see Decisions-open #6). Resolve the aarch64 toolchain question
+  above. Attempt a bare `cargo build --release --target aarch64-unknown-linux-gnu` for
+  `app-mediakit-knowledge` to surface `git2`/`syntect` issues immediately, before any
+  guest-rootfs work depends on it succeeding.
+
+- **G1 — Boot.** Bare `loader.img` boots under `qemu-system-aarch64` (TCG, no KVM needed —
+  see above) to a real login prompt.
+
+- **G2 — VirtIO passthrough.** Cite os-totebox's already-proven result against the same shared
+  `vendor-libvmm` plumbing rather than re-deriving from scratch, unless os-mediakit's own
+  build reveals a divergence — same convention os-orchestration-slm used.
+
+- **G2.5 — Real guest rootfs.** Port `build-guest-rootfs.sh` from `app-orchestration-command`
+  (closest analog). Install the cross-compiled `app-mediakit-knowledge` binary plus (new)
+  `nginx`/`certbot` packages into the debootstrap overlay, using Phase 0's `BUILD_DIR`
+  isolation rather than the shared, twice-bitten path.
+
+- **G3 — Real binary as guest init's child.** Custom `/init` (not systemd), ported from the
+  same source, adapted: brings up networking (bridged, not just user-mode NAT — needed for
+  real public reachability per the TLS section above), starts `app-mediakit-knowledge` on
+  guest-loopback, mounts a persistent `/data` disk for both the wiki content dir and
+  `/etc/letsencrypt`.
+
+- **G-TLS (new, no precedent).** nginx + certbot running inside the guest, reverse-proxying
+  to the app on loopback, ACME HTTP-01 challenge path, cert persistence across guest restarts
+  via `/data`. Needs the host-ingress/bridged-networking decision from Decisions-open #2
+  resolved, not assumed.
+
+- **G4 — Full smoke test.** HTTP through the entire chain — both loopback (direct app check)
+  and through nginx/TLS once G-TLS lands — via a Python `urllib` polling loop embedded in
+  `/init`, matching precedent's retry/backoff discipline for TCG boot-time variance.
+
+- **SIGTERM.** `kill -TERM` to **every** process the guest starts (app binary AND nginx — not
+  just one). This directly avoids a real gap found in project-totebox's own
+  `app-orchestration-command`: it has zero SIGTERM-handling code (confirmed by grep) and its
+  smoke test only checks its own port closes, never its spawned child's — `os-totebox` and
+  `app-orchestration-slm` both do this correctly via
+  `axum::serve(...).with_graceful_shutdown(...)`. Confirm real process exit (`kill -0` polling)
+  and real port closure for each process os-mediakit's guest starts.
+
+- **Phase Deploy.** Port `deploy-loader-img.sh` + `qmp-shutdown.py` (same known QMP-shutdown
+  limitation as precedent: the shared guest DTS has no ACPI/power-button device, so
+  `system_powerdown` never reaches the guest's own SIGTERM handler — document this, don't
+  pretend it's solved). Choose a deliberate, unambiguous systemd unit name up front —
+  precedent's `os-orchestration-guest.service` naming collision (claimed by SLM despite its
+  narrower scope) caused real downstream storefront-naming confusion; don't repeat it for
+  os-mediakit.
+
+**Standing carry-forward (not a phase — see Carry-forward section below)**: periodically check
+project-totebox's BRIEFs for how they resolve the MBA/gateway-wiring gap and the shared
+build-dir hazard; adopt their fix once real rather than maintaining a second workaround
+indefinitely.
 
 ## Work log
 
@@ -230,6 +385,23 @@ first draft, converging on the same fix in D3 especially. See Work log.**
   terminal (not interim) architecture, and split VMs per-binary (3, not 5) as the Phase 3
   floor, with per-tenant splitting reserved as a triggered end state rather than default.
   BRIEF rewritten to incorporate all of the above; see D1–D6 and Decisions-open 1–6.
+
+- **2026-08-10 (build-out planning)** — Operator directed lifting the Phase 3 hold and
+  building a real, sequenced build-out list, structured the same way as project-totebox's
+  `os-totebox`/`os-orchestration`. Researched project-totebox directly (not just their
+  BRIEFs — the actual `build-guest-rootfs.sh`/`deploy-loader-img.sh`/`qmp-shutdown.py`
+  scripts, all three products' Cargo.tomls, and SIGTERM-handling source code) to ground the
+  plan in verified fact rather than assumption; also read this archive's own live
+  `documentation.pointsav.com` nginx vhost directly for the real TLS/ACME mechanism to
+  replicate in-guest. Found and corrected course on: the KVM concern (resolved — precedent
+  needs none), the crate/script placement (os-mediakit is structurally closer to
+  `app-orchestration-command` than `os-totebox`, since it has no `[[bin]]` of its own), and a
+  real SIGTERM-handling gap in `app-orchestration-command` worth deliberately avoiding here.
+  Three scope decisions locked with the operator: start the seL4 build-out now; fold the
+  already-found Format B boot defect into this same build-out as Phase F; design TLS/ACME in
+  from the start rather than defer it, since it's genuinely new ground in this fleet. Added
+  the full **Build-out plan** section (Phase F/0/G1/G2/G2.5/G3/G-TLS/G4/SIGTERM/Deploy) above.
+  No G1+ engineering work started — this session's deliverable is the documentation itself.
 
 ## Carry-forward
 
@@ -269,7 +441,21 @@ first draft, converging on the same fix in D3 especially. See Work log.**
 - Coordinate with project-marketing and project-newsroom once either formally picks up
   `app-mediakit-marketing`/`app-mediakit-distributions` under D3's ownership split — D2's
   OS/app boundary (target, not yet fully implemented) is the contract they build against.
-- No seL4/Phase 3 implementation work starts from this BRIEF alone — per the rewritten
+- ~~No seL4/Phase 3 implementation work starts from this BRIEF alone — per the rewritten
   Decisions-open #4, hold until KVM/host-virtualization capability is confirmed, MBA/gateway
   wiring lands for `media-*` instances, and the shared-build-dir hazard (#6) is actually
-  fixed rather than merely documented.
+  fixed rather than merely documented.~~ **SUPERSEDED 2026-08-10** — hold lifted, operator-
+  directed. Next work starts at the **Build-out plan** section's Phase F/Phase 0, not this
+  BRIEF's old blanket hold.
+- **NEW 2026-08-10 — standing item, not a one-off**: periodically check project-totebox's
+  BRIEFs (`BRIEF-os-totebox-platform.md` is the living/current one — the "build-out" BRIEFs
+  are roadmap sketches that drifted stale once real building started, don't treat those as
+  current state) for how they resolve the MBA/gateway-wiring gap and the shared
+  `vendor-libvmm/examples/virtio/build/` directory hazard. Adopt their real fix once it lands
+  rather than maintaining os-mediakit's own parallel workaround (the Phase 0 `BUILD_DIR`
+  isolation) indefinitely.
+- **NEW 2026-08-10 — next concrete step**: start Build-out plan Phase 0 (preflight) — verify
+  the vendored Makefile's `BUILD_DIR` support, resolve the aarch64 cross-compile toolchain
+  question, and attempt a bare `cargo build --release --target aarch64-unknown-linux-gnu` for
+  `app-mediakit-knowledge` to surface `git2`/`syntect` C-dependency issues before any
+  guest-rootfs work depends on them. Not started this session — documentation only.
