@@ -6,7 +6,7 @@ title: "os-mediakit + app-mediakit-* — product-family architecture and develop
 status: active
 owner: project-knowledge
 created: 2026-08-06
-updated: 2026-08-06
+updated: 2026-08-10
 related_briefs:
   - command-os-product-family
 cites:
@@ -204,22 +204,23 @@ first draft, converging on the same fix in D3 especially. See Work log.**
 
 ## Carry-forward
 
-- **Send Command a consolidated doctrine-correction message** covering: the naming fix
-  (`app-mediakit-distribution` → `-distributions`, in §F/§L/§R.2, not §Q.7 as first
-  thought), the §Q.7-vs-§F/§L bootability contradiction (a second, separate instance of the
-  §R.1-class drift, not a duplicate), and the `software.pointsav.com` co-tenant status
-  conflict between doctrine §F and the rewritten wiki article. Not yet sent as of this
-  Work log entry.
-- **Flag back to Command/project-editorial**: the rewritten `systems/os-mediakit.md`'s
-  "Phase 1: what's running today" section asserts a `vm-mediakit` VM that does not actually
-  exist — a smaller-scope instance of the same unverified-present-tense-claim pattern that
-  caused the original fabrication. Should be corrected, not left as-is just because the
-  larger fabricated article is already gone.
-- **Get Command sign-off on Decisions-open #1's proposed VM-topology sequencing** (3-VM
-  per-binary floor, per-tenant split gated on a named trust-domain trigger) — this proposes
-  a pacing amendment to ratified doctrine §L, not a rewrite of its end state, but §L is
-  Command's document and needs their explicit agreement before this BRIEF's #1 counts as
-  truly locked.
+- ~~**Send Command a consolidated doctrine-correction message**~~ **SENT 2026-08-10**
+  (`msg-id: command-20260810-os-mediakit-answer-consolidated-doctrine`, in reply to
+  `command-20260806-question-does-os-mediakit-get-the-same-s`). Single message covering:
+  the naming fix (`app-mediakit-distribution` → `-distributions`, in §F/§L/§R.2, not §Q.7 as
+  first thought), the §Q.7-vs-§F/§L bootability contradiction, the `software.pointsav.com`
+  co-tenant status conflict, the `vm-mediakit` wiki-fabrication flag (below), the
+  Decisions-open #1 VM-topology sign-off request, the new Decisions-open #2 host-ingress
+  ownership gap, and the `conventions/os-mediakit-tier.md` ask. Awaiting Command's reply.
+- ~~**Flag back to Command/project-editorial**~~ **SENT 2026-08-10** as part of the
+  consolidated message above (§2): the rewritten `systems/os-mediakit.md`'s "Phase 1: what's
+  running today" section asserts a `vm-mediakit` VM that does not actually exist — a
+  smaller-scope instance of the same unverified-present-tense-claim pattern that caused the
+  original fabrication.
+- ~~**Get Command sign-off on Decisions-open #1's proposed VM-topology sequencing**~~
+  **REQUESTED 2026-08-10** as part of the consolidated message above (§3) — 3-VM
+  per-binary floor, per-tenant split gated on a named trust-domain trigger. Awaiting
+  Command's explicit agreement before this BRIEF's #1 counts as truly locked.
 - **Consider writing `conventions/os-mediakit-tier.md`** (doctrine names it, HIGH priority,
   does not exist) before further seL4 design work — it's the document that would formally
   resolve D2's implementation gap and the §Q.7 bootability contradiction, likely higher
