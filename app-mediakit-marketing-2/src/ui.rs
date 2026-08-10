@@ -1246,7 +1246,12 @@ pub fn not_found_page(tenant: &Tenant, lang: &str) -> Markup {
             }
             body {
                 a.m-skiplink href="#m-main" { (t(lang, "Skip to content", "Saltar al contenido")) }
-                (masthead(tenant, lang))
+                // No real page path to reflect (this function deliberately
+                // never receives the request path — see the doc comment
+                // above); `es_path: None` matches the same-as-home pattern
+                // and correctly omits the language switcher for a page that
+                // has no genuine Spanish counterpart to switch to.
+                (masthead(tenant, lang, "/", None))
                 main #m-main {
                     section.m-hero {
                         div.m-hero__inner {
@@ -1267,7 +1272,7 @@ pub fn not_found_page(tenant: &Tenant, lang: &str) -> Markup {
                     }
                 }
                 (footer(tenant, lang))
-                (drawer(tenant, lang))
+                (drawer(tenant, lang, "/", None))
                 script src="/static/app.js" {}
             }
         }
