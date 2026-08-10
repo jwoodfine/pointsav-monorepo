@@ -6,7 +6,7 @@ title: "os-mediakit + app-mediakit-* — product-family architecture and develop
 status: active
 owner: project-knowledge
 created: 2026-08-06
-updated: 2026-08-10
+updated: 2026-08-10 (smoke-test defect found)
 related_briefs:
   - command-os-product-family
 cites:
@@ -144,12 +144,17 @@ first draft, converging on the same fix in D3 especially. See Work log.**
    - The shared `vendor-libvmm/examples/virtio/build/` directory (item 6 below) is a live
      hazard that should be hardened *before* `os-mediakit` becomes its fourth consumer, not
      after.
-   - **Cheap, valuable, and not gated on any of the above**: the existing Ubuntu 24.04
-     `build-image.sh` appliance has apparently never been booted/smoke-tested end-to-end,
-     and this archive has no `.agent/binary-targets.yaml` despite shipping a real build
-     artifact. Proving the current appliance actually boots and serves `/healthz` on all
-     three ports is effectively "G0" of whatever comes next, regardless of which seL4
-     answer eventually wins — worth doing now, independent of the Phase-3 timeline question.
+   - ~~**Cheap, valuable, and not gated on any of the above**: the existing Ubuntu 24.04
+     `build-image.sh` appliance has apparently never been booted/smoke-tested end-to-end~~
+     **DONE 2026-08-10 — and the suspicion was correct, worse than expected.** First real
+     end-to-end boot attempt of the shipped artifact **did not reach a working state**:
+     root filesystem mounts fine, but `/boot` and `/boot/efi` by-label device lookups both
+     time out at 90s, the guest drops into emergency mode, and none of the 3 wiki systemd
+     units ever start. Confirmed stable (not just slow) over 6+ minutes. Root cause not
+     yet isolated between a real defect in the shipped image vs. a QEMU/TCG timing artifact
+     (this host has no `/dev/kvm`) — see new Decisions-open #7 below. Full evidence in
+     `.agent/binary-targets.yaml`'s `app-mediakit-knowledge` entry — `soft_enabled: true`
+     but Format B is now flagged **unverified**, not confirmed-working, until resolved.
 
 5. **`conventions/os-mediakit-tier.md` does not exist yet — flagged as possibly the highest-
    value next artifact, ahead of any seL4 design work.** Doctrine §K marks it HIGH priority
@@ -171,6 +176,30 @@ first draft, converging on the same fix in D3 especially. See Work log.**
    (per-product build subdirectories, already flagged as a follow-up in project-totebox's
    own BRIEF) should land before `os-mediakit` becomes a fourth consumer, not be worked
    around indefinitely.
+
+7. **NEW 2026-08-10 — `os-mediakit.qcow2` (Format B) does not boot to a working state;
+   root cause not isolated.** First real end-to-end smoke test (this session): booted
+   headless under `qemu-system-x86_64` with `-snapshot` (artifact confirmed unmutated,
+   sha256 matched before/after), hostfwd'd to non-colliding ports. Kernel/GRUB/root-fs
+   (mounted by `PARTUUID`) all came up cleanly, but `/dev/disk/by-label/BOOT` and a second
+   by-label device (`boot-efi.mount`'s dependency) both timed out at systemd's 90s device
+   wait, `local-fs.target` failed, and the guest dropped into emergency mode and stayed
+   there — none of the 3 wiki systemd units ever started, all 3 `/healthz` endpoints
+   unreachable for the full observation window. `build-image.sh` itself has zero
+   partition/label/mkfs logic (it only customizes an already-partitioned base Ubuntu cloud
+   image via `qemu-nbd`), so this is either (a) a genuine defect already present in the
+   shipped artifact — possibly introduced by the `qemu-nbd`-based customization/resize
+   step, or inherited unnoticed from the base cloud image's own UEFI-oriented partition
+   layout — or (b) a udev/by-label-symlink timing artifact specific to slow QEMU/TCG
+   emulation (no `/dev/kvm` on this host) that would not reproduce under KVM. **Not
+   distinguished between these two — needs either a KVM-capable host retest, a longer
+   systemd device-timeout kernel arg, or a direct look at the partition table/labels via
+   `qemu-nbd` mount to settle it.** Until resolved: BRIEF-binary-distribution.md's claim
+   that "Format B ... LIVE 2026-07-01" should be treated as **unverified at the boot
+   level**, not confirmed-working — Command's 2026-07-01 confirmation was of the upload/
+   listing going live on software.pointsav.com, not evidence anyone booted the image
+   end-to-end. Real customer impact if uninvestigated: BETA customers downloading Format B
+   today may hit this same emergency-mode hang.
 
 ## Work log
 
@@ -229,6 +258,14 @@ first draft, converging on the same fix in D3 especially. See Work log.**
   Ubuntu 24.04 `build-image.sh` appliance end-to-end (confirm `/healthz` on all three
   ports from inside the built QCOW2) and add `.agent/binary-targets.yaml` for it — currently
   missing despite a real build artifact existing on disk.
+- **NEW, likely highest priority — investigate/fix the Format B boot defect (Decisions-open
+  #7).** A BETA product currently listed as "live" on software.pointsav.com may not actually
+  boot for a real customer. Next step is isolating cause (a) vs (b): retest under KVM if a
+  KVM-capable host is available, or mount the qcow2 via `qemu-nbd` and directly inspect
+  `/boot`/`/boot/efi` partition labels without booting. Until isolated, consider whether
+  Command/project-software should be told Format B's live status is unverified — not done
+  automatically this session since it materially changes what was already reported as
+  working; operator call.
 - Coordinate with project-marketing and project-newsroom once either formally picks up
   `app-mediakit-marketing`/`app-mediakit-distributions` under D3's ownership split — D2's
   OS/app boundary (target, not yet fully implemented) is the contract they build against.
