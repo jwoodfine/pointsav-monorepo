@@ -1,0 +1,66 @@
+schema: foundry-binary-targets-v1
+cluster: project-knowledge
+
+targets:
+  - product_id: app-mediakit-knowledge
+    binary_name: app-mediakit-knowledge
+    source_crate: app-mediakit-knowledge
+    license: FSL-1.1-ALv2   # verified 2026-08-10 directly against
+                             # pointsav-monorepo/app-mediakit-knowledge/Cargo.toml
+                             # `[package] license = "FSL-1.1-ALv2"`. Corrects
+                             # BRIEF-binary-distribution.md's 2026-06-30 product-listing
+                             # note ("License: Apache 2.0"), which is stale relative to
+                             # the source of record.
+    license_tier: fsl
+    class: os-image          # standalone self-contained appliance (Format B: QCOW2 that
+                              # does not require os-infrastructure as a prerequisite —
+                              # BRIEF-binary-distribution.md "Decisions locked" #4), matching
+                              # the same class/layer/requires shape used for the other real
+                              # standalone appliance products in the fleet: os-totebox,
+                              # app-orchestration-slm/-command (project-totebox), and
+                              # app-privategit-design (project-design) — cross-checked
+                              # directly against both of those archives' binary-targets.yaml
+                              # 2026-08-10, not inferred.
+    layer: base
+    requires: []
+    platforms: [x86_64-unknown-linux-gnu]   # BETA is Linux x86_64 only per
+                                             # BRIEF-binary-distribution.md "Decisions
+                                             # locked" #5 — no macOS/Windows/AArch64 builds
+                                             # until pipelines exist.
+    soft_enabled: true
+    notes: >
+      Two formats, both live on software.pointsav.com since 2026-07-01 (BETA, no charge —
+      price_cents: 0, payment_required: false; do not enable pricing without an explicit
+      future outbox per BRIEF-binary-distribution.md). Format A (bare binary): a plain
+      `cargo build --release --bin app-mediakit-knowledge` in bin/build-soft.sh produces
+      this correctly. Format B (standalone QCOW2 appliance,
+      os-mediakit/scripts/build-image.sh) is a separate downstream packaging step that
+      bin/build-soft.sh does NOT run — same disclosed pipeline-gap shape as
+      project-totebox's os-totebox/app-orchestration-* loader.img entries. soft_enabled
+      stays true because Format A genuinely is buildable by the existing plain-cargo-build
+      pipeline; Format B needs a human/manual build-image.sh run regardless of this flag.
+
+      **Smoke-test result (2026-08-10, this session, first real end-to-end boot attempt
+      of the built Format B artifact) — DID NOT BOOT TO A WORKING STATE.** Booted
+      pointsav-monorepo/os-mediakit/scripts/build/os-mediakit.qcow2 (sha256
+      cf7b2dc45f5ca88831a99ece97a906709820bc4a69ccc4c2d294e7ca4b23475f) headless under
+      qemu-system-x86_64 (`-snapshot`, so the artifact itself was not mutated — confirmed
+      via matching sha256 before/after), hostfwd'd to alternate ports to avoid the live
+      production-adjacent services already bound to 9090/9093/9095 on this host. Kernel,
+      GRUB, and the root filesystem (mounted by PARTUUID) all came up cleanly — but
+      `/dev/disk/by-label/BOOT` and a second by-label device (`boot-efi.mount`'s
+      dependency, log-truncated to "U…") both timed out after 90s, `local-fs.target`
+      failed, and the guest dropped into emergency mode and stalled there (confirmed
+      stable, unchanged, after 6+ minutes). The 3 wiki systemd units never start under
+      this condition; all three /healthz endpoints were unreachable (curl: connection
+      timed out) for the full observation window.
+      `os-mediakit/scripts/build-image.sh` itself contains zero partition/label/mkfs
+      logic — it only customizes an already-partitioned base Ubuntu cloud image via
+      qemu-nbd — so this is either (a) a real defect already present in the shipped
+      artifact, or (b) a udev/by-label-symlink timing artifact specific to slow
+      QEMU/TCG software emulation (no /dev/kvm on this host) that would not reproduce
+      under KVM. Not yet distinguished between (a) and (b) — needs either a KVM-capable
+      host retest or a longer systemd device-timeout kernel arg to isolate. **Until this
+      is resolved, "Format B is live and working" should be treated as unverified, not
+      confirmed** — full detail and the open follow-up are in
+      BRIEF-os-mediakit-product-family.md.
