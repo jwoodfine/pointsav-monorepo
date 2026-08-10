@@ -802,6 +802,8 @@ async fn render_index_topic_category(
                 "",
                 state.important_info.as_deref(),
                 &state.legal,
+                state.site_description.as_deref(),
+                state.article_count,
             )
             .into_string(),
         )
