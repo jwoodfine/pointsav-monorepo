@@ -823,11 +823,25 @@ mod tests {
     #[test]
     fn heading_attr_strip_spares_backticked_mentions() {
         // A heading that documents the syntax in backticks (no bare trailing
-        // `}`) is left alone — the line doesn't end with `}` at all.
+        // `}`) is left alone by `strip_trailing_heading_attr` — the line
+        // doesn't end with `}` at all, so `{#id}` must survive intact, not
+        // get mistaken for a real trailing heading-attribute and stripped
+        // down to "The heading-attribute syntax".
+        //
+        // The literal backticks themselves don't survive into `.text`,
+        // though — `render()`'s heading extraction now reads ids/text
+        // straight from comrak's own rendered HTML (`extract_headings_from_html`,
+        // fixing a real dead-anchor bug on non-ASCII headings), and comrak
+        // renders `` `{#id}` `` as `<code>{#id}</code>`; stripping that tag
+        // for plain display text loses the backtick markup the same way any
+        // other inline formatting (bold, links) would. That's the correct,
+        // visible-rendered-text behavior, not a regression of the guard this
+        // test protects.
         let r = render("## The heading-attribute syntax `{#id}` explained\n");
         assert_eq!(
             r.headings[0].text,
-            "The heading-attribute syntax `{#id}` explained"
+            "The heading-attribute syntax {#id} explained"
         );
+        assert!(r.html.contains("<code>{#id}</code>"));
     }
 }
