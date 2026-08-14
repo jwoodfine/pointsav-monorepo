@@ -109,3 +109,7 @@ system-gateway-mba/keys/gcp_node_mba_ed25519
 # clones/<archive>/.agent/ only. Untracked .agent/ residue here previously caused
 # false-positive CRITICAL drift alerts in bin/foundry-health.sh (root-caused 2026-07-09).
 .agent/
+
+# Operator-specific runtime env files — never commit, copy from *.env.example
+service-totebox-egress/totebox-index.env
+service-content/.env
