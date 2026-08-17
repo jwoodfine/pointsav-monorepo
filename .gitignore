@@ -105,10 +105,14 @@ system-gateway-mba/vault_identity.key
 system-gateway-mba/keys/gcp_node_mba_ed25519
 *.key
 
-# Canonical-mirror repos never carry real per-archive .agent/ state — that lives in
-# clones/<archive>/.agent/ only. Untracked .agent/ residue here previously caused
-# false-positive CRITICAL drift alerts in bin/foundry-health.sh (root-caused 2026-07-09).
-.agent/
+# NOTE: a blanket `.agent/` rule was mistakenly copied in here from the canonical-mirror
+# repo's own .gitignore (ed816bef1, 2026-07-09) — that rule is correct for vendor/
+# pointsav-monorepo (which never carries real per-archive .agent/ state) but wrong for
+# this repo, which IS project-marketing's own archive-scoped repo where .agent/ should
+# be tracked per AGENT.md's cluster-branch discipline. Removed 2026-08-17 (Command) —
+# see NOTAM 2026-08-17-01/-02. Only ephemeral session locks stay ignored:
+.agent/engines/*/session.lock
+.agent/locks/
 
 # Operator-specific runtime env files — never commit, copy from *.env.example
 service-totebox-egress/totebox-index.env
