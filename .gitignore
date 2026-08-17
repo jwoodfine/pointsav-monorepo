@@ -1,0 +1,16 @@
+# Sibling sub-clones -- each has its own .git, tracked independently.
+# This top-level repo's job is .agent/ only (matches project-system's pattern).
+factory-release-engineering/
+media-knowledge-corporate/
+media-knowledge-documentation/
+media-knowledge-projects/
+pointsav-design-system/
+pointsav-fleet-deployment/
+pointsav-media-assets/
+pointsav-monorepo/
+woodfine-fleet-deployment/
+woodfine-media-assets/
+
+# Multi-agent session locks (ephemeral -- not committed)
+.agent/engines/*/session.lock
+.agent/locks/
