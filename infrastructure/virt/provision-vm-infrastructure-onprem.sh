@@ -12,7 +12,7 @@
 #                           Hosts: VM-Totebox-1 (first Totebox archive)
 #   Laptop B              — PPN mesh IP 10.8.0.1/24; WireGuard hub/relay
 #                           LAN IP: 10.0.0.224 (DNS stable — no DNS config change)
-#                           Public: 24.86.192.209:51820 (Laptop B WireGuard endpoint)
+#                           Public: <REDACTED-VPN-HUB-ENDPOINT>:51820 (Laptop B WireGuard endpoint)
 #
 # Phase 1 (now):   Linux + KVM (Laptop B) / TCG (Laptop A); QEMU-managed VMs
 # Phase 2:         NetBSD + NVMM (x86-64 compat bottom; bhyve-compatible)
@@ -52,7 +52,7 @@ PPN_SUBNET="10.8.0.0/24"
 PPN_LISTEN_PORT="51820"
 
 # WireGuard hub endpoint (Laptop B public)
-HUB_ENDPOINT="24.86.192.209:51820"
+HUB_ENDPOINT="<REDACTED-VPN-HUB-ENDPOINT>:51820"
 GCP_ENDPOINT="34.53.65.203:51820"
 
 # Pairing server on GCP relay
