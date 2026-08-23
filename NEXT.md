@@ -109,7 +109,15 @@ Commit on `cluster/project-orchestration` branch in this cluster's pointsav-mono
 - [x] **Command install + smoke test** `[closed: 2026-06-29 command@claude-code]` — confirmed via `data/binary-ledger/orchestration-command-server.jsonl`: `smoke_test: "pass"`, systemd unit `local-orchestration-command` installed, restarted.
 - [x] **project-software BETA URL confirmed** `[closed: 2026-06-30 totebox@project-software]` — `DEFAULT_BINARY_URL` set in `infrastructure/local-orchestration-command/bootstrap.sh`; ledger confirms download returns 200. Note: this was an **informal handoff** (project-software manually installed the dev binary; ledger records `source_commit: "pending-stage6"`), not the formal signed `bin/build-soft.sh` pipeline — see below.
 - [x] **Stage 6 — v0.0.1** `[closed: pre-2026-07-09, confirmed 2026-07-09 totebox@claude-code]` — confirmed present in canonical `origin/main` (`git log origin/main -- app-orchestration-command` shows commit `29d0b4a1`).
-- [ ] **Stage 6 — v0.0.2** (pairing.rs: WORM ledger `schema_version`, write-through to `user-pairings.yaml`) — NOT yet in canonical `origin/main`; pushed to promote-queue this session (2026-07-09), awaiting Command's canonical merge pass.
+- [x] **Stage 6 — v0.0.2** `[closed: 2026-08-23 command@claude-sonnet-5]` — confirmed
+      present in canonical `origin/main`, commit `2ea32087cd` ("fix(pairing):
+      schema_version in WORM ledger + write-through to user-pairings.yaml (infra ACK)"),
+      dated **2026-06-29** — actually predates the 2026-07-09 promote-queue entry that
+      described it as "not yet in canonical." Canonical has since gone further:
+      `3108f47e39` "v0.1.0 pairing.rs — SHA-256 fingerprint, PairingStore startup
+      restore, WORM pairing_revoked event" is also present. The queue entry was likely
+      a redundant re-submission of already-landed work (matches the workspace's known
+      SYS-SYNC duplicate-commit pattern). No promotion action needed.
 - [ ] **Formal SOFT- pipeline** — `bin/build-soft.sh` has never actually run for this binary; `data/app-repository/registry.yaml` is empty (`packages: {}`). Requested from Command via outbox 2026-07-09, gated on v0.0.2 canonical merge above. Will produce a real signed `data/app-repository/` entry + `registry-update` to project-software, superseding the informal BETA handoff.
 
 ### P3.5 — Update NEXT.md `[done 2026-06-29 totebox@claude-code]`
