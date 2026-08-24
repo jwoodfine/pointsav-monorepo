@@ -7,7 +7,7 @@ status: active
 owner: project-knowledge
 parent: project-knowledge-wiki-redesign
 created: 2026-07-01
-updated: 2026-07-13
+updated: 2026-08-23
 ---
 
 ## STATUS UPDATE (2026-07-13) — Full knowledge-platform vision reconciliation + Phase 3 (claim layer) landed
@@ -61,7 +61,7 @@ only in 3 *other* archives' clones)
 | 0/1/2 | Done — old-engine concerns (Stage 6, dead-code descope) or already ratified (claim-authoring convention, Doctrine claim #54) |
 | **3 — Claim layer (MVL)** | **Landed 2026-07-13, full scope** (commit `0c0f6fcf6`): `Claim` struct + extraction from the ratified convention's `<!--claim …-->` markers (`content::claims`, 11 tests incl. all 4 convention worked-examples verbatim — discharges the convention's own Phase 3.1 Engine Verification Gate); `redb`-backed claim graph + citation-verification history (`claims_store`); `citations.yaml` registry loader (`citations` — this config field existed since P0 but nothing ever consumed it until now); automatic background citation re-verification scheduler (`verification`, 24h sweep, re-fetch+re-hash+drift detection); read-only MCP server (`mcp`, see disposition above); per-article `TechArticle`+`BreadcrumbList` JSON-LD (`jsonld`); `GET /wiki/{slug}` JSON content-negotiation with on-demand-computed backlinks (`app.rs`). 54/54 tests pass, clean clippy, clean build. New deps: `redb`, `blake3`, `reqwest`, `rmcp`, `schemars`. |
 | **4 — DTCG token wiring** | Not started this session (see NEXT.md backlog — provisional-canonical-bundle plan recorded there per operator decision to proceed without blocking on project-design's answer) |
-| 5 — Bilingual `/es/` | Routing/switcher (5.1) confirmed already fully shipped. DYK localization (5.2) + `hreflang` tags remain open (NEXT.md backlog) |
+| 5 — Bilingual `/es/` | Routing/switcher (5.1) was **not** fully shipped as this line previously claimed — `/es/category/*` 404d across all 14 categories (route never registered; `/wiki` had an `/es` twin, `/category` never did). Fixed 2026-08-23 (commit `f3eaf9238`): `category_page`/`render_index_topic_category` are now `Lang`-parameterized like `serve_article` already was. Category *content* stays English-canonical by design (`ContentIndex` is English-only), matching `/es/wiki`'s existing shallow-parity depth — true `_index.es.md` Index Topic content is a separate, larger follow-up, not covered by this fix. DYK localization (5.2) + `hreflang` tags remain open (NEXT.md backlog) |
 | 6 — Three-instance split | Confirmed fully done this session via direct inspection (3 `Tenant` variants, 3 systemd services, 3 domains, correct PointSav/Woodfine ownership split) |
 | **7 — Contribution model** | `os-console`/`os-mediakit` (the planned pairing-broker + contributor client) are different crates outside this archive's cluster-manifest scope — not buildable here. This archive's deliverable is the integration-contract spec below, not code in those crates |
 | **8 — Editorial linter** | Not started this session (see NEXT.md backlog — provisional-starter-ruleset plan recorded there per operator decision to proceed without blocking on project-editorial's ruleset) |
