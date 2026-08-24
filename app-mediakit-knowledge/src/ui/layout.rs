@@ -153,9 +153,14 @@ fn search_block(input_id: &str, query: &str) -> Markup {
                 }
                 label."k-visually-hidden" for=(input_id) { "Search this registry" }
                 input."k-search__input" id=(input_id) type="search" name="q" value=(query)
-                    placeholder="Search" autocomplete="off" spellcheck="false";
+                    placeholder="Search" autocomplete="off" spellcheck="false"
+                    role="combobox" aria-expanded="false" aria-autocomplete="list"
+                    aria-controls={ (input_id) "-suggest" };
                 button."k-search__button" type="submit" { "Search" }
             }
+            // Populated client-side from `/api/search-suggest` — a real
+            // UX-review finding: search had no suggestions/typeahead at all.
+            ul."k-search__suggestions" id={ (input_id) "-suggest" } role="listbox" hidden {}
         }
     }
 }
@@ -531,6 +536,12 @@ pub fn article(
     alt_lang: Option<(&str, &str)>,
     badge: Option<&str>,
     body_html: &str,
+    // Adjacent articles in the same category, by title order — `(slug, title)`.
+    // `None`/`None` when the article has no category or sits at either end
+    // of it. A real UX-review finding: no prev/next navigation existed
+    // anywhere, forcing article -> back to category -> next article.
+    prev: Option<(&str, &str)>,
+    next: Option<(&str, &str)>,
 ) -> Markup {
     html! {
         article."k-article" {
@@ -568,6 +579,22 @@ pub fn article(
                 }
             }
             div."k-prose" { (PreEscaped(body_html)) }
+            @if prev.is_some() || next.is_some() {
+                nav."k-article-pager" aria-label="Article navigation" {
+                    @if let Some((p_slug, p_title)) = prev {
+                        a."k-article-pager__link"."k-article-pager__link--prev" href={ "/wiki/" (p_slug) } {
+                            span."k-article-pager__dir" { "\u{2190} Previous" }
+                            span."k-article-pager__title" { (p_title) }
+                        }
+                    }
+                    @if let Some((n_slug, n_title)) = next {
+                        a."k-article-pager__link"."k-article-pager__link--next" href={ "/wiki/" (n_slug) } {
+                            span."k-article-pager__dir" { "Next \u{2192}" }
+                            span."k-article-pager__title" { (n_title) }
+                        }
+                    }
+                }
+            }
             @if asof.is_none() {
                 // Print-only citation stamp (Phase 9 — .k-print-citation is
                 // display:none on screen, shown only in @media print).
