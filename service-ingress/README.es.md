@@ -6,7 +6,7 @@ desde una computadora portátil remota sin requerir el puerto 2222.
 
 ## Función
 
-Escucha en `0.0.0.0:8443`. Al iniciar por primera vez, genera automáticamente una CA
+Escucha en `0.0.0.0:8444`. Al iniciar por primera vez, genera automáticamente una CA
 autofirmada y un certificado de servidor bajo `~/.config/service-ingress/` e imprime la
 huella SHA-256. `os-console` fija esta huella (auto-fijación TOFU en
 `~/.config/os-console/server-hostkey`); las conexiones posteriores verifican contra el
@@ -28,7 +28,7 @@ Archivo de configuración opcional en `~/.config/service-ingress/config.toml`:
 
 ```toml
 [listen]
-port = 8443
+port = 8444
 
 [upstream]
 content = "http://127.0.0.1:9092"
@@ -46,7 +46,7 @@ cargo build --release -p service-ingress
 
 `service-ingress` es la capa de transporte de la Fase A. Permite que `os-console` se
 conecte a un Archivo Totebox remoto a través de redes corporativas o de hotel (tráfico
-saliente en 443/8443; sin reglas de firewall entrantes en la computadora portátil). El
+saliente en 443/8444; sin reglas de firewall entrantes en la computadora portátil). El
 puerto 2222 de GCE permanece cerrado. El enlace mTLS (ceremonia de emparejamiento MBA)
 es la puerta en la capa de aplicación; `service-ingress` es el canal.
 

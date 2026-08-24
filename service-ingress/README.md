@@ -6,7 +6,7 @@ a remote laptop without requiring port 2222.
 
 ## What it does
 
-Listens on `0.0.0.0:8443`. On first start, auto-generates a self-signed CA and server
+Listens on `0.0.0.0:8444`. On first start, auto-generates a self-signed CA and server
 certificate under `~/.config/service-ingress/` and prints the SHA-256 fingerprint.
 `os-console` pins this fingerprint (TOFU auto-pin to `~/.config/os-console/server-hostkey`);
 subsequent connections verify against the pinned value, rejecting any MITM.
@@ -27,7 +27,7 @@ Optional config file at `~/.config/service-ingress/config.toml`:
 
 ```toml
 [listen]
-port = 8443
+port = 8444
 
 [upstream]
 content = "http://127.0.0.1:9092"
@@ -44,7 +44,7 @@ cargo build --release -p service-ingress
 ## Role in the os-console architecture
 
 `service-ingress` is the Phase A transport layer. It allows `os-console` to connect to
-a remote Totebox Archive over a hotel or corporate network (outbound 443/8443 — no
+a remote Totebox Archive over a hotel or corporate network (outbound 443/8444 — no
 inbound firewall rules on the laptop). GCE port 2222 remains closed. The mTLS binding
 (MBA pairing ceremony) is the application-layer door; `service-ingress` is the pipe.
 
