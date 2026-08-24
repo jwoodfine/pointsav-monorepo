@@ -6,13 +6,14 @@ title: "os-mediakit + app-mediakit-* — product-family architecture and develop
 status: active
 owner: project-knowledge
 created: 2026-08-06
-updated: 2026-08-24 (fabricated-citation correction — see Work log)
+updated: 2026-08-24 (VM topology ratified at 1 VM — see Work log)
 related_briefs:
   - command-os-product-family
 cites:
   - command-os-product-family
   - command-sovereign-os-family-master-plan
   - infrastructure/wireguard/README.md
+  - project-infrastructure/BRIEF-ppn-infrastructure-reference.md
 ---
 
 # BRIEF — os-mediakit + app-mediakit-* product family
@@ -75,47 +76,47 @@ first draft, converging on the same fix in D3 especially. See Work log.**
 
 ## Decisions open
 
-1. **VM topology for Phase 3 — CORRECTED 2026-08-24, citations were fabricated.**
-   Command found (independently verified this session, against DOCTRINE.md's full 30-commit
-   history — zero matches, ever) that "doctrine §L" does not exist: DOCTRINE.md's real
-   sections are Roman numerals I–XVII only, with no VM-topology or PPN-allocation content
-   anywhere in any historical version. This was not restructuring drift — the citation was
-   invented.
+1. **VM topology for Phase 3 — RATIFIED 2026-08-24: 1 VM, not 3 or 5.**
+   Full arc: this item's original citations (DOCTRINE.md §L, invented 5-VM end state +
+   host IPs) were found fabricated by Command and corrected 2026-08-24, citing the real
+   substrate instead (`infrastructure/wireguard/README.md` reserves `10.42.40.0/24` for
+   media-* standalone VMs — real, but with no host-count or IP-assignment decision in it).
+   The corrected version proposed a fresh 3-VM-per-binary floor. Command brought that to
+   the operator, who initially chose a 5-VM per-tenant shape instead (weighting
+   post-exploit containment over operational cost) — but before that closed out, Command's
+   host-ingress investigation (item 2 below) surfaced a real, previously-unreconciled plan
+   conflict: `project-infrastructure`'s own `BRIEF-ppn-infrastructure-reference.md`
+   (2026-06-30, genuinely real) already has a §2 "Three-VM Layout (Tier B)" budgeting a
+   **single** `vm-mediakit` guest (6 GiB, all 6 media-* deployments combined,
+   self-terminating its own nginx TLS/public-HTTPS) alongside `vm-workspace`/
+   `vm-intelligence` — two months old, different archive, never reconciled against either
+   of today's proposals.
 
-   **What IS real, found this session**: `infrastructure/wireguard/README.md`'s address plan
-   (authoritative per `BRIEF-sovereign-os-family-master-plan.md §B`) reserves
-   `10.42.40.0/24` — "Media standalone... Reserved for when media-* move to own VMs." That
-   much of the original claim was grounded. **What was invented on top of it**: a specific
-   "5-VM end state," the `mediakit-knowledge-vm-1/2/3` naming, and host IPs
-   `10.42.40.1–.3` — none of that exists in the real address-plan document, which reserves
-   only the bare /24 with zero host-level assignments or VM-count decision.
+   **Final ruling, operator-directed**: start with **1 VM** (`vm-mediakit`), matching
+   project-infrastructure's existing Tier B budget — not 5, not 3. All 3 wiki tenants +
+   marketing + dist run on this one VM initially; avoid committing to a larger topology
+   ahead of real cost/usage data. The per-binary reasoning from the 3-VM proposal (a
+   byte-identical binary means RCE isn't contained by VM boundaries anyway) still supports
+   *not* over-splitting early, so it's consistent with this outcome even though the VM
+   count differs from what was proposed here. Split beyond 1 VM is a future decision,
+   triggered by real need, not pre-planned now. Command has flagged directly to
+   project-infrastructure that their Tier B plan is being adopted as the actual Phase 3
+   starting point.
 
-   **Reframed as a fresh proposal, not a correction to an already-ratified position**
-   (the engineering reasoning itself holds up independently of the fake citation, so it's
-   kept, not discarded): VM boundary per *binary*, not per *tenant*, as the Phase 3 floor —
-   3 VMs (`mediakit-knowledge-vm`, `mediakit-marketing-vm`, `mediakit-dist-vm` once real),
-   drawing host IPs from the real reserved `10.42.40.0/24` block when Phase 3 actually
-   provisions them (exact host IPs assigned at that time, not pre-decided here). Reasoning:
-   the three wiki tenants run the byte-identical `app-mediakit-knowledge` binary — any RCE
-   is exploitable against all three regardless of VM boundaries, so per-tenant VMs buy
-   mainly post-exploit containment, not attack-surface reduction; marketing and distribution
-   are genuinely different code with different exposure (distribution eventually touches
-   payment/license logic), where a VM boundary earns its cost. **Named split trigger**
-   (proposed, not yet operator-confirmed): split `mediakit-knowledge-vm` per-tenant when a
-   wiki tenant crosses a trust-domain line — concretely, when `corporate.woodfinegroup.com`
-   starts carrying regulated/BCSC-sensitive content, or a tenant gets an external-facing
-   editor audience per the Record Keeping product vision. **This needs Command's explicit
-   sign-off as a fresh proposal** — there is no existing ratified end state to amend; a
-   5-VM shape is one option among others once real, not a foregone conclusion this BRIEF
-   should assume.
-
-2. **New — host-ingress ownership, surfaced by both reviewers, not previously tracked
-   anywhere.** Once Phase 3 lands (any VM count > 1), multiple VMs sit behind one public
-   IP — port 443 binds once at the host. Nobody owns SNI-based L4 passthrough or per-VM
-   public IP allocation today; D2's OS/app boundary doesn't cover this (it's a host/
-   infrastructure-layer concern, not `os-mediakit`-guest-layer). Needs an explicit owner
-   (likely `os-infrastructure` or `os-network-admin`) before Phase 3, not assumed to fall
-   out of D2 automatically.
+2. **Host-ingress ownership — largely moot for the near term, given the 1-VM ruling above.**
+   A single VM behind a plain host port-forward doesn't need SNI-based multi-VM routing;
+   worth reopening only if/when a real split happens later. Investigation before that
+   ruling landed (kept for record): neither `os-infrastructure` nor `os-network-admin` is
+   documented anywhere as an actual hypervisor/host layer for other products' guest VMs —
+   both are themselves guest-level OS products, same category as `os-mediakit`, not a
+   dom0/host layer. There is no host-assignment decision anywhere yet for where these VMs
+   would even run (GCP Compute Engine vs. a to-be-determined local/PPN-hosted QEMU-KVM
+   host) — that's the real blocker if this ever reopens, not a pick between the two named
+   candidates. Separately, `project-infrastructure`'s own `BRIEF-ppn-infrastructure-
+   reference.md` §1 confirms `os-infrastructure` IS meant to become the hypervisor
+   substrate eventually — worth cross-referencing project-infrastructure's architecture
+   docs directly before any future os-mediakit infra proposal, not just DOCTRINE.md/
+   conventions.
 
 3. **RETRACTED 2026-08-24 — this entire item was built on fabricated citations, not
    verified this session against any real source.** §F, §L, §Q.7, §B, §R.1, §R.2 do not
@@ -440,12 +441,36 @@ indefinitely.
      never-verified-against-source claims) recurring a third time across the original
      fabricated-article incident, D4, and this one.
 
+- **2026-08-24 (VM topology ratified)** — Command independently re-verified the
+  2026-08-24 re-verification pass above (checked the real `10.42.40.0/24` citation, the
+  isolated invented content, the #3 retraction, and the D6 caveat directly against source —
+  not self-certified) and confirmed it met the bar. Brought Decisions-open #1/#2 to the
+  operator. Initial call: 5-VM per-tenant (operator weighted post-exploit containment over
+  the 3-VM proposal's operational-cost reasoning). Superseded same session: Command's
+  host-ingress investigation surfaced `project-infrastructure`'s own
+  `BRIEF-ppn-infrastructure-reference.md` (2026-06-30, real, never reconciled against
+  today's proposals) already budgeting a single `vm-mediakit` guest under its Tier B plan.
+  **Final ruling: 1 VM**, not 5 or 3 — matches project-infrastructure's existing budget,
+  avoids committing to a larger topology ahead of real cost/usage data. Decisions-open #1
+  and #2 rewritten above to reflect this as the ratified outcome, with the superseded 3-VM
+  and 5-VM proposals kept in the Work log (this entry) for provenance, not restated as
+  live options in Decisions-open itself.
+
 ## Carry-forward
 
-- ~~**Resend the sign-off request to Command per their checklist**~~ **SENT 2026-08-24**
-  (`msg-id: command-20260824-re-verified-brief-os-mediakit-product-fa`, in reply to
-  `command-20260824-what-s-needed-before-command-picks-48-ba`). Awaiting Command's reply —
-  #48 stays open until they act on it.
+- ~~**Resend the sign-off request to Command per their checklist**~~ **RESOLVED 2026-08-24**
+  — item #48 is closed. Sign-off request sent (`command-20260824-re-verified-brief-os-
+  mediakit-product-fa`), Command independently re-verified it and brought Decisions-open
+  #1/#2 to the operator; final ruling (1 VM, not 5 or 3) landed same session — see the
+  new 2026-08-24 (VM topology ratified) Work log entry and the rewritten Decisions-open
+  #1/#2 above. Nothing further pending on this thread.
+- **NEW 2026-08-24 — next concrete step, now that topology is ratified**: the Build-out
+  plan's Phase F/Phase 0 sequencing doesn't change (still binary-per-VM structure, just
+  1 VM total instead of 3), but Phase 0's cross-compile/toolchain work and the G-series
+  gate ladder should be read once more against a single-VM target before implementation
+  starts — e.g. G2.5's guest-rootfs step now installs all of knowledge+marketing+dist
+  into one rootfs rather than per-product ones. Not re-derived this session — flagging so
+  the Build-out plan section isn't read as still assuming the superseded 3-VM shape.
 - ~~**Send Command a consolidated doctrine-correction message**~~ **SENT 2026-08-10**
   (`msg-id: command-20260810-os-mediakit-answer-consolidated-doctrine`, in reply to
   `command-20260806-question-does-os-mediakit-get-the-same-s`). Single message covering:
