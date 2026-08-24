@@ -1,6 +1,6 @@
 //! service-ingress — mTLS Phase A public ingress for os-console.
 //!
-//! Listens on 0.0.0.0:8443 (HTTPS/TLS 1.3). On first start, auto-generates a
+//! Listens on 0.0.0.0:8444 (HTTPS/TLS 1.3). On first start, auto-generates a
 //! self-signed CA + server cert under ~/.config/service-ingress/ and prints the
 //! SHA-256 fingerprint so os-console can pin it.
 //!
@@ -13,7 +13,7 @@
 //!
 //! Config file (optional): ~/.config/service-ingress/config.toml
 //!   [listen]
-//!   port = 8443
+//!   port = 8444
 //!   [upstream]
 //!   content = "http://127.0.0.1:9092"
 //!   doorman = "http://127.0.0.1:9080"
@@ -224,6 +224,12 @@ async fn proxy(State(cfg): State<Arc<IngressConfig>>, req: Request) -> Response 
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Both `ring` and `aws-lc-rs` reach rustls transitively (axum-server vs. reqwest's
+    // rustls-tls), so rustls can't auto-select a CryptoProvider — must install one explicitly.
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("failed to install rustls ring CryptoProvider");
+
     let (cert_pem, key_pem) = ensure_cert()?;
 
     let fingerprint = fingerprint_from_pem(&cert_pem);
@@ -244,7 +250,7 @@ async fn main() -> Result<()> {
         .route("/", any(proxy))
         .with_state(cfg);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 8443));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8444));
     eprintln!("service-ingress: listening on https://{addr}");
 
     axum_server::bind_rustls(addr, tls_config)
