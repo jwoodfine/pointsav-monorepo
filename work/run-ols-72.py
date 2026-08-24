@@ -20,7 +20,7 @@ import os
 
 warnings.filterwarnings('ignore')
 
-WORK = '/srv/foundry/clones/project-gis/pointsav-monorepo/app-orchestration-gis/work'
+WORK = os.path.dirname(__file__)
 OUT  = os.path.dirname(__file__)
 
 df_full = pd.read_csv(f'{WORK}/clusters-ols.csv')

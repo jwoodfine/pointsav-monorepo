@@ -1,4 +1,4 @@
-export PYTHONPATH=$PYTHONPATH:/srv/foundry/clones/project-gis/pointsav-monorepo/app-orchestration-gis
+export PYTHONPATH=$PYTHONPATH:"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 for iso in usa can mex gbr deu fra nld aut prt grc dnk isl pol; do
   echo "Processing $iso..."
   python3 -c "
@@ -8,9 +8,15 @@ import rasterio
 from rasterio.windows import Window
 import numpy as np
 from utils.spatial_filter import ClusterFilter
-CLUSTERS_META = '/srv/foundry/deployments/gateway-orchestration-gis-1/www/data/clusters-meta.json'
-DATA_BASE_DIR = '/srv/foundry/deployments/cluster-totebox-personnel-1/service-fs/service-census/raw/'
-OUTPUT_DIR = '/srv/foundry/deployments/cluster-totebox-personnel-1/service-fs/service-census/'
+CLUSTERS_META = os.environ.get('GIS_CLUSTERS_META')
+if not CLUSTERS_META:
+    raise SystemExit('GIS_CLUSTERS_META must be set (2026-08-19 GitHub-exposure remediation - no real-value default) - point it at the GIS gateway deployment clusters-meta.json')
+DATA_BASE_DIR = os.environ.get('GIS_CENSUS_RAW_DIR')
+if not DATA_BASE_DIR:
+    raise SystemExit('GIS_CENSUS_RAW_DIR must be set (2026-08-19 GitHub-exposure remediation - no real-value default) - point it at the census service raw-data directory')
+OUTPUT_DIR = os.environ.get('GIS_CENSUS_OUTPUT_DIR')
+if not OUTPUT_DIR:
+    raise SystemExit('GIS_CENSUS_OUTPUT_DIR must be set (2026-08-19 GitHub-exposure remediation - no real-value default) - point it at the census service output directory')
 iso = '$iso'
 cf = ClusterFilter(CLUSTERS_META, threshold_km=150.0)
 input_file = os.path.join(DATA_BASE_DIR, f'{iso}_pop_2026.tif')
