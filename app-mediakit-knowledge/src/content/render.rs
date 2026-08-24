@@ -344,7 +344,12 @@ fn resolve_wikilinks(md: &str) -> String {
                         // `slugify`-based version; no regression, just not a new fix.
                         format!("#{}", comrak::Anchorizer::new().anchorize(anchor))
                     } else {
-                        format!("/wiki/{}", target)
+                        // A bare `[[Zero Container Inference]]` (no `|label`) used
+                        // to build the href from the raw bracket text verbatim —
+                        // spaces and all — instead of the real slug. Slugifying is
+                        // a no-op on an already-valid slug (explicit `[[slug|Label]]`
+                        // form), so this is safe for both branches.
+                        format!("/wiki/{}", slugify(target))
                     };
                     out.push('[');
                     out.push_str(label);
@@ -582,24 +587,21 @@ mod tests {
     }
 
     #[test]
-    fn wikilink_target_with_a_space_still_renders_as_a_real_link() {
-        // Without angle-bracket wrapping, CommonMark refuses an unescaped
-        // space in a link destination and renders the literal source text
-        // instead of an <a> tag — this must not regress. comrak percent-
-        // encodes the space in the emitted href (correct, valid HTML — a
-        // real browser link), so the assertion checks for a genuine anchor
-        // tag rather than an exact (unencoded) href string.
+    fn wikilink_target_with_a_space_slugifies_to_a_real_resolvable_href() {
+        // A bare `[[Zero Container Inference]]` (no `|label`) used to build
+        // the href from the raw bracket text verbatim — spaces and all,
+        // percent-encoded by comrak into a URL no real slug ever matches
+        // (`/wiki/Zero%20Container%20Inference`, a dead link). Real UX-review
+        // finding, 2026-08-23: the target must be slugified like any other
+        // slug, so the link actually resolves.
         let r = render("See [[Zero Container Inference]].\n");
         assert!(
             r.html
-                .contains("<a href=\"/wiki/Zero%20Container%20Inference\""),
+                .contains("<a href=\"/wiki/zero-container-inference\""),
             "got: {}",
             r.html
         );
         assert!(r.html.contains(">Zero Container Inference</a>"));
-        assert!(!r
-            .html
-            .contains("[Zero Container Inference](/wiki/Zero Container Inference)"));
     }
 
     #[test]

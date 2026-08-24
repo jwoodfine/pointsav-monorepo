@@ -79,12 +79,21 @@ impl ContentIndex {
     }
 
     /// Count of English documents in each category (categories with content only).
+    ///
+    /// Excludes each category's own Index Topic file (`_index.md`) from its
+    /// own count — `category_page`/`render_index_topic_category` already
+    /// exclude that same file from the listing itself (`not_own_index_topic`
+    /// in `app.rs`); this count previously disagreed with that listing by one.
     pub fn category_counts(&self) -> std::collections::BTreeMap<String, usize> {
         let mut counts = std::collections::BTreeMap::new();
         for doc in self.documents() {
             if let Some(cat) = doc.category.as_deref() {
                 if !cat.is_empty() && cat != "root" {
-                    *counts.entry(cat.to_string()).or_insert(0) += 1;
+                    let is_own_index_topic =
+                        doc.index_type.is_some() && doc.index_scope.as_deref() == Some(cat);
+                    if !is_own_index_topic {
+                        *counts.entry(cat.to_string()).or_insert(0) += 1;
+                    }
                 }
             }
         }

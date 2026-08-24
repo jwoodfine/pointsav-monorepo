@@ -119,6 +119,23 @@ async fn known_article_renders_200_with_title() {
 }
 
 #[tokio::test]
+async fn es_category_route_renders_200_not_404() {
+    let app = router(test_state());
+    let resp = app
+        .oneshot(
+            Request::builder()
+                .uri("/es/category/architecture")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+    let text = body_text(resp).await;
+    assert!(text.contains(r#"lang="es""#), "got: {text}");
+}
+
+#[tokio::test]
 async fn unknown_slug_returns_chrome_wrapped_404() {
     let app = router(test_state());
     let resp = app

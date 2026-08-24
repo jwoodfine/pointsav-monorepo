@@ -28,7 +28,7 @@
 //! state-tracking to specifically handle — worst case, parsing bails to
 //! `None` and the page renders as a plain article instead of mis-rendering.
 
-use super::render::{render, strip_trailing_heading_attr};
+use super::render::{render, slugify, strip_trailing_heading_attr};
 
 const START_HERE_OPEN: &str = "START-HERE-HIGHLIGHT";
 const START_HERE_CLOSE: &str = "END-START-HERE-HIGHLIGHT";
@@ -44,6 +44,12 @@ pub struct StartHere {
     pub href: String,
     pub label: String,
     pub prose_html: String,
+    /// Slug the link resolves to (post-slugify) — lets a caller with index
+    /// access look up the real article title when `explicit_label` is false.
+    pub slug: String,
+    /// `false` for a bare `[[slug]]` (no `|label`) — `label` is then just the
+    /// raw bracket text, not necessarily the article's real title.
+    pub explicit_label: bool,
 }
 
 /// One curated member link under a group.
@@ -52,6 +58,10 @@ pub struct Member {
     pub href: String,
     pub label: String,
     pub annotation_html: String,
+    /// See `StartHere::slug`.
+    pub slug: String,
+    /// See `StartHere::explicit_label`.
+    pub explicit_label: bool,
 }
 
 /// One H2 group: a heading followed (after an optional short prose intro) by
@@ -98,21 +108,21 @@ pub fn parse_index_topic(raw_body_md: &str) -> Option<IndexTopic> {
         let (sh_close_marker_pos, sh_close_end) =
             marker_end(text, sh_content_start, text.len(), START_HERE_CLOSE)?;
         let block_md = text[sh_content_start..sh_close_marker_pos].trim();
-        let (target, label) = first_wikilink(block_md)?;
+        let (target, label, explicit_label) = first_wikilink(block_md)?;
+        let slug = slugify(&target);
         start_here = Some(StartHere {
-            href: format!("/wiki/{target}"),
+            href: format!("/wiki/{slug}"),
             label,
             prose_html: render(block_md).html,
+            slug,
+            explicit_label,
         });
         cursor = sh_close_end;
     }
 
     let mut groups = Vec::new();
     let mut intro_end_set = start_here.is_some();
-    loop {
-        let Some((h_start, h_after, raw_title)) = next_h2(text, cursor) else {
-            break;
-        };
+    while let Some((h_start, h_after, raw_title)) = next_h2(text, cursor) {
         if !intro_end_set {
             intro_end = h_start;
             intro_end_set = true;
@@ -194,19 +204,19 @@ fn marker_end(text: &str, from: usize, end: usize, marker: &str) -> Option<(usiz
 
 /// The first `[[target]]` or `[[target|label]]` in `text` — same convention
 /// as `render::resolve_wikilinks`.
-fn first_wikilink(text: &str) -> Option<(String, String)> {
+fn first_wikilink(text: &str) -> Option<(String, String, bool)> {
     let start = text.find("[[")?;
     let rest = &text[start + 2..];
     let close = rest.find("]]")?;
     let inner = &rest[..close];
-    let (target, label) = match inner.split_once('|') {
-        Some((t, l)) => (t.trim(), l.trim()),
-        None => (inner.trim(), inner.trim()),
+    let (target, label, explicit_label) = match inner.split_once('|') {
+        Some((t, l)) => (t.trim(), l.trim(), true),
+        None => (inner.trim(), inner.trim(), false),
     };
     if target.is_empty() {
         return None;
     }
-    Some((target.to_string(), label.to_string()))
+    Some((target.to_string(), label.to_string(), explicit_label))
 }
 
 /// Parse a `- [[target|label]] — annotation` bullet list into `Member`s.
@@ -225,14 +235,17 @@ fn parse_members(text: &str) -> Option<Vec<Member>> {
         let Some(rest) = t.strip_prefix("- ") else {
             continue;
         };
-        let (target, label) = first_wikilink(rest)?;
+        let (target, label, explicit_label) = first_wikilink(rest)?;
+        let slug = slugify(&target);
         let link_end = rest.find("]]").map(|i| i + 2).unwrap_or(0);
         let after_link = rest[link_end..].trim();
         let annotation_md = after_link.strip_prefix('\u{2014}').unwrap_or(after_link).trim();
         members.push(Member {
-            href: format!("/wiki/{target}"),
+            href: format!("/wiki/{slug}"),
             label,
             annotation_html: render(annotation_md).html,
+            slug,
+            explicit_label,
         });
     }
     if members.is_empty() {
