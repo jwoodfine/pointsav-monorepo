@@ -442,12 +442,10 @@ indefinitely.
 
 ## Carry-forward
 
-- **NEW 2026-08-24 — highest priority, blocks item #48**: resend the sign-off request to
-  Command per their explicit checklist (`command-20260824-what-s-needed-before-command-picks-48-ba`),
-  now that Decisions-open #1 is corrected (real citation, honest fresh-proposal framing),
-  #3 is retracted, and D6 carries an honest provenance caveat. Reference this BRIEF's
-  2026-08-24 Work log entry for the full re-verification trail Command can independently
-  check. Not sent yet as of this edit — do this next.
+- ~~**Resend the sign-off request to Command per their checklist**~~ **SENT 2026-08-24**
+  (`msg-id: command-20260824-re-verified-brief-os-mediakit-product-fa`, in reply to
+  `command-20260824-what-s-needed-before-command-picks-48-ba`). Awaiting Command's reply —
+  #48 stays open until they act on it.
 - ~~**Send Command a consolidated doctrine-correction message**~~ **SENT 2026-08-10**
   (`msg-id: command-20260810-os-mediakit-answer-consolidated-doctrine`, in reply to
   `command-20260806-question-does-os-mediakit-get-the-same-s`). Single message covering:
