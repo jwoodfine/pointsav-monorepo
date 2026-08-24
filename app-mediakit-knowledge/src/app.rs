@@ -183,6 +183,7 @@ pub fn router(state: AppState) -> Router {
         .route("/research/{slug}", get(research_landing))
         .route("/research/{slug}/full", get(research_fulltext))
         .route("/search", get(search_page))
+        .route("/api/search-suggest", get(search_suggest))
         .route("/history/{*slug}", get(history_page))
         .route("/special/all-pages", get(special_all_pages))
         .route("/special/recent-changes", get(special_recent))
@@ -927,6 +928,34 @@ async fn search_page(State(state): State<AppState>, Query(params): Query<SearchQ
     .into_response()
 }
 
+#[derive(serde::Serialize)]
+struct Suggestion {
+    slug: String,
+    title: String,
+}
+
+/// `GET /api/search-suggest?q=...` — JSON typeahead suggestions, reusing the
+/// same in-RAM tantivy index `search_page` queries. A real UX-review finding:
+/// search had no suggestions/typeahead at all. Deliberately title-only (no
+/// snippet/matched-context excerpt) — `DocRef` doesn't hold article bodies in
+/// memory, so a real excerpt needs either tantivy's own `SnippetGenerator` or
+/// a disk read per result; not worth building ahead of the route existing.
+async fn search_suggest(State(state): State<AppState>, Query(params): Query<SearchQuery>) -> Response {
+    let q = params.q.unwrap_or_default();
+    let suggestions: Vec<Suggestion> = state
+        .search
+        .query(&q, 8)
+        .into_iter()
+        .filter_map(|slug| {
+            state
+                .index
+                .resolve(&slug, Lang::En)
+                .map(|d| Suggestion { slug: d.slug.clone(), title: d.title.clone() })
+        })
+        .collect();
+    axum::Json(suggestions).into_response()
+}
+
 #[derive(serde::Deserialize)]
 struct HistoryQuery {
     rev: Option<String>,
@@ -1307,22 +1336,37 @@ async fn serve_article(
     // Stamping `<html lang>` and the toggle from the *requested* `lang`
     // instead of this would mislabel English fallback content as Spanish.
     let lang_code = if doc.lang == Lang::Es { "es" } else { "en" };
-    // "In this topic" sidebar list — a real UX-review finding: the sidebar
-    // only ever showed categories, never sibling articles, so reading flow
-    // was strictly article -> back to category page -> next article.
+    // "In this topic" sidebar list + prev/next pager — real UX-review
+    // findings: the sidebar only ever showed categories, never sibling
+    // articles (reading flow was strictly article -> back to category page
+    // -> next article), and no prev/next navigation existed at all.
+    // `in_category` is already title-sorted, so index-of-current +/- 1 is
+    // the adjacent article with zero new lookups.
     let current_category = doc.category.as_deref();
-    let siblings: Vec<(String, String)> = current_category
+    let category_docs: Vec<(String, String)> = current_category
         .map(|cat| {
             state
                 .index
                 .in_category(cat)
                 .into_iter()
                 .filter(not_own_index_topic(cat))
-                .filter(|d| d.slug != doc.slug)
                 .map(|d| (d.slug.clone(), d.title.clone()))
                 .collect()
         })
         .unwrap_or_default();
+    let self_index = category_docs.iter().position(|(s, _)| s == &doc.slug);
+    let prev = self_index
+        .filter(|&i| i > 0)
+        .and_then(|i| category_docs.get(i - 1))
+        .map(|(s, t)| (s.as_str(), t.as_str()));
+    let next = self_index
+        .and_then(|i| category_docs.get(i + 1))
+        .map(|(s, t)| (s.as_str(), t.as_str()));
+    let siblings: Vec<(String, String)> = category_docs
+        .iter()
+        .filter(|(s, _)| s != &doc.slug)
+        .cloned()
+        .collect();
     let repo_root = &state.mounts.mounts[doc.mount_index].path;
     let rel = doc.path.strip_prefix(repo_root).unwrap_or(&doc.path);
 
@@ -1340,7 +1384,9 @@ async fn serve_article(
             .unwrap_or_else(|| doc.title.clone());
         let short = rev.chars().take(8).collect::<String>();
         let badge = content_type_badge(parsed.frontmatter.index_type.as_deref(), doc.lang);
-        let body = ui::article(&title, &doc.slug, None, Some(&short), Some(&date), None, badge, &rendered.html);
+        // A historical snapshot doesn't get prev/next pager links — those
+        // navigate the current article set, not this point-in-time view.
+        let body = ui::article(&title, &doc.slug, None, Some(&short), Some(&date), None, badge, &rendered.html, None, None);
         // Canonical points at the CURRENT version, not this historical snapshot —
         // an as-of view shouldn't compete with the live article for indexing.
         let head = ui::doc_head(&format!("{title} (as of {date})"), "", tenant, &format!("{prefix}/wiki/{}", doc.slug), false);
@@ -1451,6 +1497,8 @@ async fn serve_article(
         alt_ref,
         badge,
         &rendered.html,
+        prev,
+        next,
     );
     // Breadcrumb — a real finding: no page anywhere had one. Home -> Category
     // (when the article has one) -> current article (not a link).

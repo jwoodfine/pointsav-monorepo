@@ -141,6 +141,39 @@
 .k-article__sha { font-family: var(--k-font-mono, monospace); font-size: 0.9em; }
 .k-article__lang { font-family: var(--k-font-sans); }
 
+/* Prev/next article pager (same category, title-sorted) — a real UX-review
+   finding: reading flow was strictly article -> back to category -> next
+   article, with no direct link between adjacent articles. */
+.k-article-pager {
+  display: flex;
+  gap: var(--k-space-4);
+  margin: var(--k-space-6) 0;
+  padding-top: var(--k-space-4);
+  border-top: 1px solid var(--k-border);
+}
+.k-article-pager__link {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--k-space-1);
+  padding: var(--k-space-3) var(--k-space-4);
+  border: 1px solid var(--k-border);
+  border-radius: var(--k-radius-md);
+  color: inherit;
+}
+.k-article-pager__link:hover { border-color: var(--k-accent); }
+.k-article-pager__link--next { text-align: right; margin-left: auto; }
+.k-article-pager__dir {
+  font-family: var(--k-font-sans);
+  font-size: var(--k-text-sm);
+  color: var(--k-ink-muted);
+}
+.k-article-pager__title {
+  font-family: var(--k-font-sans);
+  font-weight: var(--k-weight-medium);
+  color: var(--k-accent);
+}
+
 /* Point-in-time "as-of" banner (historical revision) */
 .k-asof {
   margin: 0 0 var(--k-space-5);
