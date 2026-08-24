@@ -46,8 +46,8 @@ WORK_DIR="$SCRIPT_DIR/work/aec"
 export WORK_DIR
 LOG="$SCRIPT_DIR/build-aec-flood.log"
 STAMP="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-TILES_OUT="/srv/foundry/deployments/gateway-orchestration-gis-1/www/tiles"
-META_PATH="/srv/foundry/deployments/gateway-orchestration-gis-1/www/data/clusters-meta.json"
+TILES_OUT="${GIS_TILES_OUT:?GIS_TILES_OUT must be set (2026-08-19 GitHub-exposure remediation - no real-value default) - point it at the GIS gateway deployment tiles directory}"
+META_PATH="${GIS_CLUSTERS_META:?GIS_CLUSTERS_META must be set (2026-08-19 GitHub-exposure remediation - no real-value default) - point it at the GIS gateway deployment clusters-meta.json}"
 
 echo "──────────────────────────────────────────────" | tee -a "$LOG"
 echo "build-aec-flood  $STAMP" | tee -a "$LOG"

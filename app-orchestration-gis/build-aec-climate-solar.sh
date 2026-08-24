@@ -41,8 +41,8 @@ WORK_DIR="$SCRIPT_DIR/work/aec"
 export WORK_DIR
 LOG="$SCRIPT_DIR/build-aec-climate-solar.log"
 STAMP="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-TILES_OUT="/srv/foundry/deployments/gateway-orchestration-gis-1/www/tiles"
-META_PATH="/srv/foundry/deployments/gateway-orchestration-gis-1/www/data/clusters-meta.json"
+TILES_OUT="${GIS_TILES_OUT:?GIS_TILES_OUT must be set (2026-08-19 GitHub-exposure remediation - no real-value default) - point it at the GIS gateway deployment tiles directory}"
+META_PATH="${GIS_CLUSTERS_META:?GIS_CLUSTERS_META must be set (2026-08-19 GitHub-exposure remediation - no real-value default) - point it at the GIS gateway deployment clusters-meta.json}"
 
 echo "──────────────────────────────────────────────" | tee -a "$LOG"
 echo "build-aec-climate-solar  $STAMP" | tee -a "$LOG"
@@ -99,7 +99,7 @@ if [[ ! -f "$ASHRAE_CSV" ]]; then
     python3 - <<'PYEOF' 2>&1 | tee -a "$LOG"
 import urllib.request, csv, io
 url = "https://oedi-data-lake.s3.amazonaws.com/nrel-pds-building-stock/end-use-load-profiles-for-us-building-stock/2022/resstock_tmy3_release_1.1/geographic_information/spatial_tract_lookup_table.csv"
-out = "/srv/foundry/clones/project-gis/pointsav-monorepo/app-orchestration-gis/work/aec/ashrae-county-zones.csv"
+out = os.environ['WORK_DIR'] + '/ashrae-county-zones.csv'
 seen = {}
 reader = csv.DictReader(io.TextIOWrapper(urllib.request.urlopen(url), encoding='utf-8'))
 for row in reader:

@@ -21,13 +21,12 @@ CLUSTER_KM   = 0.6    # merge signals within 600m into one UF candidate
 # but accept the sweep taking much longer wall-clock time as a result.
 QUERY_SLEEP  = 25     # seconds between Overpass requests
 
-SERVICE_BUSINESS = Path(
-    "/srv/foundry/deployments/cluster-totebox-personnel-1"
-    "/service-fs/service-business"
-)
-CLUSTERS_GEOJSON = Path(
-    "/srv/foundry/clones/project-gis/app-orchestration-gis/work/clusters.geojson"
-)
+import os
+
+SERVICE_BUSINESS = Path(os.environ.get("GIS_SERVICE_BUSINESS_DIR", ""))
+if not str(SERVICE_BUSINESS):
+    raise SystemExit("GIS_SERVICE_BUSINESS_DIR must be set (2026-08-19 GitHub-exposure remediation - no real-value default) - point it at the personnel service service-business directory")
+CLUSTERS_GEOJSON = Path(__file__).resolve().parent / "work" / "clusters.geojson"
 
 # Per-region hardware chains
 HARDWARE_BY_REGION = {

@@ -33,8 +33,12 @@ BASEMAP_SHP = (
     "/pyogrio/tests/fixtures/naturalearth_lowres/naturalearth_lowres.shp"
 )
 
-DATA_DIR = "/srv/foundry/deployments/gateway-orchestration-gis-1/www/data"
-OUT_DIR = "/srv/foundry/clones/project-gis/work/figures"
+DATA_DIR = os.environ.get("GIS_DATA_DIR")
+if not DATA_DIR:
+    raise SystemExit("GIS_DATA_DIR must be set (2026-08-19 GitHub-exposure remediation - no real-value default) - point it at your GIS gateway deployment data directory")
+OUT_DIR = os.environ.get("GIS_OUT_DIR")
+if not OUT_DIR:
+    raise SystemExit("GIS_OUT_DIR must be set (2026-08-19 GitHub-exposure remediation - no real-value default) - point it at where rendered figures should be written")
 
 TIER_COLORS = {
     "T1": "#2563EB",   # blue-600  — highest tier
