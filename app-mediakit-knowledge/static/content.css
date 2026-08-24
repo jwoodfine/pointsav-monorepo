@@ -791,6 +791,15 @@
 .k-prose .anchor {
   scroll-margin-top: calc(var(--k-header-height) + var(--k-space-5));
   text-decoration: none;
+  /* Landing on a #heading-id URL (a TOC link, or any external link into a
+     specific section) programmatically focuses this anchor, which counts as
+     :focus-visible in every major browser — without this, the browser's
+     default focus outline drew a stray rectangle right next to the § mark
+     for a moment (a real bug report: "square box flashes beside the section
+     symbol"). The §-turns-accent-colored treatment below is already a real,
+     visible focus indicator, so the native outline is redundant, not needed
+     for accessibility here. */
+  outline: none;
 }
 .k-prose :is(h2, h3, h4) .anchor::before {
   content: "\00a7";                    /* § — section mark, records register */
