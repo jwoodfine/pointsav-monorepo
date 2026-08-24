@@ -124,25 +124,50 @@ something introduced or fixed here.
 
 ## Decisions open
 
-1. **Which copy is authoritative?** Neither local copy (archive-root, sub-clone)
-   matches `origin-staging-j`'s current tip, and archive-root doesn't even have the 2
-   target commits. Does the remote's real `app-mediakit-knowledge` work need to be
-   pulled into one of the local copies first, or does one of the local copies actually
-   supersede the remote and this needs a deliberate, reviewed overwrite? The
-   `reconcile(project-knowledge): graft root's canonical-repair provenance...` commit
-   on the remote is worth reading in full first — it may describe exactly this
-   situation from a prior session's perspective.
-2. **How to carry the 2 target commits (and any other real un-landed local work)
-   through the reconciliation** without losing anything on any of the three sides.
-3. **Root cause**: why do the archive-root repo and the nested sub-clone keep
-   diverging from each other and from the remote? Is this one-time drift or an
-   ongoing structural problem (e.g. two different sessions/scripts writing to
-   different copies without cross-syncing)? Fixing the cause matters as much as
-   fixing the current state, or this recurs.
-4. **Sequencing vs. the separate 6,722-commit canonical gap** — should staging-mirror
-   reconciliation happen first (smaller, more tractable), with canonical
-   reconciliation as a distinct follow-on, or should both be tackled together since
-   they likely share root-cause context?
+1. **RESOLVED 2026-08-24 — which copy is authoritative?** Read the graft commit in
+   full (`ac6be54d59`, 2026-08-13): it already answers this from a prior session's
+   perspective — "nested's tree is authoritative and unchanged by this commit...
+   nested is the confirmed real pusher (tip matches both origin-staging-j and
+   origin-staging-p exactly)... root stalled at 90f5c3611 (2026-08-09) and was
+   abandoned." Independently confirmed this still holds: `manifest.md`'s declared
+   `clones:` list has only ever named `pointsav-monorepo/app-mediakit-knowledge/`
+   (the nested sub-clone) — never a top-level archive-root copy, at any point. The
+   nested sub-clone is authoritative; archive-root's copy is not a live parallel
+   development to reconcile with.
+2. **DONE 2026-08-24 — carried the 2 target commits through.** Merged
+   `origin-staging-j`'s tip into the nested sub-clone (commit `4f62c535a8`), resolving
+   all 22 real content conflicts individually (10 files "ours" — the 2 target commits'
+   own work plus an already-redacted PII file; 12 files "theirs" — a real 2026-08-19
+   GitHub-exposure remediation on the remote that local was missing). Pushed and
+   **verified** on both `origin-staging-j`/`origin-staging-p` (`git fetch` +
+   `git branch -r --contains`, not just trusting the push output). This closes the
+   "5,176 commits neither local copy has" gap that motivated this Decision — nested
+   now contains all of origin-staging-j's content, merged in.
+3. **RESOLVED 2026-08-24 — root cause found, not an ongoing structural problem.**
+   `git log --reverse -- app-mediakit-knowledge/` on the archive-root repo traces its
+   earliest commit to **2026-02-28** ("Sovereign Update"/"DOCS: Structural Anchoring"),
+   predating this workspace's 2026-04-21 sovereign-sync retirement (CLAUDE.md §4:
+   "`sovereign_sync.sh` deleted. All 7 engineering repos bootstrapped on staging tier
+   (2026-04-21)"). Archive-root's `app-mediakit-knowledge/` is dead legacy content
+   from the retired pre-bootstrap sync mechanism, frozen since before the current
+   nested-sub-clone architecture existed — not two live processes actively diverging.
+   Nothing to fix going forward; this is historical drift, not a recurring pattern.
+   Whether it's worth deleting from archive-root as cleanup is a separate, much
+   lower-stakes question — not gating anything above.
+4. **RESOLVED BY SEQUENCING 2026-08-24 — staging first, canonical separately, as this
+   item anticipated.** Staging-mirror reconciliation (Decision 2) is done and verified.
+   Canonical reconciliation was picked up narrowly rather than via the archive-root/
+   sub-clone/remote 3-way lens at all: since archive-root is confirmed non-authoritative
+   dead content (Decision 3), the canonical gap only concerns nested vs. `origin/main`.
+   Built `reconcile-canonical-app-mediakit-knowledge-2026-08-24` (commit `e5fc54aa62`)
+   directly off `origin/main`'s current tip, replacing only `app-mediakit-knowledge/` +
+   the workspace `Cargo.lock` — none of the other 394 files in the 428-file tree diff
+   (other archives' real work) touched. **This branch's premise still holds** — Command
+   asked this be re-checked given the full 3-way picture; it does, because the branch
+   never depended on archive-root or on origin-staging-j's pre-merge state, only on
+   nested's current (now-reconciled) content. `cargo build`/`test` verified clean
+   against canonical's real workspace state. Local only, not pushed — Command applies
+   from this same filesystem path.
 
 ## Related
 
@@ -161,12 +186,27 @@ something introduced or fixed here.
 
 ## Carry-forward
 
-- [ ] Determine authoritative source among the 3 diverged copies (Decision 1).
-- [ ] Reconcile histories, carrying the 2 target commits + any other real local work
-      through cleanly.
-- [ ] Re-run `self-service-promote.sh` once local matches (or deliberately supersedes)
-      `origin-staging-j`'s actual tip.
-- [ ] Separately address the 6,722-commit canonical gap (own item, may be sequenced
-      after staging reconciliation).
-- [ ] Investigate and fix the root cause of the archive-root/sub-clone/remote
-      3-way drift so it doesn't recur.
+- [x] Determine authoritative source among the 3 diverged copies (Decision 1) —
+      nested sub-clone; archive-root is dead legacy content, not a competing source.
+- [x] Reconcile histories, carrying the 2 target commits + any other real local work
+      through cleanly — merge `4f62c535a8`, verified on both staging mirrors.
+- [x] Re-run `self-service-promote.sh` once local matches (or deliberately supersedes)
+      `origin-staging-j`'s actual tip — done, succeeded cleanly (also needed 2 separate
+      gate fixes from Command along the way: `bin/lib/data-content-filter.sh`'s
+      `DATA_CONTENT_ALLOWLIST`/`SECRET_PATTERN_ALLOWLIST` gaps, commits `3694ce1`/
+      `38cba20`).
+- [x] Separately address the 6,722/11,230-commit canonical gap — scoped narrowly
+      instead of a full branch reconciliation: `reconcile-canonical-app-mediakit-
+      knowledge-2026-08-24` (commit `e5fc54aa62`), touching only this crate. Ready for
+      Command to apply; not pushed anywhere (no canonical push credentials from this
+      session).
+- [x] Investigate the root cause of the archive-root/sub-clone/remote 3-way drift —
+      not an ongoing problem; archive-root's copy is frozen pre-2026-04-21 sovereign-
+      sync-era content, never part of the current nested-sub-clone architecture.
+      Nothing to fix going forward. Optional lower-priority cleanup: whether to
+      delete/archive the stale copy from archive-root's repo — not done here, not
+      blocking anything.
+
+**All 4 Decisions-open items resolved 2026-08-24** — see the rewritten Decisions-open
+section above for full detail on each. Nothing further pending from this BRIEF; the
+canonical-reconciliation branch and its application are Command's next step.
