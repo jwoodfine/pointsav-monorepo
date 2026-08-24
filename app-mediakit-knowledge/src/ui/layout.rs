@@ -238,7 +238,14 @@ pub fn header(tenant: Tenant, _lang: &str, query: &str) -> Markup {
 }
 
 /// Off-canvas mobile nav drawer + overlay (ships hidden; app.js manages state).
-pub fn mobile_nav(tenant: Tenant, query: &str) -> Markup {
+pub fn mobile_nav(tenant: Tenant, query: &str, cats: &[(String, String, String)]) -> Markup {
+    // Same split `sidebar()` uses — the drawer previously dropped the wiki
+    // entirely at mobile widths (search/Navigate/Resources/external links
+    // only, no category browse at all; a real UX-review finding).
+    let topics: Vec<&(String, String, String)> =
+        cats.iter().filter(|(_, _, kind)| kind != "guide").collect();
+    let guides: Vec<&(String, String, String)> =
+        cats.iter().filter(|(_, _, kind)| kind == "guide").collect();
     html! {
         div."k-overlay" #"k-overlay" hidden {}
         div."k-nav-drawer" #"k-nav-drawer" role="dialog" aria-modal="true"
@@ -259,6 +266,26 @@ pub fn mobile_nav(tenant: Tenant, query: &str) -> Markup {
                         li { a."k-nav-link" href="/" { "Home" } }
                         li { a."k-nav-link" href="/special/all-pages" { "Index of record" } }
                         li { a."k-nav-link" href="/special/recent-changes" { "Recent changes" } }
+                    }
+                }
+                @if !topics.is_empty() {
+                    section."k-nav-section" {
+                        h2."k-nav-section__title" { "Topics" }
+                        ul."k-nav-list" {
+                            @for (slug, label, _) in &topics {
+                                li { a."k-nav-link" href={ "/category/" (slug) } { (label) } }
+                            }
+                        }
+                    }
+                }
+                @if !guides.is_empty() {
+                    section."k-nav-section" {
+                        h2."k-nav-section__title" { "Guides" }
+                        ul."k-nav-list" {
+                            @for (slug, label, _) in &guides {
+                                li { a."k-nav-link" href={ "/category/" (slug) } { (label) } }
+                            }
+                        }
                     }
                 }
                 section."k-nav-section" {
@@ -877,7 +904,9 @@ pub fn search_results(query: &str, results: &[(String, String, String)]) -> Mark
     let q = query.trim();
     html! {
         div."k-catpage" {
-            div."k-catpage__eyebrow" { "Search" }
+            // No eyebrow here, unlike other `.k-catpage` renders — the H1
+            // already reads "Search" one line below; the eyebrow would just
+            // repeat it verbatim (a real UX-review finding, 2026-08-23).
             h1."k-article__title" { "Search" }
             // The header search bar carries the query — no second on-page box.
             @if q.is_empty() {
@@ -948,7 +977,18 @@ fn toc_nav(toc: &[Heading]) -> Markup {
 /// `.k-sidebar--reading` marker class is added, and the Topics/Guides nav is
 /// CSS-default-collapsed behind a toggle button — see `.k-sidebar--reading`
 /// in `app.css` and `initNavCollapse()` in `app.js`.
-fn sidebar(cats: &[(String, String, String)], toc: &[Heading]) -> Markup {
+/// `current_category` marks the active Topics/Guides link with `aria-current`
+/// (a real UX-review finding: no "you are here" existed anywhere in the
+/// sidebar). `siblings` — `(slug, title)`, current article already excluded
+/// by the caller — renders an "In this topic" list above the Browse toggle,
+/// the single structural feature every hyperscaler-docs benchmark shares
+/// that this engine previously lacked entirely.
+fn sidebar(
+    cats: &[(String, String, String)],
+    toc: &[Heading],
+    current_category: Option<&str>,
+    siblings: &[(String, String)],
+) -> Markup {
     let reading = !toc.is_empty();
     let topics: Vec<&(String, String, String)> =
         cats.iter().filter(|(_, _, kind)| kind != "guide").collect();
@@ -960,6 +1000,16 @@ fn sidebar(cats: &[(String, String, String)], toc: &[Heading]) -> Markup {
             nav."k-sidenav" {
                 a."k-sidenav__home" href="/" { "Main page" }
                 (toc_nav(toc))
+                @if !siblings.is_empty() {
+                    div."k-sidenav__group" {
+                        h2."k-sidenav__heading" { "In this topic" }
+                        ul."k-sidenav__list" {
+                            @for (slug, title) in siblings {
+                                li { a."k-sidenav__link" href={ "/wiki/" (slug) } { (title) } }
+                            }
+                        }
+                    }
+                }
                 @if has_browse {
                     button."k-nav-toggle" type="button"
                         aria-expanded="false" aria-controls="k-sidenav-browse" {
@@ -971,7 +1021,13 @@ fn sidebar(cats: &[(String, String, String)], toc: &[Heading]) -> Markup {
                                 h2."k-sidenav__heading" { "Topics" }
                                 ul."k-sidenav__list" {
                                     @for (slug, label, _) in &topics {
-                                        li { a."k-sidenav__link" href={ "/category/" (slug) } { (label) } }
+                                        @let active = current_category == Some(slug.as_str());
+                                        li {
+                                            a."k-sidenav__link"
+                                                href={ "/category/" (slug) }
+                                                aria-current=[active.then_some("page")]
+                                                { (label) }
+                                        }
                                     }
                                 }
                             }
@@ -981,7 +1037,13 @@ fn sidebar(cats: &[(String, String, String)], toc: &[Heading]) -> Markup {
                                 h2."k-sidenav__heading" { "Guides" }
                                 ul."k-sidenav__list" {
                                     @for (slug, label, _) in &guides {
-                                        li { a."k-sidenav__link" href={ "/category/" (slug) } { (label) } }
+                                        @let active = current_category == Some(slug.as_str());
+                                        li {
+                                            a."k-sidenav__link"
+                                                href={ "/category/" (slug) }
+                                                aria-current=[active.then_some("page")]
+                                                { (label) }
+                                        }
                                     }
                                 }
                             }
@@ -1318,6 +1380,8 @@ pub fn page(
     legal: &LegalTokens,
     site_description: Option<&str>,
     article_count: usize,
+    current_category: Option<&str>,
+    siblings: &[(String, String)],
 ) -> Markup {
     html! {
         (DOCTYPE)
@@ -1325,13 +1389,13 @@ pub fn page(
             head { (head) }
             body {
                 a."k-skip-link" href="#k-main" { "Skip to content" }
-                (mobile_nav(tenant, query))
+                (mobile_nav(tenant, query, cats))
                 div."k-page" {
                     (print_brand_mark(tenant, site_description))
                     (utility_bar(tenant))
                     (header(tenant, lang, query))
                     div."k-shell" {
-                        (sidebar(cats, toc))
+                        (sidebar(cats, toc, current_category, siblings))
                         main."k-page__body" #"k-main" tabindex="-1" { (body) }
                     }
                     (compliance_band(tenant, disclaimer))
