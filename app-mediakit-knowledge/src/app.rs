@@ -178,6 +178,7 @@ pub fn router(state: AppState) -> Router {
         .route("/wiki/{*slug}", get(wiki_raw))
         .route("/es/wiki/{*slug}", get(wiki_es))
         .route("/category/{name}", get(category_page))
+        .route("/es/category/{name}", get(category_page_es))
         .route("/research", get(research_index))
         .route("/research/{slug}", get(research_landing))
         .route("/research/{slug}/full", get(research_fulltext))
@@ -350,6 +351,8 @@ fn not_found(state: &AppState, message: &str) -> Response {
                 &state.legal,
                 state.site_description.as_deref(),
                 state.article_count,
+                None,
+                &[],
             )
             .into_string(),
         ),
@@ -437,6 +440,8 @@ async fn home(State(state): State<AppState>) -> Response {
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
@@ -465,11 +470,30 @@ async fn category_page(
     Path(name): Path<String>,
     Query(params): Query<CategoryQuery>,
 ) -> Response {
+    serve_category(state, name, params, Lang::En).await
+}
+
+/// Spanish category route (`/es/category/{name}`) — same handler, `Lang::Es`.
+/// Category membership itself stays English-canonical (`ContentIndex::in_category`
+/// is English-only by design), matching `/es/wiki`'s existing shallow-parity
+/// depth: this closes the route-registration 404, it does not localize listing
+/// content — that's a separate, larger follow-up (true `_index.es.md` support).
+async fn category_page_es(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+    Query(params): Query<CategoryQuery>,
+) -> Response {
+    serve_category(state, name, params, Lang::Es).await
+}
+
+async fn serve_category(state: AppState, name: String, params: CategoryQuery, lang: Lang) -> Response {
     let tenant = state.tenant;
+    let prefix = if lang == Lang::Es { "/es" } else { "" };
+    let lang_code = if lang == Lang::Es { "es" } else { "en" };
     let label = category_label(&state, &name);
     if !params.wants_flat_list() {
         if let Some(index_doc) = state.index.index_topic_for_scope(&name) {
-            if let Some(resp) = render_index_topic_category(&state, index_doc, &name, &label).await {
+            if let Some(resp) = render_index_topic_category(&state, index_doc, &name, &label, lang).await {
                 return resp;
             }
             // `parse_index_topic` returned `None` (malformed content) — fall
@@ -502,7 +526,7 @@ async fn category_page(
     };
     let trail = vec![("/".to_string(), tenant.home_label().to_string())];
     let body = html! { (ui::breadcrumb(&trail, &label)) (ui::category_index(&label, &docs)) };
-    let path = format!("/category/{name}");
+    let path = format!("{prefix}/category/{name}");
     let home = tenant.home_url();
     let home = home.trim_end_matches('/');
     let jsonld_trail = [
@@ -514,7 +538,7 @@ async fn category_page(
     Html(
         ui::page(
             tenant,
-            "en",
+            lang_code,
             head,
             body,
             &nav_cats(&state),
@@ -524,6 +548,10 @@ async fn category_page(
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            Some(name.as_str()),
+            // Not the sidebar sibling list here — the page body already *is*
+            // the full category listing; a second copy would be redundant.
+            &[],
         )
         .into_string(),
     )
@@ -573,6 +601,8 @@ async fn research_index(State(state): State<AppState>) -> Response {
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
@@ -651,6 +681,8 @@ async fn research_landing(State(state): State<AppState>, Path(slug): Path<String
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
@@ -722,6 +754,8 @@ async fn research_fulltext(State(state): State<AppState>, Path(slug): Path<Strin
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
@@ -743,10 +777,32 @@ async fn render_index_topic_category(
     index_doc: &content::DocRef,
     name: &str,
     label: &str,
+    lang: Lang,
 ) -> Option<Response> {
     let tenant = state.tenant;
+    let prefix = if lang == Lang::Es { "/es" } else { "" };
+    let lang_code = if lang == Lang::Es { "es" } else { "en" };
     let raw = content::load_raw(index_doc).ok()?;
-    let topic = content::parse_index_topic(&raw.body_md)?;
+    let mut topic = content::parse_index_topic(&raw.body_md)?;
+    // A bare `[[slug]]` member link (no `|label`) carries the raw slug text
+    // as its label rather than the article's real title — resolve it now
+    // that we have index access, which the parser itself doesn't.
+    if let Some(sh) = topic.start_here.as_mut() {
+        if !sh.explicit_label {
+            if let Some(doc) = state.index.resolve(&sh.slug, Lang::En) {
+                sh.label = doc.title.clone();
+            }
+        }
+    }
+    for group in &mut topic.groups {
+        for member in &mut group.members {
+            if !member.explicit_label {
+                if let Some(doc) = state.index.resolve(&member.slug, Lang::En) {
+                    member.label = doc.title.clone();
+                }
+            }
+        }
+    }
     let total = state
         .index
         .in_category(name)
@@ -781,7 +837,7 @@ async fn render_index_topic_category(
         .short_description
         .clone()
         .unwrap_or_default();
-    let path = format!("/category/{name}");
+    let path = format!("{prefix}/category/{name}");
     let home = tenant.home_url();
     let home = home.trim_end_matches('/');
     let jsonld_trail = [
@@ -794,7 +850,7 @@ async fn render_index_topic_category(
         Html(
             ui::page(
                 tenant,
-                "en",
+                lang_code,
                 head,
                 body,
                 &nav_cats(state),
@@ -804,6 +860,8 @@ async fn render_index_topic_category(
                 &state.legal,
                 state.site_description.as_deref(),
                 state.article_count,
+                Some(name),
+                &[], // the body is already the curated member list
             )
             .into_string(),
         )
@@ -861,6 +919,8 @@ async fn search_page(State(state): State<AppState>, Query(params): Query<SearchQ
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
@@ -916,6 +976,8 @@ async fn history_page(
                 &state.legal,
                 state.site_description.as_deref(),
                 state.article_count,
+                None,
+                &[],
             )
             .into_string(),
         )
@@ -944,6 +1006,8 @@ async fn history_page(
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
@@ -986,6 +1050,8 @@ async fn special_all_pages(State(state): State<AppState>) -> Response {
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
@@ -1023,6 +1089,8 @@ async fn special_recent(State(state): State<AppState>) -> Response {
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
@@ -1239,6 +1307,22 @@ async fn serve_article(
     // Stamping `<html lang>` and the toggle from the *requested* `lang`
     // instead of this would mislabel English fallback content as Spanish.
     let lang_code = if doc.lang == Lang::Es { "es" } else { "en" };
+    // "In this topic" sidebar list — a real UX-review finding: the sidebar
+    // only ever showed categories, never sibling articles, so reading flow
+    // was strictly article -> back to category page -> next article.
+    let current_category = doc.category.as_deref();
+    let siblings: Vec<(String, String)> = current_category
+        .map(|cat| {
+            state
+                .index
+                .in_category(cat)
+                .into_iter()
+                .filter(not_own_index_topic(cat))
+                .filter(|d| d.slug != doc.slug)
+                .map(|d| (d.slug.clone(), d.title.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
     let repo_root = &state.mounts.mounts[doc.mount_index].path;
     let rel = doc.path.strip_prefix(repo_root).unwrap_or(&doc.path);
 
@@ -1273,6 +1357,8 @@ async fn serve_article(
                 &state.legal,
                 state.site_description.as_deref(),
                 state.article_count,
+                current_category,
+                &siblings,
             )
             .into_string(),
         )
@@ -1427,6 +1513,8 @@ async fn serve_article(
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            current_category,
+            &siblings,
         )
         .into_string(),
     )

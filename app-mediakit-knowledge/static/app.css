@@ -175,6 +175,11 @@ button:disabled { cursor: default; }
   word-break: break-word;
 }
 .k-sidenav__link:hover { color: var(--k-accent); border-left-color: var(--k-accent); }
+.k-sidenav__link[aria-current="page"] {
+  color: var(--k-accent);
+  font-weight: var(--k-weight-semibold);
+  border-left-color: var(--k-accent);
+}
 
 /* Article table of contents (in the sticky sidebar, Vector 2022 style). */
 .k-toc__list { list-style: none; margin: 0; padding: 0; }
