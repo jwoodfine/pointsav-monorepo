@@ -6,12 +6,13 @@ title: "os-mediakit + app-mediakit-* — product-family architecture and develop
 status: active
 owner: project-knowledge
 created: 2026-08-06
-updated: 2026-08-10 (build-out plan added)
+updated: 2026-08-24 (fabricated-citation correction — see Work log)
 related_briefs:
   - command-os-product-family
 cites:
   - command-os-product-family
   - command-sovereign-os-family-master-plan
+  - infrastructure/wireguard/README.md
 ---
 
 # BRIEF — os-mediakit + app-mediakit-* product family
@@ -70,33 +71,43 @@ first draft, converging on the same fix in D3 especially. See Work log.**
 | D3 | **Ownership split, operator-directed 2026-08-06**: project-knowledge owns `os-mediakit` (base) + `app-mediakit-knowledge` (first product, live) — already true, already done. `app-mediakit-marketing` → project-marketing. `app-mediakit-distributions` → project-newsroom. **Corrected**: `app-mediakit-marketing` is NOT a scaffold — real, deployed, live (~770+ lines of Rust across `server.rs`/`content.rs`/`config.rs`/`mcp.rs`/`pending.rs`, bilingual content for two brands, a deployed binary with month(s) of dated backups, two running systemd units `local-marketing.service`/`local-marketing-pointsav.service`). Only `app-mediakit-distributions` (a 7-line `lib.rs`) is a genuine empty scaffold. This correction changes Decisions-open #4 below materially. |
 | D4 | **Wiki-content record is substantially improved, not fully accurate — verify claims, don't blanket-trust.** `systems/os-mediakit.md` (rewritten 2026-08-06) correctly hedges Phase 3 and matches D1/current-state on the QCOW2 mechanism. **But** its "Phase 1: what's running today" section asserts a `vm-mediakit` VM that does not exist (no such systemd unit, no `/srv/foundry/infrastructure/local-vm-mediakit/`, no running QEMU process — confirmed directly) — the same class of unverified-present-tense claim that caused the original fabricated-article incident, just smaller in scope. Flagged to Command/project-editorial (see Carry-forward) rather than silently absorbed here. |
 | D5 | **project-totebox's own `os-mediakit`/`app-mediakit-knowledge` directories are not a competing effort.** Every archive's `pointsav-monorepo` sub-clone is a full checkout of the same canonical monorepo — project-totebox's copy is a byte-identical scaffold from normal shared-repo structure, and their own `BRIEF-os-orchestration-platform.md` §7b explicitly disclaims ownership. Minor note for them: that disclaimer names the owner as "project-mediakit," which does not exist in `pairings.yaml` — a small phantom-archive citation error on their side, not ours to fix. |
-| D6 | **Pattern A (Microkit + `vendor-libvmm` Linux-guest) is the right mechanism if/when `os-mediakit` migrates to seL4, and should be treated as os-mediakit's *terminal* architecture, not an interim step toward bare metal.** Locked after independent Opus + Fable convergence (both, unprompted, reached the same recommendation with the same reasoning — see Work log): `app-mediakit-knowledge`/`-marketing` are tokio/glibc-linked binaries requiring nginx+certbot in-guest per D2; a `no_std` bare-metal rewrite is a non-starter for an ACME-capable TLS-terminating web tier, unlike `os-totebox`'s data-vault threat model which actually motivates bare-metal PD isolation. Real cost this adds, not previously tracked: Pattern A as practiced is AArch64 (Microkit boards, `qemu-system-aarch64`); today's binaries are x86_64 — Phase 3 includes a cross-arch recompile and rootfs/toolchain rework, not just "port the same binary into a guest." |
+| D6 | **Pattern A (Microkit + `vendor-libvmm` Linux-guest) is the right mechanism if/when `os-mediakit` migrates to seL4, and should be treated as os-mediakit's *terminal* architecture, not an interim step toward bare metal.** Locked after independent Opus + Fable convergence (both, unprompted, reached the same recommendation with the same reasoning — see Work log): `app-mediakit-knowledge`/`-marketing` are tokio/glibc-linked binaries requiring nginx+certbot in-guest per D2; a `no_std` bare-metal rewrite is a non-starter for an ACME-capable TLS-terminating web tier, unlike `os-totebox`'s data-vault threat model which actually motivates bare-metal PD isolation. Real cost this adds, not previously tracked: Pattern A as practiced is AArch64 (Microkit boards, `qemu-system-aarch64`); today's binaries are x86_64 — Phase 3 includes a cross-arch recompile and rootfs/toolchain rework, not just "port the same binary into a guest." **CAVEAT added 2026-08-24**: given this BRIEF's own first draft is confirmed to have fabricated other citations (Decisions-open #1/#3), the "independent Opus + Fable convergence" claim itself was re-checked this session and could not be verified — no git history, session-context entry, or artifact survives for any 2026-08-06 review of this BRIEF (this file's earliest git commit, 2026-08-09, is explicitly marked "recovered after VM crash," and no `.agent/` activity from 2026-08-06 survived that crash at all). This is not proof the review didn't happen — the crash plausibly explains total data loss — but it cannot be confirmed either, and per the operator's standing instruction not to re-assert unconfirmable claims, D6's *provenance* is unconfirmed even though its underlying engineering reasoning (tokio/glibc requiring a Linux guest, AArch64-only Microkit) checks out independently on its own technical merits. |
 
 ## Decisions open
 
-1. **VM topology for Phase 3 — resolved to a specific shape, needs Command sign-off since
-   it touches ratified §L.** The original framing ("1 combined vs. 5 separate") was a false
-   binary — both reviewers independently converged on the same middle position:
-   **VM boundary per *binary*, not per *tenant*, as the Phase 3 floor — 3 VMs
-   (`mediakit-knowledge-vm`, `mediakit-marketing-vm`, `mediakit-dist-vm` once real) —
-   with per-tenant splitting of the knowledge VM (→ the full 5 already named in doctrine
-   §L, `mediakit-knowledge-vm-1/2/3` at PPN 10.42.40.1–.3) reserved as the end state,
-   triggered explicitly rather than done upfront.** Reasoning: the three wiki tenants run
-   the byte-identical `app-mediakit-knowledge` binary — any RCE is exploitable against all
-   three regardless of VM boundaries, so per-tenant VMs buy mainly post-exploit containment,
-   not attack-surface reduction; marketing and distribution are genuinely different code
-   with different exposure (distribution eventually touches payment/license logic), where a
-   VM boundary earns its cost. Doctrine's own §L already accepts same-binary co-tenancy
-   elsewhere (`mediakit-marketing-vm` already co-tenants two brand sites of the same
-   binary) — applying that same standard to knowledge yields 3 VMs, not 5, as the starting
-   shape. **Named split trigger** (not yet operator-confirmed, proposed here): split
-   `mediakit-knowledge-vm` per-tenant when a wiki tenant crosses a trust-domain line —
-   concretely, when `corporate.woodfinegroup.com` starts carrying regulated/BCSC-sensitive
-   content, or a tenant gets an external-facing editor audience per the Record Keeping
-   product vision. **This is a proposed sequencing amendment to ratified §L, not a
-   fait accompli — needs Command's explicit sign-off**, since §L already names the full
-   5-VM end state with allocated PPN IPs; nothing here contradicts that end state, only
-   the order/pace of getting there.
+1. **VM topology for Phase 3 — CORRECTED 2026-08-24, citations were fabricated.**
+   Command found (independently verified this session, against DOCTRINE.md's full 30-commit
+   history — zero matches, ever) that "doctrine §L" does not exist: DOCTRINE.md's real
+   sections are Roman numerals I–XVII only, with no VM-topology or PPN-allocation content
+   anywhere in any historical version. This was not restructuring drift — the citation was
+   invented.
+
+   **What IS real, found this session**: `infrastructure/wireguard/README.md`'s address plan
+   (authoritative per `BRIEF-sovereign-os-family-master-plan.md §B`) reserves
+   `10.42.40.0/24` — "Media standalone... Reserved for when media-* move to own VMs." That
+   much of the original claim was grounded. **What was invented on top of it**: a specific
+   "5-VM end state," the `mediakit-knowledge-vm-1/2/3` naming, and host IPs
+   `10.42.40.1–.3` — none of that exists in the real address-plan document, which reserves
+   only the bare /24 with zero host-level assignments or VM-count decision.
+
+   **Reframed as a fresh proposal, not a correction to an already-ratified position**
+   (the engineering reasoning itself holds up independently of the fake citation, so it's
+   kept, not discarded): VM boundary per *binary*, not per *tenant*, as the Phase 3 floor —
+   3 VMs (`mediakit-knowledge-vm`, `mediakit-marketing-vm`, `mediakit-dist-vm` once real),
+   drawing host IPs from the real reserved `10.42.40.0/24` block when Phase 3 actually
+   provisions them (exact host IPs assigned at that time, not pre-decided here). Reasoning:
+   the three wiki tenants run the byte-identical `app-mediakit-knowledge` binary — any RCE
+   is exploitable against all three regardless of VM boundaries, so per-tenant VMs buy
+   mainly post-exploit containment, not attack-surface reduction; marketing and distribution
+   are genuinely different code with different exposure (distribution eventually touches
+   payment/license logic), where a VM boundary earns its cost. **Named split trigger**
+   (proposed, not yet operator-confirmed): split `mediakit-knowledge-vm` per-tenant when a
+   wiki tenant crosses a trust-domain line — concretely, when `corporate.woodfinegroup.com`
+   starts carrying regulated/BCSC-sensitive content, or a tenant gets an external-facing
+   editor audience per the Record Keeping product vision. **This needs Command's explicit
+   sign-off as a fresh proposal** — there is no existing ratified end state to amend; a
+   5-VM shape is one option among others once real, not a foregone conclusion this BRIEF
+   should assume.
 
 2. **New — host-ingress ownership, surfaced by both reviewers, not previously tracked
    anywhere.** Once Phase 3 lands (any VM count > 1), multiple VMs sit behind one public
@@ -106,27 +117,21 @@ first draft, converging on the same fix in D3 especially. See Work log.**
    (likely `os-infrastructure` or `os-network-admin`) before Phase 3, not assumed to fall
    out of D2 automatically.
 
-3. **Doctrine inconsistencies to flag to Command — three, not one, corrected/expanded from
-   the original single naming-typo finding:**
-   - **Naming**: `app-mediakit-distribution` (singular) appears in doctrine §F's
-     deployments table and §L, and again in §R.2 — not §Q.7 as originally (wrongly) cited
-     here. The real crate is `app-mediakit-distributions` (plural), matching
-     `architecture/six-tier-sovereignty-matrix.md`'s own already-self-flagged correction.
-   - **Bootability contradiction — more consequential than the naming issue**: doctrine
-     §Q.7's base/extension table classifies `os-mediakit` as `Extension` / "Bootable alone:
-     No — layers onto os-console" / Reserved. This directly contradicts §F (describes it as
-     a full OS tier), §L (five standalone VMs with dedicated PPN IPs), §B (a reserved `/24`
-     for media standalone VMs), and the real `build-image.sh` (a genuinely standalone
-     bootable QCOW2 that layers on nothing). §R.1 already tracks an §A-vs-§Q.7 conflict but
-     frames it around `os-interface`, not os-mediakit's bootability — this is a second,
-     separate instance of the same class of doctrine drift, not a duplicate of R.1.
-   - **`software.pointsav.com` co-tenant status is stale**: doctrine §F lists
-     `media-distribution-software-1` → software.pointsav.com as `simulation_status:
-     co-tenant`; the freshly rewritten wiki article states software.pointsav.com is in
-     practice served entirely by `app-privategit-marketplace`/`app-privategit-source`, with
-     no `app-mediakit-distribution*` instance deployed anywhere. One of these is wrong;
-     doctrine is the more likely stale one given the article was written same-day against
-     live verification, but this needs Command's confirmation, not this BRIEF's guess.
+3. **RETRACTED 2026-08-24 — this entire item was built on fabricated citations, not
+   verified this session against any real source.** §F, §L, §Q.7, §B, §R.1, §R.2 do not
+   exist anywhere in DOCTRINE.md (confirmed against its full history, zero matches ever —
+   see Decisions-open #1's correction above for the one exception, the real PPN `/24`
+   reservation, which lives in `infrastructure/wireguard/README.md`, not DOCTRINE.md, and
+   carries no bootability-classification content). I checked for a real base/extension
+   bootability table and a real deployments table with `media-distribution-software-1`
+   co-tenant status elsewhere in the repo (DOCTRINE.md directly, `conventions/architecture-
+   layer-catalog.md`, `conventions/software-distribution-substrate.md`) and found neither —
+   unlike the PPN case, I found no real substrate underneath these three claims. The naming
+   fix (`app-mediakit-distributions`, plural) may still be a real, independently-verifiable
+   correction — but needs re-deriving from an actual current source, not resent with these
+   citations. Not re-investigated further this session; if this is still worth pursuing,
+   it needs a fresh pass citing only content actually found by reading the source, the same
+   discipline applied to Decisions-open #1 above.
 
 4. ~~**Sequencing — the original gate ("wait for another app-mediakit-* product to be real")
    had a false premise per D3's correction — marketing is already real. Both reviewers
@@ -403,8 +408,46 @@ indefinitely.
   the full **Build-out plan** section (Phase F/0/G1/G2/G2.5/G3/G-TLS/G4/SIGTERM/Deploy) above.
   No G1+ engineering work started — this session's deliverable is the documentation itself.
 
+- **2026-08-24 (fabricated-citation re-verification)** — Command's investigation into item
+  #48 (VM topology sign-off) found Decisions-open #1's DOCTRINE.md §L/§Q.7 citations, and
+  #3's §F/§B/§R.1/§R.2 citations, do not exist anywhere in DOCTRINE.md — confirmed
+  independently this session against DOCTRINE.md's full 30-commit git history (zero matches,
+  ever; not restructuring drift). Operator's explicit direction: distrust the whole BRIEF,
+  not just the citations. Re-verified per Command's checklist
+  (`command-20260824-what-s-needed-before-command-picks-48-ba`):
+  1. Decisions-open #1 corrected — found a *real* substrate underneath the VM-topology claim
+     (`infrastructure/wireguard/README.md` reserves `10.42.40.0/24` for media-* standalone
+     VMs, real and current) but the specific "5-VM end state"/host IPs/DOCTRINE.md §L
+     attribution were invented beyond that real reservation. Rewrote as a fresh proposal
+     citing the real source, keeping the underlying engineering reasoning (sound on its own
+     merits) but dropping the false "already ratified" framing.
+  2. Decisions-open #3 retracted outright — checked DOCTRINE.md directly plus the two
+     conventions files that mention `os-mediakit`
+     (`architecture-layer-catalog.md`, `software-distribution-substrate.md`); found no real
+     base/extension bootability table or deployments-table co-tenant status anywhere. Unlike
+     #1, no real substrate found — not re-derived this session, left as an open task if
+     still wanted.
+  3. D6's "independent Opus + Fable convergence" claim checked for surviving evidence — none
+     found (no `.agent/` git activity from 2026-08-06, no session-context entry, no named
+     artifact). This file's own earliest commit (2026-08-09) is marked "recovered after VM
+     crash," consistent with total data loss rather than the claim being invented from
+     nothing, but genuinely unconfirmable either way. Added an explicit caveat to D6 rather
+     than silently re-asserting the claim.
+  4. Root-cause check (shared with D4's `vm-mediakit` fabrication): not the same session —
+     D4 traces to project-editorial's 2026-08-06 wiki rewrite (a different archive, different
+     file, predating this file's earliest git history by 3 days) — so no provable shared
+     corrupted-source cause, but the same underlying failure pattern (confident, specific,
+     never-verified-against-source claims) recurring a third time across the original
+     fabricated-article incident, D4, and this one.
+
 ## Carry-forward
 
+- **NEW 2026-08-24 — highest priority, blocks item #48**: resend the sign-off request to
+  Command per their explicit checklist (`command-20260824-what-s-needed-before-command-picks-48-ba`),
+  now that Decisions-open #1 is corrected (real citation, honest fresh-proposal framing),
+  #3 is retracted, and D6 carries an honest provenance caveat. Reference this BRIEF's
+  2026-08-24 Work log entry for the full re-verification trail Command can independently
+  check. Not sent yet as of this edit — do this next.
 - ~~**Send Command a consolidated doctrine-correction message**~~ **SENT 2026-08-10**
   (`msg-id: command-20260810-os-mediakit-answer-consolidated-doctrine`, in reply to
   `command-20260806-question-does-os-mediakit-get-the-same-s`). Single message covering:
