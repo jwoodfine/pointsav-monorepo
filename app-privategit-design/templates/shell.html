@@ -1,6 +1,9 @@
 <!--
-  SPDX-License-Identifier: AGPL-3.0-or-later
+  SPDX-License-Identifier: FSL-1.1-ALv2
   SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
+-->
+
+<!--
 -->
 
 <!DOCTYPE html>
@@ -46,12 +49,11 @@
 <a href="/components/button/usage">{{ nav_components }}</a>
 <!-- Restructured 2026-07-16 (IA coherence audit, Opus): the old single "More"
      dropdown grouped 5 unrelated domains (Guidelines/Elements/Adoption/Agents/
-     Releases) behind one vague label -- the clearest "ad-hoc growth" tell per
-     real Carbon/Primer/Polaris precedent. Split into two honest groupings:
-     design guidance (this dropdown -- Accessibility + Elements, surfaced right
-     next to Tokens/Components rather than buried) and developer-facing docs
-     (Develop, below -- Self-host/Agents/Releases, a real Carbon-style "Get
-     started"/"Develop" bucket). -->
+     Releases) behind one vague label -- a classic "ad-hoc growth" tell. Split
+     into two honest groupings: design guidance (this dropdown -- Accessibility
+     + Elements, surfaced right next to Tokens/Components rather than buried)
+     and developer-facing docs (Develop, below -- Self-host/Agents/Releases, a
+     standard "Get started"/"Develop" bucket). -->
 <details class="site-nav__dropdown">
 <summary aria-controls="site-nav-guidelines-panel">{{ nav_guidelines }}</summary>
 <div class="site-nav__dropdown-panel" id="site-nav-guidelines-panel" role="group" aria-label="{{ nav_guidelines }}">
@@ -129,7 +131,7 @@
 </div>
 </header>
 <div class="layout">
-{% if nav_html %}<nav class="sidebar" aria-label="Sections">{{ nav_html | safe }}</nav>{% endif %}
+{% if nav_html %}<nav class="sidebar" aria-label="{% if path == '/tokens' %}Token tiers{% else %}Components{% endif %}">{{ nav_html | safe }}</nav>{% endif %}
 <main class="main" id="main-content">
 {{ tab_bar | safe }}
 {% if page_title %}<h1 class="page-title">{{ page_title }}</h1>
@@ -141,7 +143,14 @@
 {% if nav_html %}
 <script>
 (function(){
-var parts='{{ path }}'.split('/');
+// Live-audit finding (2026-08-04): '{{ path }}' is HTML-entity-escaped by minijinja's
+// autoescape (/ -> &#x2f;) when interpolated here, and browsers do NOT decode entities
+// inside <script> content -- so splitting that string on '/' never found a real slash,
+// even before the components-only guard below existed (parts[2] was always undefined,
+// so slug was always ''). Reading location.pathname instead sidesteps the escaping
+// entirely -- same pattern edit.js already uses for the same reason.
+var parts=location.pathname.split('/');
+if(parts[1] !== 'components') return;
 var slug=parts[2]||'';
 var _es=new EventSource('/sidebar/sse?lang={{ lang }}&section=components&slug='+encodeURIComponent(slug));
 _es.onmessage=function(e){var n=document.querySelector('nav.sidebar');if(n)n.innerHTML=e.data;};
@@ -150,8 +159,8 @@ _es.onmessage=function(e){var n=document.querySelector('nav.sidebar');if(n)n.inn
 {% endif %}
 <script defer src="/static/nav-dropdown.js"></script>
 <script defer src="/static/drawer.js"></script>
-<script defer src="/static/edit.js"></script>
-<script defer src="/static/tokens-gallery.js"></script>
+<script defer src="/static/edit.js"></script><script defer src="/static/tokens-gallery.js"></script>
+<script defer src="/static/tokens-scrollspy.js"></script>
 <script defer src="/static/code-copy.js"></script>
 <script defer src="/static/search.js"></script>
 <script defer src="/static/theme-toggle.js"></script>

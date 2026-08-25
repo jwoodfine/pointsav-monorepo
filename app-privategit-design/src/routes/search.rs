@@ -1,5 +1,6 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
+
 
 use crate::{state::AppState, vault};
 use axum::{
@@ -38,11 +39,19 @@ pub async fn token_search(
             .into_iter()
             .take(20)
             .map(|doc| {
+                // Live-audit finding (2026-08-04): this used to also emit "id":doc.id --
+                // doc.id is the document's absolute filesystem path (moonshot_index's
+                // internal identifier), which leaked the production server's real
+                // deployment path (e.g. "/srv/foundry-prod/deployments/
+                // vault-privategit-design-1/...") on this public JSON API, confirmed
+                // live. static/search.js only ever reads `.url`/`.title`/`.snippet` --
+                // never `.id` -- so the field was pure leaked implementation detail
+                // with no consumer. Dropped entirely rather than sanitized, since
+                // nothing needs it.
                 let snippet = snippet(&doc.body, &q);
                 let url = doc_url(&doc.id, &state.vault);
                 format!(
-                    "{{\"id\":{},\"title\":{},\"snippet\":{},\"url\":{}}}",
-                    json_str(&doc.id),
+                    "{{\"title\":{},\"snippet\":{},\"url\":{}}}",
                     json_str(&doc.title),
                     json_str(&snippet),
                     json_str(&url)
