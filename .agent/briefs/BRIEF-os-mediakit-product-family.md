@@ -200,29 +200,63 @@ first draft, converging on the same fix in D3 especially. See Work log.**
    the start (Build-out plan, Phase 0) — verify the vendored Makefile's `BUILD_DIR` support
    directly before relying on it, don't assume.
 
-7. **NEW 2026-08-10 — `os-mediakit.qcow2` (Format B) does not boot to a working state;
-   root cause not isolated.** First real end-to-end smoke test (this session): booted
-   headless under `qemu-system-x86_64` with `-snapshot` (artifact confirmed unmutated,
-   sha256 matched before/after), hostfwd'd to non-colliding ports. Kernel/GRUB/root-fs
-   (mounted by `PARTUUID`) all came up cleanly, but `/dev/disk/by-label/BOOT` and a second
-   by-label device (`boot-efi.mount`'s dependency) both timed out at systemd's 90s device
-   wait, `local-fs.target` failed, and the guest dropped into emergency mode and stayed
-   there — none of the 3 wiki systemd units ever started, all 3 `/healthz` endpoints
-   unreachable for the full observation window. `build-image.sh` itself has zero
-   partition/label/mkfs logic (it only customizes an already-partitioned base Ubuntu cloud
-   image via `qemu-nbd`), so this is either (a) a genuine defect already present in the
-   shipped artifact — possibly introduced by the `qemu-nbd`-based customization/resize
-   step, or inherited unnoticed from the base cloud image's own UEFI-oriented partition
-   layout — or (b) a udev/by-label-symlink timing artifact specific to slow QEMU/TCG
-   emulation (no `/dev/kvm` on this host) that would not reproduce under KVM. **Not
-   distinguished between these two — needs either a KVM-capable host retest, a longer
-   systemd device-timeout kernel arg, or a direct look at the partition table/labels via
-   `qemu-nbd` mount to settle it.** Until resolved: BRIEF-binary-distribution.md's claim
-   that "Format B ... LIVE 2026-07-01" should be treated as **unverified at the boot
-   level**, not confirmed-working — Command's 2026-07-01 confirmation was of the upload/
-   listing going live on software.pointsav.com, not evidence anyone booted the image
-   end-to-end. Real customer impact if uninvestigated: BETA customers downloading Format B
+7. **UPDATED 2026-08-25 — Phase F root-cause done: (a) ruled out, points to (b).**
+   `os-mediakit.qcow2` still does not boot to a working state (2026-08-10 finding
+   below stands), but the direct `qemu-nbd` partition/label inspection this BRIEF's own
+   Phase F called for is now done, settling which of the two hypotheses is real.
+
+   Connected the artifact read-only via `qemu-nbd` (sha256 verified unmutated before
+   and after — `cf7b2dc4...`), inspected without booting:
+   - Partition table: standard GPT, 4 partitions (`p1` root 2.5G, `p14` BIOS-boot 4M,
+     `p15` EFI System 106M, `p16` extended-boot 913M) — exactly the shape a genuine
+     Ubuntu 24.04 cloud image should have. No corruption, no missing partitions.
+   - Filesystem labels: `p15` = `UEFI` (vfat), `p16` = `BOOT` (ext4) — both present,
+     both correctly formatted. Mounted `p1` (root) and `p16` (`/boot`) directly, both
+     mount cleanly with no filesystem errors.
+   - `/etc/fstab` on the root partition: `LABEL=BOOT /boot`, `LABEL=UEFI /boot/efi` —
+     matches the on-disk labels exactly. (The original boot log's truncated "U…" is
+     now confirmed to be "UEFI", not some other unexpected label.)
+   - `/boot`'s own contents (kernel, initramfs, grub.cfg) are intact and well-formed;
+     grub's kernel cmdline uses `root=PARTUUID=...` (matching the root partition's real
+     PARTUUID) with no custom `systemd.device-timeout=`/`rd.timeout=` argument — boots
+     with systemd's stock 90s default, consistent with the observed "timed out at 90s"
+     symptom.
+
+   **Conclusion: hypothesis (a) — a real defect in the shipped artifact — is ruled
+   out.** The partition table, filesystem labels, and fstab are internally consistent
+   and correctly matched; there is nothing wrong with the disk image itself. This
+   leaves **hypothesis (b) — a udev/by-label-symlink timing artifact specific to slow
+   QEMU/TCG software emulation (no `/dev/kvm` on this host)** as the far more likely
+   explanation, though a KVM-capable-host retest is still the only way to fully confirm
+   it rather than infer it by elimination. **Recommended next step, cheap and
+   low-risk**: add `systemd.device-timeout=300` (or similar) to the grub kernel cmdline
+   and re-run the original boot smoke test — if that alone gets the guest past
+   `local-fs.target`, it confirms (b) conclusively and is a real, shippable fix
+   (widening a timeout, not patching around a defect). Not yet attempted this session.
+
+   Until that retest lands, `BRIEF-binary-distribution.md`'s claim that "Format B ...
+   LIVE 2026-07-01" should still be treated as **unverified at the boot level**, not
+   confirmed-working — Command's 2026-07-01 confirmation was of the upload/listing
+   going live on software.pointsav.com, not evidence anyone booted the image end to
+   end. Real customer impact if uninvestigated: BETA customers downloading Format B
    today may hit this same emergency-mode hang.
+
+   <details><summary>2026-08-10 original finding (superseded above, kept for record)</summary>
+
+   First real end-to-end smoke test (that session): booted headless under
+   `qemu-system-x86_64` with `-snapshot` (artifact confirmed unmutated, sha256 matched
+   before/after), hostfwd'd to non-colliding ports. Kernel/GRUB/root-fs (mounted by
+   `PARTUUID`) all came up cleanly, but `/dev/disk/by-label/BOOT` and a second by-label
+   device (`boot-efi.mount`'s dependency) both timed out at systemd's 90s device wait,
+   `local-fs.target` failed, and the guest dropped into emergency mode and stayed there
+   — none of the 3 wiki systemd units ever started, all 3 `/healthz` endpoints
+   unreachable for the full observation window. `build-image.sh` itself has zero
+   partition/label/mkfs logic (it only customizes an already-partitioned base Ubuntu
+   cloud image via `qemu-nbd`), so this was either (a) a genuine defect already present
+   in the shipped artifact, or (b) a udev/by-label-symlink timing artifact — not
+   distinguished at the time.
+
+   </details>
 
 ## Build-out plan — bootable seL4/Microkit os-mediakit running app-mediakit-knowledge
 

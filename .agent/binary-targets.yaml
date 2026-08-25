@@ -56,11 +56,17 @@ targets:
       timed out) for the full observation window.
       `os-mediakit/scripts/build-image.sh` itself contains zero partition/label/mkfs
       logic — it only customizes an already-partitioned base Ubuntu cloud image via
-      qemu-nbd — so this is either (a) a real defect already present in the shipped
+      qemu-nbd — so this was either (a) a real defect already present in the shipped
       artifact, or (b) a udev/by-label-symlink timing artifact specific to slow
-      QEMU/TCG software emulation (no /dev/kvm on this host) that would not reproduce
-      under KVM. Not yet distinguished between (a) and (b) — needs either a KVM-capable
-      host retest or a longer systemd device-timeout kernel arg to isolate. **Until this
-      is resolved, "Format B is live and working" should be treated as unverified, not
-      confirmed** — full detail and the open follow-up are in
-      BRIEF-os-mediakit-product-family.md.
+      QEMU/TCG software emulation (no /dev/kvm on this host).
+
+      **UPDATE 2026-08-25 — Phase F root cause done, (a) ruled out.** Mounted the same
+      artifact (sha256 re-verified unchanged) read-only via qemu-nbd and inspected the
+      partition table/labels/fstab directly, without booting: GPT layout, filesystem
+      labels (UEFI, BOOT), and /etc/fstab are all present, correctly formatted, and
+      mutually consistent — no defect in the shipped image. This rules out (a) and
+      leaves (b) — a TCG/udev timing artifact under software emulation — as the
+      remaining explanation, still to be confirmed by either a KVM-capable-host retest
+      or adding a longer systemd.device-timeout= kernel arg and re-booting. **Until that
+      retest lands, "Format B is live and working" remains unverified, not confirmed**
+      — full detail in BRIEF-os-mediakit-product-family.md's Decisions-open #7.
