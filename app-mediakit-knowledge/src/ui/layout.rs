@@ -15,6 +15,7 @@ use serde_json::json;
 use super::tenant::Tenant;
 use crate::content::frontmatter::Author;
 use crate::content::render::Heading;
+use crate::content::IndexTopic;
 use crate::history::{FileDiff, Revision};
 use crate::legal::LegalTokens;
 
@@ -124,6 +125,21 @@ pub fn doc_head(title: &str, description: &str, tenant: Tenant, path: &str, noin
         script {
             (PreEscaped(r#"(function(){try{var t=localStorage.getItem('k-theme');if(t!=='light'&&t!=='dark'){t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();"#))
         }
+        // Pre-paint nav-collapse guard — mirrors the theme guard above, but in
+        // the opposite direction: collapsed is the CSS *default* (no rule to
+        // race), so this only matters for a reader who previously chose
+        // "open" (key 'k-nav', shared with app.js's initNavCollapse()).
+        script {
+            (PreEscaped(r#"(function(){try{if(localStorage.getItem('k-nav')==='open'){document.documentElement.setAttribute('data-nav','open');}}catch(e){}})();"#))
+        }
+        // No-JS fallback: without JavaScript there is no way to reach the
+        // toggle button, so the browse nav must stay reachable regardless —
+        // force it open and hide the now-inert (non-functional) toggle.
+        noscript {
+            style {
+                ".k-sidebar--reading .k-sidenav__browse{display:block}.k-sidebar--reading .k-nav-toggle{display:none}"
+            }
+        }
     }
 }
 
@@ -137,9 +153,14 @@ fn search_block(input_id: &str, query: &str) -> Markup {
                 }
                 label."k-visually-hidden" for=(input_id) { "Search this registry" }
                 input."k-search__input" id=(input_id) type="search" name="q" value=(query)
-                    placeholder="Search" autocomplete="off" spellcheck="false";
+                    placeholder="Search" autocomplete="off" spellcheck="false"
+                    role="combobox" aria-expanded="false" aria-autocomplete="list"
+                    aria-controls={ (input_id) "-suggest" };
                 button."k-search__button" type="submit" { "Search" }
             }
+            // Populated client-side from `/api/search-suggest` — a real
+            // UX-review finding: search had no suggestions/typeahead at all.
+            ul."k-search__suggestions" id={ (input_id) "-suggest" } role="listbox" hidden {}
         }
     }
 }
@@ -222,7 +243,14 @@ pub fn header(tenant: Tenant, _lang: &str, query: &str) -> Markup {
 }
 
 /// Off-canvas mobile nav drawer + overlay (ships hidden; app.js manages state).
-pub fn mobile_nav(tenant: Tenant, query: &str) -> Markup {
+pub fn mobile_nav(tenant: Tenant, query: &str, cats: &[(String, String, String)]) -> Markup {
+    // Same split `sidebar()` uses — the drawer previously dropped the wiki
+    // entirely at mobile widths (search/Navigate/Resources/external links
+    // only, no category browse at all; a real UX-review finding).
+    let topics: Vec<&(String, String, String)> =
+        cats.iter().filter(|(_, _, kind)| kind != "guide").collect();
+    let guides: Vec<&(String, String, String)> =
+        cats.iter().filter(|(_, _, kind)| kind == "guide").collect();
     html! {
         div."k-overlay" #"k-overlay" hidden {}
         div."k-nav-drawer" #"k-nav-drawer" role="dialog" aria-modal="true"
@@ -243,6 +271,26 @@ pub fn mobile_nav(tenant: Tenant, query: &str) -> Markup {
                         li { a."k-nav-link" href="/" { "Home" } }
                         li { a."k-nav-link" href="/special/all-pages" { "Index of record" } }
                         li { a."k-nav-link" href="/special/recent-changes" { "Recent changes" } }
+                    }
+                }
+                @if !topics.is_empty() {
+                    section."k-nav-section" {
+                        h2."k-nav-section__title" { "Topics" }
+                        ul."k-nav-list" {
+                            @for (slug, label, _) in &topics {
+                                li { a."k-nav-link" href={ "/category/" (slug) } { (label) } }
+                            }
+                        }
+                    }
+                }
+                @if !guides.is_empty() {
+                    section."k-nav-section" {
+                        h2."k-nav-section__title" { "Guides" }
+                        ul."k-nav-list" {
+                            @for (slug, label, _) in &guides {
+                                li { a."k-nav-link" href={ "/category/" (slug) } { (label) } }
+                            }
+                        }
                     }
                 }
                 section."k-nav-section" {
@@ -439,13 +487,25 @@ fn format_date(iso: &str) -> String {
 /// "article" or "history"; the current one is a non-link span, the other links.
 /// (No "Notes" placeholder — a reviewer-annotation channel ships as a real tab or
 /// not at all; no dead controls in front of auditors.)
-fn tab_bar(slug: &str, active: &str) -> Markup {
+/// `active` is "article" or "history" — the current one is a non-link span,
+/// the other links. `slug` is always the *content's own file slug* (used for
+/// the History link regardless of `hub`; an Index Topic's own slug, e.g.
+/// `security-index`, not its category id). `hub`, when `Some(category_slug)`,
+/// is what makes this the Index Topic variant: the first tab reads
+/// "Overview" and links to `/category/{category_slug}` — the canonical hub
+/// URL a reader should land back on — instead of "Article" →
+/// `/wiki/{slug}`. `None` is the ordinary-article behavior, unchanged.
+fn tab_bar(slug: &str, active: &str, hub: Option<&str>) -> Markup {
+    let (first_label, first_href) = match hub {
+        Some(category_slug) => ("Overview", format!("/category/{category_slug}")),
+        None => ("Article", format!("/wiki/{slug}")),
+    };
     html! {
         nav."k-tabs" aria-label="Views" {
             @if active == "article" {
-                span."k-tab k-tab--active" aria-current="page" { "Article" }
+                span."k-tab k-tab--active" aria-current="page" { (first_label) }
             } @else {
-                a."k-tab" href={ "/wiki/" (slug) } { "Article" }
+                a."k-tab" href=(first_href) { (first_label) }
             }
             @if active == "history" {
                 span."k-tab k-tab--active" aria-current="page" { "History" }
@@ -461,6 +521,12 @@ fn tab_bar(slug: &str, active: &str) -> Markup {
 /// `sha` is the short commit hash the render is drawn from (provenance line);
 /// `asof` is set only for the point-in-time view (a historical revision) and
 /// carries that revision's date, which switches the meta label + shows a banner.
+/// `badge` is a plain-text content-type label next to the H1 (currently only
+/// "Index"/"Índice" for Index Topics — ordinary TOPIC/GUIDE articles pass
+/// `None`; there's no icon or color block, matching the site's understated
+/// register). The caller resolves the exact label string (language included)
+/// since it already knows which language the loaded file actually is.
+#[allow(clippy::too_many_arguments)]
 pub fn article(
     title: &str,
     slug: &str,
@@ -468,12 +534,19 @@ pub fn article(
     sha: Option<&str>,
     asof: Option<&str>,
     alt_lang: Option<(&str, &str)>,
+    badge: Option<&str>,
     body_html: &str,
+    // Adjacent articles in the same category, by title order — `(slug, title)`.
+    // `None`/`None` when the article has no category or sits at either end
+    // of it. A real UX-review finding: no prev/next navigation existed
+    // anywhere, forcing article -> back to category -> next article.
+    prev: Option<(&str, &str)>,
+    next: Option<(&str, &str)>,
 ) -> Markup {
     html! {
         article."k-article" {
             div."k-article-nav" {
-                (tab_bar(slug, "article"))
+                (tab_bar(slug, "article", None))
                 @if updated.is_some() || asof.is_some() || sha.is_some() {
                     p."k-article__meta" {
                         @if let Some(d) = asof {
@@ -499,8 +572,29 @@ pub fn article(
                     a."k-asof__link" href={ "/wiki/" (slug) } { "View the current record \u{2192}" }
                 }
             }
-            h1."k-article__title" { (title) }
+            h1."k-article__title" {
+                (title)
+                @if let Some(b) = badge {
+                    span."k-content-badge" { (b) }
+                }
+            }
             div."k-prose" { (PreEscaped(body_html)) }
+            @if prev.is_some() || next.is_some() {
+                nav."k-article-pager" aria-label="Article navigation" {
+                    @if let Some((p_slug, p_title)) = prev {
+                        a."k-article-pager__link"."k-article-pager__link--prev" href={ "/wiki/" (p_slug) } {
+                            span."k-article-pager__dir" { "\u{2190} Previous" }
+                            span."k-article-pager__title" { (p_title) }
+                        }
+                    }
+                    @if let Some((n_slug, n_title)) = next {
+                        a."k-article-pager__link"."k-article-pager__link--next" href={ "/wiki/" (n_slug) } {
+                            span."k-article-pager__dir" { "Next \u{2192}" }
+                            span."k-article-pager__title" { (n_title) }
+                        }
+                    }
+                }
+            }
             @if asof.is_none() {
                 // Print-only citation stamp (Phase 9 — .k-print-citation is
                 // display:none on screen, shown only in @media print).
@@ -526,7 +620,7 @@ pub fn article(
 pub fn history_page(title: &str, slug: &str, issuer: &str, revs: &[Revision]) -> Markup {
     html! {
         article."k-article" {
-            div."k-article-nav" { (tab_bar(slug, "history")) }
+            div."k-article-nav" { (tab_bar(slug, "history", None)) }
             h1."k-article__title" { (title) }
             div."k-home__stat" { strong { (revs.len()) } " " (count_word_rev(revs.len())) }
             p."k-history__note" {
@@ -575,7 +669,7 @@ fn diff_line_class(origin: char) -> &'static str {
 pub fn diff_page(title: &str, slug: &str, issuer: &str, diff: &FileDiff) -> Markup {
     html! {
         article."k-article" {
-            div."k-article-nav" { (tab_bar(slug, "history")) }
+            div."k-article-nav" { (tab_bar(slug, "history", None)) }
             h1."k-article__title" { (title) }
             div."k-diff__head" {
                 a."k-diff__back" href={ "/history/" (slug) } { "\u{2190} All revisions" }
@@ -693,6 +787,113 @@ pub fn category_index(label: &str, docs: &[(String, String, String)]) -> Markup 
     }
 }
 
+/// The header + chrome above an Index Topic rendered at its category's own
+/// `/category/{slug}` URL. Unified with the ordinary Article chrome — tab
+/// bar (Overview/History) + "Last updated · sha" — rather than the plain
+/// `.k-catpage__eyebrow` label: an Index Topic is real, file-backed,
+/// human-authored content with real git history, same as any other article,
+/// so a plain metadata eyebrow with no history/provenance would be
+/// dishonest chrome. The eyebrow itself is untouched and still used by
+/// every category that does *not* have `index_type:` set — those are
+/// genuinely engine-synthesized listings with no file/history/sha behind
+/// them (see `category_index()`) — this is a deliberate scope boundary
+/// ("chrome follows provenance"), not an inconsistency.
+///
+/// `index_slug` is the `_index.md` file's own slug (e.g. `security-index`)
+/// — used for the History tab's link, since that resolves against the
+/// file's real slug, not the category id. `category_slug` is only used for
+/// the Overview tab's link and the safety-net link — the canonical URL a
+/// reader should land back on is the category page, not the raw file route.
+/// `total` is the category's real article count
+/// (`ContentIndex::in_category(name).len()`), not the sum of the Index
+/// Topic's own group counts — the two can legitimately differ.
+pub fn index_topic_header(
+    label: &str,
+    total: usize,
+    category_slug: &str,
+    index_slug: &str,
+    updated: Option<&str>,
+    sha: Option<&str>,
+) -> Markup {
+    html! {
+        div."k-article-nav" {
+            (tab_bar(index_slug, "article", Some(category_slug)))
+            @if updated.is_some() || sha.is_some() {
+                p."k-article__meta" {
+                    @if let Some(d) = updated.filter(|s| !s.trim().is_empty()) {
+                        "Last updated "
+                        time."k-article__date" datetime=(d) { (format_date(d)) }
+                    }
+                    @if let Some(s) = sha {
+                        " \u{00b7} " code."k-article__sha" { (s) }
+                    }
+                }
+            }
+        }
+        h1."k-article__title" { (label) }
+        p."k-index-topic__see-all" {
+            a href={ "/category/" (category_slug) "?view=all" } {
+                "See all " (total) " " (count_word(total)) " in " (label) " \u{2192}"
+            }
+        }
+    }
+}
+
+/// An Index Topic's body: the highlighted "start here" pick, each curated
+/// group with a live member-count pill and calm annotated link list, then any
+/// trailing prose ("What this is not", "See also") as authored.
+///
+/// The "start here" block is rendered as a styled card containing its
+/// `prose_html` as-is — deliberately *not* also wrapped in a separate `<a
+/// href=(sh.href)>`: `prose_html` already contains its own inline link (the
+/// wikilink resolved as part of "**Start here:** [[...]]..."), and wrapping
+/// that in another anchor would nest `<a>` inside `<a>` — invalid HTML and an
+/// ambiguous click target. `StartHere.href`/`.label` exist for callers that
+/// need the target structurally (e.g. future structured data), not for this
+/// render.
+///
+/// Each member's wikilink, by contrast, *is* rendered as a distinct link
+/// (`m.href`/`m.label`) followed by `annotation_html` — `parse_index_topic`
+/// already strips the wikilink out of the annotation text, so there's no
+/// duplication risk there.
+pub fn index_topic_body(topic: &IndexTopic) -> Markup {
+    html! {
+        div."k-index-topic" {
+            @if !topic.intro_html.is_empty() {
+                div."k-prose" { (PreEscaped(topic.intro_html.clone())) }
+            }
+            @if let Some(sh) = &topic.start_here {
+                aside."k-index-topic__start-here" aria-label="Start here" {
+                    span."k-index-topic__start-here-eyebrow" { "Start here" }
+                    div."k-prose" { (PreEscaped(sh.prose_html.clone())) }
+                }
+            }
+            @for group in &topic.groups {
+                section."k-index-group" {
+                    div."k-index-group__head" {
+                        h2."k-index-group__title" { (group.title) }
+                        span."k-index-group__count" { (group.count()) " " (count_word(group.count())) }
+                    }
+                    @if let Some(intro) = &group.intro_html {
+                        div."k-prose k-index-group__intro" { (PreEscaped(intro.clone())) }
+                    }
+                    ul."k-index-list" {
+                        @for m in &group.members {
+                            li."k-index-list__item" {
+                                a."k-index-list__link" href=(m.href) { (m.label) }
+                                span."k-index-list__annotation" { (PreEscaped(m.annotation_html.clone())) }
+                            }
+                        }
+                    }
+                }
+            }
+            @if !topic.tail_html.is_empty() {
+                div."k-prose k-index-topic__tail" { (PreEscaped(topic.tail_html.clone())) }
+            }
+        }
+    }
+}
+
 /// A generic index page — "Index of record" (A–Z all articles) and "Recent
 /// changes". `items` is `(slug, title, meta)`; `meta` is a description or a date.
 pub fn special_list(heading: &str, eyebrow: &str, items: &[(String, String, String)]) -> Markup {
@@ -730,7 +931,9 @@ pub fn search_results(query: &str, results: &[(String, String, String)]) -> Mark
     let q = query.trim();
     html! {
         div."k-catpage" {
-            div."k-catpage__eyebrow" { "Search" }
+            // No eyebrow here, unlike other `.k-catpage` renders — the H1
+            // already reads "Search" one line below; the eyebrow would just
+            // repeat it verbatim (a real UX-review finding, 2026-08-23).
             h1."k-article__title" { "Search" }
             // The header search bar carries the query — no second on-page box.
             @if q.is_empty() {
@@ -759,40 +962,116 @@ pub fn search_results(query: &str, results: &[(String, String, String)]) -> Mark
     }
 }
 
-/// The left navigation column (Wikipedia Vector 2022 pattern): Main page,
-/// Browse-by-area, Guides. Sticky on desktop; hidden below the tablet breakpoint
-/// where the off-canvas drawer covers navigation. `cats` is `(slug, label)`.
-fn sidebar(tenant: Tenant, cats: &[(String, String)], toc: &[Heading]) -> Markup {
+/// Article table of contents — a `k-sidenav__group` on its own, present only
+/// on pages with headings. Extracted so `sidebar()` can place it either above
+/// or below the browse nav depending on whether this is a "reading page".
+fn toc_nav(toc: &[Heading]) -> Markup {
     html! {
-        aside."k-sidebar" aria-label="Site navigation" {
+        @if !toc.is_empty() {
+            nav."k-sidenav__group k-toc" aria-label="Contents" {
+                h2."k-sidenav__heading" { "Contents" }
+                ul."k-toc__list" {
+                    @for h in toc {
+                        li."k-toc__item"."k-toc__item--sub"[h.level == 3] {
+                            a."k-toc__link" href={ "#" (h.id) } { (h.text) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// The left navigation column (Wikipedia Vector 2022 pattern): Main page,
+/// [Contents], Topics, Guides. Sticky on desktop; hidden below the tablet
+/// breakpoint where the off-canvas drawer covers navigation. `cats` is
+/// `(slug, label, kind)` — `kind` (`"topic"`/`"guide"`, from
+/// `categories.yaml`, see `sitedata::Category`) is the section a category
+/// renders under. Reading it structurally, rather than hardcoding a
+/// `how-to`-id special case (the previous approach), fixes a real duplicate —
+/// `how-to` used to render both in the flat category list AND in a separate
+/// hardcoded "Guides" block — and means a future guide-category split needs
+/// zero engine change: a new category just carries `kind: guide` and appears
+/// in the right section automatically. Anything not `"guide"` renders under
+/// Topics (not just `"topic"` exactly) so a missing/malformed `kind` value
+/// never silently drops a category from the nav.
+///
+/// A page with a non-empty `toc` is a "reading page" (the current-article and
+/// as-of-revision views — every other page type passes `&[]`, and Index Topic
+/// pages do too, deliberately, so they keep the full browse sidebar "for
+/// free" as a browsing surface). On a reading page: the TOC renders first
+/// (the article's own contents, not buried under the full category list), a
+/// `.k-sidebar--reading` marker class is added, and the Topics/Guides nav is
+/// CSS-default-collapsed behind a toggle button — see `.k-sidebar--reading`
+/// in `app.css` and `initNavCollapse()` in `app.js`.
+/// `current_category` marks the active Topics/Guides link with `aria-current`
+/// (a real UX-review finding: no "you are here" existed anywhere in the
+/// sidebar). `siblings` — `(slug, title)`, current article already excluded
+/// by the caller — renders an "In this topic" list above the Browse toggle,
+/// the single structural feature every hyperscaler-docs benchmark shares
+/// that this engine previously lacked entirely.
+fn sidebar(
+    cats: &[(String, String, String)],
+    toc: &[Heading],
+    current_category: Option<&str>,
+    siblings: &[(String, String)],
+) -> Markup {
+    let reading = !toc.is_empty();
+    let topics: Vec<&(String, String, String)> =
+        cats.iter().filter(|(_, _, kind)| kind != "guide").collect();
+    let guides: Vec<&(String, String, String)> =
+        cats.iter().filter(|(_, _, kind)| kind == "guide").collect();
+    let has_browse = !cats.is_empty();
+    html! {
+        aside."k-sidebar"."k-sidebar--reading"[reading] aria-label="Site navigation" {
             nav."k-sidenav" {
                 a."k-sidenav__home" href="/" { "Main page" }
-                @if !cats.is_empty() {
+                (toc_nav(toc))
+                @if !siblings.is_empty() {
                     div."k-sidenav__group" {
-                        h2."k-sidenav__heading" { "Browse by area" }
+                        h2."k-sidenav__heading" { "In this topic" }
                         ul."k-sidenav__list" {
-                            @for (slug, label) in cats {
-                                li { a."k-sidenav__link" href={ "/category/" (slug) } { (label) } }
+                            @for (slug, title) in siblings {
+                                li { a."k-sidenav__link" href={ "/wiki/" (slug) } { (title) } }
                             }
                         }
                     }
                 }
-                @if tenant.serves_guides() {
-                    div."k-sidenav__group" {
-                        h2."k-sidenav__heading" { "Guides" }
-                        ul."k-sidenav__list" {
-                            li { a."k-sidenav__link" href="/category/how-to" { "How-to guides" } }
-                        }
+                @if has_browse {
+                    button."k-nav-toggle" type="button"
+                        aria-expanded="false" aria-controls="k-sidenav-browse" {
+                        "Browse"
                     }
-                }
-                // Article table of contents (present only on pages with headings).
-                @if !toc.is_empty() {
-                    nav."k-sidenav__group k-toc" aria-label="Contents" {
-                        h2."k-sidenav__heading" { "Contents" }
-                        ul."k-toc__list" {
-                            @for h in toc {
-                                li."k-toc__item"."k-toc__item--sub"[h.level == 3] {
-                                    a."k-toc__link" href={ "#" (h.id) } { (h.text) }
+                    nav."k-sidenav__browse" #"k-sidenav-browse" {
+                        @if !topics.is_empty() {
+                            div."k-sidenav__group" {
+                                h2."k-sidenav__heading" { "Topics" }
+                                ul."k-sidenav__list" {
+                                    @for (slug, label, _) in &topics {
+                                        @let active = current_category == Some(slug.as_str());
+                                        li {
+                                            a."k-sidenav__link"
+                                                href={ "/category/" (slug) }
+                                                aria-current=[active.then_some("page")]
+                                                { (label) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        @if !guides.is_empty() {
+                            div."k-sidenav__group" {
+                                h2."k-sidenav__heading" { "Guides" }
+                                ul."k-sidenav__list" {
+                                    @for (slug, label, _) in &guides {
+                                        @let active = current_category == Some(slug.as_str());
+                                        li {
+                                            a."k-sidenav__link"
+                                                href={ "/category/" (slug) }
+                                                aria-current=[active.then_some("page")]
+                                                { (label) }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -1121,13 +1400,15 @@ pub fn page(
     lang: &str,
     head: Markup,
     body: Markup,
-    cats: &[(String, String)],
+    cats: &[(String, String, String)],
     toc: &[Heading],
     query: &str,
     disclaimer: Option<&str>,
     legal: &LegalTokens,
     site_description: Option<&str>,
     article_count: usize,
+    current_category: Option<&str>,
+    siblings: &[(String, String)],
 ) -> Markup {
     html! {
         (DOCTYPE)
@@ -1135,13 +1416,13 @@ pub fn page(
             head { (head) }
             body {
                 a."k-skip-link" href="#k-main" { "Skip to content" }
-                (mobile_nav(tenant, query))
+                (mobile_nav(tenant, query, cats))
                 div."k-page" {
                     (print_brand_mark(tenant, site_description))
                     (utility_bar(tenant))
                     (header(tenant, lang, query))
                     div."k-shell" {
-                        (sidebar(tenant, cats, toc))
+                        (sidebar(cats, toc, current_category, siblings))
                         main."k-page__body" #"k-main" tabindex="-1" { (body) }
                     }
                     (compliance_band(tenant, disclaimer))

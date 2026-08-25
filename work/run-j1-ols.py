@@ -35,7 +35,7 @@ import matplotlib.patches as mpatches
 import os, warnings
 warnings.filterwarnings('ignore')
 
-DATA_DIR = '/srv/foundry/clones/project-gis/pointsav-monorepo/app-orchestration-gis/work'
+DATA_DIR = os.path.dirname(__file__)
 OUT_DIR  = os.path.join(os.path.dirname(__file__), 'figures')
 os.makedirs(OUT_DIR, exist_ok=True)
 
