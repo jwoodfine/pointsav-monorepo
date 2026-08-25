@@ -1,5 +1,6 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
+
 
 use minijinja::Environment;
 use moonshot_index::InvertedIndex;
@@ -12,7 +13,6 @@ pub struct AppState {
     pub nav: Arc<HashMap<String, Vec<String>>>,
     #[allow(dead_code)]
     pub tenant: String,
-    pub doorman_url: String,
     pub watch_tx: Arc<watch::Sender<()>>,
     pub index: Arc<RwLock<InvertedIndex>>,
     pub edit_token: Arc<String>,

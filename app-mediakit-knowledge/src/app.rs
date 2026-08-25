@@ -178,10 +178,12 @@ pub fn router(state: AppState) -> Router {
         .route("/wiki/{*slug}", get(wiki_raw))
         .route("/es/wiki/{*slug}", get(wiki_es))
         .route("/category/{name}", get(category_page))
+        .route("/es/category/{name}", get(category_page_es))
         .route("/research", get(research_index))
         .route("/research/{slug}", get(research_landing))
         .route("/research/{slug}/full", get(research_fulltext))
         .route("/search", get(search_page))
+        .route("/api/search-suggest", get(search_suggest))
         .route("/history/{*slug}", get(history_page))
         .route("/special/all-pages", get(special_all_pages))
         .route("/special/recent-changes", get(special_recent))
@@ -256,9 +258,16 @@ fn humanize(slug: &str) -> String {
         .join(" ")
 }
 
-/// Ordered `(slug, label)` category list for the sidebar nav — the configured
-/// order when set, else discovered categories. Mirrors the home-grid ordering.
-fn nav_cats(state: &AppState) -> Vec<(String, String)> {
+/// Ordered `(slug, label, kind)` category list for the sidebar nav — the
+/// configured order when set, else discovered categories. Mirrors the
+/// home-grid ordering. `kind` is `"topic"` or `"guide"` (see
+/// `sitedata::Category`) — the sidebar's Topics/Guides section split. The
+/// fallback path (no `categories.yaml`) has no `kind` data at all; every
+/// wiki with a real `how-to`/guide category has a `categories.yaml` (the
+/// only ones that don't — corporate/projects — never serve guides at all,
+/// see `Tenant::serves_guides`), so defaulting the fallback path to `"topic"`
+/// uniformly never actually hides a real guide category from its section.
+fn nav_cats(state: &AppState) -> Vec<(String, String, String)> {
     let counts = &state.category_counts;
     // Prefer the canonical categories.yaml (id → route, name → display, order),
     // showing only categories that currently have content.
@@ -273,24 +282,33 @@ fn nav_cats(state: &AppState) -> Vec<(String, String)> {
                 } else {
                     c.name.clone()
                 };
-                (c.id.clone(), name)
+                (c.id.clone(), name, c.kind.clone())
             })
             .collect();
     }
     // Fallback: knowledge.toml categories, else discovered.
-    let mut cats: Vec<(String, String)> = Vec::new();
+    let mut cats: Vec<(String, String, String)> = Vec::new();
     if state.config.site.categories.is_empty() {
         for slug in counts.keys() {
-            cats.push((slug.clone(), humanize(slug)));
+            cats.push((slug.clone(), humanize(slug), "topic".to_string()));
         }
     } else {
         for slug in &state.config.site.categories {
             if counts.contains_key(slug) {
-                cats.push((slug.clone(), humanize(slug)));
+                cats.push((slug.clone(), humanize(slug), "topic".to_string()));
             }
         }
     }
     cats
+}
+
+/// The plain-text content-type badge label next to an article H1 — "Index"
+/// for Index Topics, `None` for ordinary TOPIC/GUIDE articles. Language
+/// follows `lang` — the *content's* actual resolved language (`doc.lang`),
+/// not necessarily the request path's `/es/` prefix, since `resolve()` can
+/// fall back to English content under an `/es/wiki/` URL.
+fn content_type_badge(index_type: Option<&str>, lang: Lang) -> Option<&'static str> {
+    index_type.map(|_| if lang == Lang::Es { "\u{00cd}ndice" } else { "Index" })
 }
 
 /// Display label for a category id — the categories.yaml `name` when present.
@@ -334,6 +352,8 @@ fn not_found(state: &AppState, message: &str) -> Response {
                 &state.legal,
                 state.site_description.as_deref(),
                 state.article_count,
+                None,
+                &[],
             )
             .into_string(),
         ),
@@ -372,9 +392,14 @@ async fn home(State(state): State<AppState>) -> Response {
     // Was computed twice per home-page request (here + again inside
     // nav_cats); both now read the one value memoized in AppState::build.
     let counts = &state.category_counts;
-    let cats: Vec<(String, String, usize)> = nav_cats(&state)
+    // Computed once — `nav` (sidebar, needs `kind`) and `cats` (home-grid
+    // cards, needs a count) are both derived from this single call rather
+    // than calling `nav_cats` twice.
+    let raw_cats = nav_cats(&state);
+    let nav: Vec<(String, String, String)> = raw_cats.clone();
+    let cats: Vec<(String, String, usize)> = raw_cats
         .into_iter()
-        .map(|(id, name)| {
+        .map(|(id, name, _kind)| {
             let n = counts.get(&id).copied().unwrap_or(0);
             (id, name, n)
         })
@@ -401,10 +426,6 @@ async fn home(State(state): State<AppState>) -> Response {
         Vec::new()
     };
 
-    let nav: Vec<(String, String)> = cats
-        .iter()
-        .map(|(s, l, _)| (s.clone(), l.clone()))
-        .collect();
     let body = ui::home_page(tenant, &lede, total, &cats, &guides);
     let head = ui::doc_head(tenant.home_label(), &description, tenant, "/", false);
     Html(
@@ -420,19 +441,71 @@ async fn home(State(state): State<AppState>) -> Response {
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
     .into_response()
 }
 
-/// Category listing page — every article in one category.
-async fn category_page(State(state): State<AppState>, Path(name): Path<String>) -> Response {
+#[derive(serde::Deserialize)]
+struct CategoryQuery {
+    view: Option<String>,
+}
+
+impl CategoryQuery {
+    /// `?view=all` — the Index Topic safety-net link back to the flat list.
+    fn wants_flat_list(&self) -> bool {
+        self.view.as_deref() == Some("all")
+    }
+}
+
+/// `/category/{name}` — the Index Topic hub for this category, when one
+/// exists (via `render_index_topic_category`, same URL, no redirect); the
+/// flat article list otherwise, and always via `?view=all` regardless of
+/// whether an Index Topic exists (the safety-net view, and the natural
+/// behavior for the categories not yet migrated).
+async fn category_page(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+    Query(params): Query<CategoryQuery>,
+) -> Response {
+    serve_category(state, name, params, Lang::En).await
+}
+
+/// Spanish category route (`/es/category/{name}`) — same handler, `Lang::Es`.
+/// Category membership itself stays English-canonical (`ContentIndex::in_category`
+/// is English-only by design), matching `/es/wiki`'s existing shallow-parity
+/// depth: this closes the route-registration 404, it does not localize listing
+/// content — that's a separate, larger follow-up (true `_index.es.md` support).
+async fn category_page_es(
+    State(state): State<AppState>,
+    Path(name): Path<String>,
+    Query(params): Query<CategoryQuery>,
+) -> Response {
+    serve_category(state, name, params, Lang::Es).await
+}
+
+async fn serve_category(state: AppState, name: String, params: CategoryQuery, lang: Lang) -> Response {
     let tenant = state.tenant;
+    let prefix = if lang == Lang::Es { "/es" } else { "" };
+    let lang_code = if lang == Lang::Es { "es" } else { "en" };
+    let label = category_label(&state, &name);
+    if !params.wants_flat_list() {
+        if let Some(index_doc) = state.index.index_topic_for_scope(&name) {
+            if let Some(resp) = render_index_topic_category(&state, index_doc, &name, &label, lang).await {
+                return resp;
+            }
+            // `parse_index_topic` returned `None` (malformed content) — fall
+            // through to the flat list rather than surface a broken page.
+        }
+    }
     let docs: Vec<(String, String, String)> = state
         .index
         .in_category(&name)
         .into_iter()
+        .filter(not_own_index_topic(&name))
         .map(|d| {
             (
                 d.slug.clone(),
@@ -444,7 +517,6 @@ async fn category_page(State(state): State<AppState>, Path(name): Path<String>) 
     if docs.is_empty() {
         return not_found(&state, &format!("No such area: \u{201c}{name}\u{201d}."));
     }
-    let label = category_label(&state, &name);
     // Avoid "Articles in the The Buildings area." when a category's display
     // name already leads with an article (a real finding: 2 of 3 wikis had
     // this doubled verbatim in search snippets).
@@ -455,7 +527,7 @@ async fn category_page(State(state): State<AppState>, Path(name): Path<String>) 
     };
     let trail = vec![("/".to_string(), tenant.home_label().to_string())];
     let body = html! { (ui::breadcrumb(&trail, &label)) (ui::category_index(&label, &docs)) };
-    let path = format!("/category/{name}");
+    let path = format!("{prefix}/category/{name}");
     let home = tenant.home_url();
     let home = home.trim_end_matches('/');
     let jsonld_trail = [
@@ -467,7 +539,7 @@ async fn category_page(State(state): State<AppState>, Path(name): Path<String>) 
     Html(
         ui::page(
             tenant,
-            "en",
+            lang_code,
             head,
             body,
             &nav_cats(&state),
@@ -477,6 +549,10 @@ async fn category_page(State(state): State<AppState>, Path(name): Path<String>) 
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            Some(name.as_str()),
+            // Not the sidebar sibling list here — the page body already *is*
+            // the full category listing; a second copy would be redundant.
+            &[],
         )
         .into_string(),
     )
@@ -526,6 +602,8 @@ async fn research_index(State(state): State<AppState>) -> Response {
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
@@ -604,6 +682,8 @@ async fn research_landing(State(state): State<AppState>, Path(slug): Path<String
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
@@ -675,10 +755,119 @@ async fn research_fulltext(State(state): State<AppState>, Path(slug): Path<Strin
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
     .into_response()
+}
+
+/// Render `/category/{name}` as `index_doc`'s Index Topic hub, if its body
+/// actually parses as one. Returns `None` (not an error response) on any
+/// parse failure — the caller falls through to the ordinary flat list; a
+/// malformed Index Topic file must never surface as a 500 or a broken page.
+///
+/// Reads the file via `content::load_raw` (comment-preserving), not
+/// `content::load` — `parse_index_topic` depends on the
+/// `<!-- START-HERE-HIGHLIGHT -->`/`<!-- AUTO-GENERATED MEMBERSHIP -->`
+/// HTML-comment markers that `content::load`/`frontmatter::parse` strip for
+/// every ordinary article's search-index/summary hygiene.
+async fn render_index_topic_category(
+    state: &AppState,
+    index_doc: &content::DocRef,
+    name: &str,
+    label: &str,
+    lang: Lang,
+) -> Option<Response> {
+    let tenant = state.tenant;
+    let prefix = if lang == Lang::Es { "/es" } else { "" };
+    let lang_code = if lang == Lang::Es { "es" } else { "en" };
+    let raw = content::load_raw(index_doc).ok()?;
+    let mut topic = content::parse_index_topic(&raw.body_md)?;
+    // A bare `[[slug]]` member link (no `|label`) carries the raw slug text
+    // as its label rather than the article's real title — resolve it now
+    // that we have index access, which the parser itself doesn't.
+    if let Some(sh) = topic.start_here.as_mut() {
+        if !sh.explicit_label {
+            if let Some(doc) = state.index.resolve(&sh.slug, Lang::En) {
+                sh.label = doc.title.clone();
+            }
+        }
+    }
+    for group in &mut topic.groups {
+        for member in &mut group.members {
+            if !member.explicit_label {
+                if let Some(doc) = state.index.resolve(&member.slug, Lang::En) {
+                    member.label = doc.title.clone();
+                }
+            }
+        }
+    }
+    let total = state
+        .index
+        .in_category(name)
+        .into_iter()
+        .filter(not_own_index_topic(name))
+        .count();
+    // Provenance line, same mechanism `serve_article` uses: the short hash
+    // of the _index.md file's own most recent commit — real history, since
+    // an Index Topic is a real committed file, unified chrome per the
+    // 2026-08-05 header-unification round.
+    let repo_root = &state.mounts.mounts[index_doc.mount_index].path;
+    let rel = index_doc.path.strip_prefix(repo_root).unwrap_or(&index_doc.path);
+    let prov = crate::history::file_history(repo_root, rel, 1);
+    let sha = prov.first().map(|r| r.short_sha.as_str());
+    let trail = vec![("/".to_string(), tenant.home_label().to_string())];
+    let body = html! {
+        (ui::breadcrumb(&trail, label))
+        article."k-article" {
+            (ui::index_topic_header(
+                label,
+                total,
+                name,
+                &index_doc.slug,
+                raw.frontmatter.last_edited.as_deref(),
+                sha,
+            ))
+            (ui::index_topic_body(&topic))
+        }
+    };
+    let description = raw
+        .frontmatter
+        .short_description
+        .clone()
+        .unwrap_or_default();
+    let path = format!("{prefix}/category/{name}");
+    let home = tenant.home_url();
+    let home = home.trim_end_matches('/');
+    let jsonld_trail = [
+        (format!("{home}/"), tenant.home_label().to_string()),
+        (format!("{home}{path}"), label.to_string()),
+    ];
+    let head = ui::doc_head(label, &description, tenant, &path, false);
+    let head = html! { (head) (ui::breadcrumb_jsonld(&jsonld_trail)) };
+    Some(
+        Html(
+            ui::page(
+                tenant,
+                lang_code,
+                head,
+                body,
+                &nav_cats(state),
+                &[], // the body is already a curated table of contents
+                "",
+                state.important_info.as_deref(),
+                &state.legal,
+                state.site_description.as_deref(),
+                state.article_count,
+                Some(name),
+                &[], // the body is already the curated member list
+            )
+            .into_string(),
+        )
+        .into_response(),
+    )
 }
 
 #[derive(serde::Deserialize)]
@@ -731,10 +920,40 @@ async fn search_page(State(state): State<AppState>, Query(params): Query<SearchQ
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
     .into_response()
+}
+
+#[derive(serde::Serialize)]
+struct Suggestion {
+    slug: String,
+    title: String,
+}
+
+/// `GET /api/search-suggest?q=...` — JSON typeahead suggestions, reusing the
+/// same in-RAM tantivy index `search_page` queries. A real UX-review finding:
+/// search had no suggestions/typeahead at all. Deliberately title-only (no
+/// snippet/matched-context excerpt) — `DocRef` doesn't hold article bodies in
+/// memory, so a real excerpt needs either tantivy's own `SnippetGenerator` or
+/// a disk read per result; not worth building ahead of the route existing.
+async fn search_suggest(State(state): State<AppState>, Query(params): Query<SearchQuery>) -> Response {
+    let q = params.q.unwrap_or_default();
+    let suggestions: Vec<Suggestion> = state
+        .search
+        .query(&q, 8)
+        .into_iter()
+        .filter_map(|slug| {
+            state
+                .index
+                .resolve(&slug, Lang::En)
+                .map(|d| Suggestion { slug: d.slug.clone(), title: d.title.clone() })
+        })
+        .collect();
+    axum::Json(suggestions).into_response()
 }
 
 #[derive(serde::Deserialize)]
@@ -786,6 +1005,8 @@ async fn history_page(
                 &state.legal,
                 state.site_description.as_deref(),
                 state.article_count,
+                None,
+                &[],
             )
             .into_string(),
         )
@@ -814,6 +1035,8 @@ async fn history_page(
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
@@ -856,6 +1079,8 @@ async fn special_all_pages(State(state): State<AppState>) -> Response {
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
@@ -893,6 +1118,8 @@ async fn special_recent(State(state): State<AppState>) -> Response {
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            None,
+            &[],
         )
         .into_string(),
     )
@@ -922,6 +1149,19 @@ async fn robots(State(state): State<AppState>) -> Response {
 // never list it a second time on a discovery surface.
 fn not_index(d: &&content::DocRef) -> bool {
     d.slug != "index"
+}
+
+/// An Index Topic is the curated hub *for* its category, not a member *of*
+/// it — excluded from that one category's own flat list/count (both the
+/// `?view=all` fallback and the safety-net "See all N articles" link),
+/// though it's still a real, indexed, discoverable page everywhere else
+/// (sitemap, search, site-wide article count). Confirmed against real
+/// content: without this, `security-index` (which itself carries
+/// `category: security`) inflated `security`'s own count to 14 and
+/// self-listed in its own flat view — the authored content's own intro text
+/// says "13 articles," matching the reader's actual mental model.
+fn not_own_index_topic<'a>(category: &'a str) -> impl Fn(&&content::DocRef) -> bool + 'a {
+    move |d| !(d.index_type.is_some() && d.index_scope.as_deref() == Some(category))
 }
 
 async fn sitemap(State(state): State<AppState>) -> Response {
@@ -1096,6 +1336,37 @@ async fn serve_article(
     // Stamping `<html lang>` and the toggle from the *requested* `lang`
     // instead of this would mislabel English fallback content as Spanish.
     let lang_code = if doc.lang == Lang::Es { "es" } else { "en" };
+    // "In this topic" sidebar list + prev/next pager — real UX-review
+    // findings: the sidebar only ever showed categories, never sibling
+    // articles (reading flow was strictly article -> back to category page
+    // -> next article), and no prev/next navigation existed at all.
+    // `in_category` is already title-sorted, so index-of-current +/- 1 is
+    // the adjacent article with zero new lookups.
+    let current_category = doc.category.as_deref();
+    let category_docs: Vec<(String, String)> = current_category
+        .map(|cat| {
+            state
+                .index
+                .in_category(cat)
+                .into_iter()
+                .filter(not_own_index_topic(cat))
+                .map(|d| (d.slug.clone(), d.title.clone()))
+                .collect()
+        })
+        .unwrap_or_default();
+    let self_index = category_docs.iter().position(|(s, _)| s == &doc.slug);
+    let prev = self_index
+        .filter(|&i| i > 0)
+        .and_then(|i| category_docs.get(i - 1))
+        .map(|(s, t)| (s.as_str(), t.as_str()));
+    let next = self_index
+        .and_then(|i| category_docs.get(i + 1))
+        .map(|(s, t)| (s.as_str(), t.as_str()));
+    let siblings: Vec<(String, String)> = category_docs
+        .iter()
+        .filter(|(s, _)| s != &doc.slug)
+        .cloned()
+        .collect();
     let repo_root = &state.mounts.mounts[doc.mount_index].path;
     let rel = doc.path.strip_prefix(repo_root).unwrap_or(&doc.path);
 
@@ -1112,7 +1383,10 @@ async fn serve_article(
             .clone()
             .unwrap_or_else(|| doc.title.clone());
         let short = rev.chars().take(8).collect::<String>();
-        let body = ui::article(&title, &doc.slug, None, Some(&short), Some(&date), None, &rendered.html);
+        let badge = content_type_badge(parsed.frontmatter.index_type.as_deref(), doc.lang);
+        // A historical snapshot doesn't get prev/next pager links — those
+        // navigate the current article set, not this point-in-time view.
+        let body = ui::article(&title, &doc.slug, None, Some(&short), Some(&date), None, badge, &rendered.html, None, None);
         // Canonical points at the CURRENT version, not this historical snapshot —
         // an as-of view shouldn't compete with the live article for indexing.
         let head = ui::doc_head(&format!("{title} (as of {date})"), "", tenant, &format!("{prefix}/wiki/{}", doc.slug), false);
@@ -1129,6 +1403,8 @@ async fn serve_article(
                 &state.legal,
                 state.site_description.as_deref(),
                 state.article_count,
+                current_category,
+                &siblings,
             )
             .into_string(),
         )
@@ -1211,6 +1487,7 @@ async fn serve_article(
         None
     };
     let alt_ref = alt_lang.as_ref().map(|(u, l)| (u.as_str(), *l));
+    let badge = content_type_badge(parsed.frontmatter.index_type.as_deref(), doc.lang);
     let article_body = ui::article(
         &title,
         &doc.slug,
@@ -1218,7 +1495,10 @@ async fn serve_article(
         sha,
         None,
         alt_ref,
+        badge,
         &rendered.html,
+        prev,
+        next,
     );
     // Breadcrumb — a real finding: no page anywhere had one. Home -> Category
     // (when the article has one) -> current article (not a link).
@@ -1259,6 +1539,15 @@ async fn serve_article(
         (ui::article_jsonld(tenant, &title, &description, &current_url, parsed.frontmatter.last_edited.as_deref()))
         (ui::breadcrumb_jsonld(&jsonld_trail))
     };
+    // Index Topics suppress the "Contents" sidebar TOC: the page body is
+    // already a curated table of contents (grouped links), so a second one
+    // restating the same H2s is redundant — same mechanism every non-article
+    // page type already uses (an empty headings slice).
+    let toc: &[content::Heading] = if parsed.frontmatter.index_type.is_some() {
+        &[]
+    } else {
+        &rendered.headings
+    };
     Html(
         ui::page(
             tenant,
@@ -1266,12 +1555,14 @@ async fn serve_article(
             head,
             body,
             &nav_cats(&state),
-            &rendered.headings,
+            toc,
             "",
             state.important_info.as_deref(),
             &state.legal,
             state.site_description.as_deref(),
             state.article_count,
+            current_category,
+            &siblings,
         )
         .into_string(),
     )
