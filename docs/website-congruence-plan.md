@@ -102,7 +102,7 @@ to land.
 
 ## Where Location Intelligence + BIM Tokens live
 
-- **Location Intelligence** — referenced in `pointsav-monorepo/USER_GUIDE_2026-03-30_V2.md`; this is the GIS app surface, not a static marketing page.
+- **Location Intelligence** — referenced in `pointsav-monorepo/USER_GUIDE.md`; this is the GIS app surface, not a static marketing page.
 - **BIM Tokens** — `customer/woodfine-design-bim/tokens/bim/*.dtcg.json` (DTCG design tokens for BIM concepts: assemblies, relationships, systems, performance, identity-codes). This is a design-system data product, not a marketing page.
 
 Both are **operational sub-products** with their own technology

@@ -1,5 +1,6 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
+
 
 use std::{collections::HashMap, fs, path::Path, path::PathBuf};
 
@@ -71,20 +72,6 @@ pub fn component_origin_label<'a>(
         .map(|(label, _)| label.as_str())
 }
 
-/// The `discover_component_groups` entry (label, slugs) that a given component slug
-/// belongs to — regardless of whether it's the generic (empty-label) group. Used by the
-/// component-detail sidebar (Phase: nav/sidebar structural rebuild) to scope the rail to
-/// just the current component's own category, matching the mockup's real per-page
-/// `doc-toc` (never the full mixed tree `component_origin_label`'s callers show).
-pub fn component_group_for_slug<'a>(
-    component_groups: &'a [(String, Vec<String>)],
-    slug: &str,
-) -> Option<&'a (String, Vec<String>)> {
-    component_groups
-        .iter()
-        .find(|(_, slugs)| slugs.iter().any(|s| s == slug))
-}
-
 /// A sidebar rail needs a plain noun heading ("GIS", "Knowledge Platform") and, for the
 /// 3 non-generic categories, a real link out to that domain's product-line page —
 /// distinct wording from `discover_component_groups`'s origin-badge label ("Also used on
@@ -94,9 +81,20 @@ pub fn sidebar_heading_for_group_label(label: &str) -> (&'static str, Option<&'s
     if label.contains("gis.woodfinegroup.com") {
         ("GIS", Some("/products/gis/overview"))
     } else if label.contains("wiki engine") {
-        ("Knowledge Platform", Some("/products/knowledge-platform/overview"))
+        (
+            "Knowledge Platform",
+            Some("/products/knowledge-platform/overview"),
+        )
     } else if label.contains("Org Chart") {
         ("Org Charts", Some("/products/org-charts/overview"))
+    } else if label.contains("Paper") {
+        // Live-audit finding (2026-08-04): this case was missing, so the "paper"
+        // category (7 slugs) silently fell through to the generic "Components"
+        // heading below -- harmless while the sidebar only ever showed one category
+        // at a time, but a real gap once it shows all categories together and
+        // "Paper" needs its own real heading to be distinguishable from the generic
+        // group sitting right next to it.
+        ("Paper", Some("/paper/paper/overview"))
     } else {
         ("Components", None)
     }
@@ -156,6 +154,19 @@ pub fn is_flat_section(section: &str) -> bool {
         .any(|(s, _, l)| *s == section && *l == Layout::Flat)
 }
 
+/// Sections withheld from public reach as a stopgap (2026-08-04) -- NOT the future
+/// public "journals" feature (that's unbuilt, separately scoped, not this). `research/`
+/// content is pre-decision working material that still carries competitor-name
+/// violations and was never meant for the primary nav or search engines, but this app's
+/// routing served it identically to every other section. Files stay on disk and remain
+/// editable via the existing edit_token-authed save path; only unauthenticated public
+/// reach is cut.
+const GATED_SECTIONS: &[&str] = &["research"];
+
+pub fn is_publicly_reachable(section: &str) -> bool {
+    is_known_section(section) && !GATED_SECTIONS.contains(&section)
+}
+
 /// The one place that knows flat sections ignore the tab segment on disk — every
 /// content-path lookup (browsing, editing, WYSIWYG save) should go through this rather
 /// than building the path inline, so the flat/nested distinction stays in one function.
@@ -181,8 +192,10 @@ pub fn discover_nav(vault: &Path) -> HashMap<String, Vec<String>> {
                 let name = e.file_name().into_string().ok()?;
                 match layout {
                     Layout::Nested => ft.is_dir().then_some(name),
-                    Layout::Flat => (ft.is_file() && name.ends_with(".md") && !name.ends_with(".es.md"))
-                        .then(|| name[..name.len() - 3].to_string()),
+                    Layout::Flat => {
+                        (ft.is_file() && name.ends_with(".md") && !name.ends_with(".es.md"))
+                            .then(|| name[..name.len() - 3].to_string())
+                    }
                 }
             })
             .collect();
@@ -234,6 +247,9 @@ pub fn discover_tabs(vault: &Path, section: &str, slug: &str) -> Vec<String> {
 /// like "Wiki Toc Sidebar" read as auto-title-cased file names, not curated nav, next to
 /// real prose labels. (bim/guid/3d/rs1/ifc removed 2026-07-04 — those were BIM-specific
 /// slugs, and BIM content no longer lives in this substrate.)
+// "wcp" was added 2026-08-04 (tokens sidebar redesign exposed to_title("wcp")
+// rendering as "Wcp" once forced-uppercase text-transform was removed), then
+// removed again the same day when the "wcp" pillar itself was retired.
 const ACRONYM_WORDS: &[&str] = &["gis", "toc", "mcp"];
 
 pub fn to_title(s: &str) -> String {
