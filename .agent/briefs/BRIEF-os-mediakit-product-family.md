@@ -407,8 +407,30 @@ abandoned H0–H8 native-PD track)
   **Phase 0 gate cleared — Phase F and Phase 0 are both done; G1 (boot) is the next
   real implementation step, not yet started.**
 
-- **G1 — Boot.** Bare `loader.img` boots under `qemu-system-aarch64` (TCG, no KVM needed —
-  see above) to a real login prompt.
+- **G1 — Boot. DONE 2026-08-25.** Bare `loader.img` boots under `qemu-system-aarch64`
+  (TCG, no KVM needed — see above) to a real login prompt. `os-mediakit/scripts/
+  build-microkit-image.sh` written (ports os-totebox's crash-informed resource-pressure
+  preflight guard verbatim — same thresholds, hard-abort, not a third invented variant),
+  held until host load actually cleared (~15-17 on 8 cores from concurrent sessions
+  down to 7.33) rather than overridden. `make -C vendor-libvmm/examples/virtio
+  BUILD_DIR=build-os-mediakit qemu` built `loader.img` (21.4 MB) + `report.txt` (real
+  CapDL detail — IRQ 33/48/49 for serial/eth/blk drivers, TCB details, not a
+  placeholder) using vendor-libvmm's own stock example kernel/rootfs (auto-downloaded,
+  unrelated to app-mediakit-knowledge — that's G2.5). Boot observed end-to-end via
+  serial console: seL4 kernel boots, "Booting all finished, dropped to user space",
+  Linux kernel boots, virtio-blk (`vda`, 14 MB) and virtio-net both attach, DHCP
+  actually completes (`udhcpc: lease of 10.0.2.15 obtained`, unlike the still-open
+  Format B DHCP question in Decisions-open #7 — a real, useful data point that a
+  functioning virtio-net path under this same host's TCG emulation is achievable),
+  reaches `buildroot login:`. Terminated cleanly (SIGTERM) once the login prompt
+  confirmed the gate; artifact and report.txt left in place under
+  `vendor-libvmm/examples/virtio/build-os-mediakit/` (gitignored build output, not
+  committed — same convention as Format B's `os-mediakit/scripts/build/`).
+  **G1 gate cleared — G2 (VirtIO passthrough) is next, not yet started.**
+
+- **G2 — VirtIO passthrough.** Cite os-totebox's already-proven result against the same shared
+  `vendor-libvmm` plumbing rather than re-deriving from scratch, unless os-mediakit's own
+  build reveals a divergence — same convention os-orchestration-slm used.
 
 - **G2 — VirtIO passthrough.** Cite os-totebox's already-proven result against the same shared
   `vendor-libvmm` plumbing rather than re-deriving from scratch, unless os-mediakit's own
