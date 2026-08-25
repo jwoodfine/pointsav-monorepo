@@ -241,6 +241,53 @@ first draft, converging on the same fix in D3 especially. See Work log.**
    end. Real customer impact if uninvestigated: BETA customers downloading Format B
    today may hit this same emergency-mode hang.
 
+   **UPDATE 2026-08-25 (same day, later) — hypothesis (b) confirmed, real fix landed
+   in `build-image.sh`; a second, independent defect found underneath it; artifact
+   rebuilt; end-to-end reachability still open.**
+
+   Added `systemd.device-timeout=300` to the grub kernel cmdline as a permanent
+   step in `build-image.sh` (patches `grub.cfg` on the BOOT-labelled partition after
+   the systemd-unit-install step; idempotent, warns rather than fails if no
+   BOOT-labelled partition is found). Confirmed via two boot tests — first a
+   hand-patched throwaway copy, then a fully rebuilt real artifact — that this
+   eliminates the emergency-mode failure outright: by-label devices resolve
+   immediately, `local-fs.target` succeeds, the guest reaches the login prompt.
+   **Hypothesis (b) is now confirmed, not just inferred by elimination.**
+
+   Fixing (b) unmasked a **second, previously-hidden defect**: the three
+   `wiki-*.service` units carried `After=network-online.target` /
+   `Wants=network-online.target`. Under this host's QEMU/TCG+slirp test networking,
+   `systemd-networkd-wait-online.service` never completes (no timeout on that job),
+   so the wiki units — gated behind it — never fired at all. This was invisible
+   before because emergency mode always intervened first. Fixed in `build-image.sh`:
+   changed the dependency to plain `network.target` (the app binds `0.0.0.0` locally
+   and needs no DHCP/DNS resolution to start). Confirmed by rebuild + reboot: all
+   three `wiki-{documentation,projects,corporate}.service` units now log `Started`
+   (previously: zero mentions of any wiki unit in the boot log, ever).
+
+   Incidental third fix, found while rebuilding: `build-image.sh`'s hardcoded
+   `IMAGE_SIZE="2G"` default is smaller than the current upstream Ubuntu 24.04
+   minimal cloud image's own virtual size (now 3.5 GiB — it has grown since this
+   pipeline was written), which corrupts the overlay's GPT backup header on any
+   default-settings build (`could not detect ext4 root partition` / `Alternate GPT
+   is invalid`). `IMAGE_SIZE` is now auto-detected from the downloaded base image
+   unless explicitly overridden.
+
+   **Still open: end-to-end HTTP reachability.** With all three fixes applied, the
+   rebuilt artifact (sha256
+   `921fcb8b2602d27c7146d50aa202114c776f85471924cc522a8310f8f261eb59`) boots cleanly
+   and starts all three wiki services, but `/healthz` on all three hostfwd'd ports
+   timed out (curl exit 28 — connection timeout, not connection refused) across 3
+   attempts up to 30s. No DHCP/link-up evidence appears in the captured serial log
+   either way, so this can't yet be attributed with confidence. Leading hypothesis,
+   consistent with the same TCG/software-emulation class of artifact as the original
+   defect (no `/dev/kvm` on this host): the guest's virtio-net interface may not
+   have completed its slirp DHCP lease by the time of the check, which would block
+   host→guest hostfwd forwarding regardless of app readiness. **Not yet confirmed
+   either way** — needs a longer soak or a KVM-capable-host retest before "Format B
+   is live and working end-to-end" can be called confirmed, as distinct from "Format
+   B boots and starts its services," which is now confirmed.
+
    <details><summary>2026-08-10 original finding (superseded above, kept for record)</summary>
 
    First real end-to-end smoke test (that session): booted headless under
