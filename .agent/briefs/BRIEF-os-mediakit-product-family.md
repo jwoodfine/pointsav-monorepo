@@ -428,13 +428,21 @@ abandoned H0–H8 native-PD track)
   committed — same convention as Format B's `os-mediakit/scripts/build/`).
   **G1 gate cleared — G2 (VirtIO passthrough) is next, not yet started.**
 
-- **G2 — VirtIO passthrough.** Cite os-totebox's already-proven result against the same shared
-  `vendor-libvmm` plumbing rather than re-deriving from scratch, unless os-mediakit's own
-  build reveals a divergence — same convention os-orchestration-slm used.
-
-- **G2 — VirtIO passthrough.** Cite os-totebox's already-proven result against the same shared
-  `vendor-libvmm` plumbing rather than re-deriving from scratch, unless os-mediakit's own
-  build reveals a divergence — same convention os-orchestration-slm used.
+- **G2 — VirtIO passthrough. DONE 2026-08-25, same boot as G1.** Not re-derived from
+  scratch or accepted on citation alone — os-mediakit's own G1 boot directly exercised
+  both halves of G2's real content (VirtIO block + net passthrough through libvmm's
+  device model) with no divergence from precedent: `virtio_blk virtio1... [vda] 28672
+  512-byte logical blocks` (disk recognized, mounted at `/mnt`) and a real DHCP lease
+  over virtio-net (`udhcpc: lease of 10.0.2.15 obtained`, DNS added). This is the exact
+  situation project-totebox's own BRIEF documents and names explicitly ("G2 —
+  substantively satisfied by shared infrastructure, honestly recorded rather than
+  re-derived from scratch... G2's real content... is the same shared infrastructure
+  already proven... Recorded as satisfied by reference, not by a redundant fresh test
+  with no [track]-specific content to add") — except os-mediakit's own boot *did* add
+  fresh, track-specific evidence (not just a citation), making this an even stronger
+  basis than pure reference. **G2 gate cleared — G2.5 (real guest rootfs) is next, the
+  first genuinely new engineering step (same precedent: "this is where [the track]
+  diverges... needs genuine new work, unlike G1/G2 which are shared toolchain proof").**
 
 - **G2.5 — Real guest rootfs.** Port `build-guest-rootfs.sh` from `app-orchestration-command`
   (closest analog). Install the cross-compiled `app-mediakit-knowledge` binary plus (new)
