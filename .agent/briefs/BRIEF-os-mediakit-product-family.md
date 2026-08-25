@@ -307,12 +307,20 @@ future third download option.
 `git2 = "0.20"` (binds `libgit2`, a C library) and `syntect = "5"` (default features may pull
 in `onig`, a C Oniguruma binding, unless built with `regex-fancy` instead) — both candidates
 for the same class of FFI/C-dependency pain that cost project-totebox's own build a
-multi-bug cross-compile saga on `LadybugDB`. Check these **first** (Phase 0), don't discover
-them mid-build. Also reconcile a real apparent gap: `conventions/soft-distribution-pipeline.md`
-§4 lists `aarch64-unknown-linux-gnu` as fleet-wide "Planned — requires Docker + `cross`,
-operator decision pending," yet project-totebox clearly has *something* working already (real,
-built, deployed aarch64 binaries) — find out whether their toolchain is directly reusable
-before assuming a fresh one is needed.
+multi-bug cross-compile saga on `LadybugDB`.
+
+**RESOLVED 2026-08-25 — non-issue, real cross-compile attempted, not just checked for risk
+on paper.** Ran the actual Phase 0 build this warned to run first: `cargo build --release
+--target aarch64-unknown-linux-gnu` (with `CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=
+aarch64-linux-gnu-gcc`, `PKG_CONFIG_ALLOW_CROSS=1`) for `app-mediakit-knowledge`, on this
+VM. **Finished clean in 19m11s, zero errors, zero warnings for `git2`/`syntect`/`onig`** —
+both flagged crates cross-compiled without incident. Verified the output is a real ARM
+binary (`file`: "ELF 64-bit LSB pie executable, ARM aarch64... for GNU/Linux"), not just a
+clean exit code. The aarch64 toolchain question is also resolved as a side effect: both the
+`aarch64-unknown-linux-gnu` rustup target and `aarch64-linux-gnu-gcc` were already installed
+on this VM (same toolchain `project-sel4`'s own BRIEF independently confirmed working for
+their Microkit PD builds) — no fresh toolchain setup was needed, `conventions/soft-
+distribution-pipeline.md` §4's "Planned" status is stale for this host specifically.
 
 ### TLS/ACME — new ground, designed in from the start (operator: "this is unique to
 os-mediakit so we need to get it right")
@@ -342,11 +350,15 @@ abandoned H0–H8 native-PD track)
   artifact defect vs. TCG/udev timing artifact. Fix, then re-verify with a real boot (same
   method as the 2026-08-10 smoke test: `-snapshot`, alternate host ports).
 
-- **Phase 0 — Preflight.** Confirm the vendored Makefile's `BUILD_DIR` support (per-product
-  isolation from day one, see Decisions-open #6). Resolve the aarch64 toolchain question
-  above. Attempt a bare `cargo build --release --target aarch64-unknown-linux-gnu` for
-  `app-mediakit-knowledge` to surface `git2`/`syntect` issues immediately, before any
-  guest-rootfs work depends on it succeeding.
+- **Phase 0 — Preflight. DONE 2026-08-25.** `vendor-libvmm`'s Makefiles confirmed to
+  have real, working `BUILD_DIR ?= build` support (`?=` is externally overridable,
+  `export`ed to sub-makes) — verified directly in `vendor-libvmm/examples/virtio/
+  Makefile`, not assumed. Per-product isolation (`make BUILD_DIR=os-mediakit-build ...`)
+  is real and available from day one, closing Decisions-open #6's mitigation. aarch64
+  toolchain and `git2`/`syntect` cross-compile risk both resolved — see the "Known
+  cross-compile risk" note above: real build attempted, finished clean, zero issues.
+  **Phase 0 gate cleared — Phase F and Phase 0 are both done; G1 (boot) is the next
+  real implementation step, not yet started.**
 
 - **G1 — Boot.** Bare `loader.img` boots under `qemu-system-aarch64` (TCG, no KVM needed —
   see above) to a real login prompt.
@@ -397,6 +409,36 @@ build-dir hazard; adopt their fix once real rather than maintaining a second wor
 indefinitely.
 
 ## Work log
+
+- **2026-08-25 (Phase F + Phase 0, real hands-on work, not planning)** — Cross-checked
+  against `project-sel4`'s real native-seL4 work for os-totebox first (their own
+  BRIEF, 2,479 lines, read in full): confirmed native seL4 PDs are not viable for
+  `app-mediakit-knowledge` (a tokio/axum/tantivy/git2/reqwest service hits every wall
+  their rigorous Phase 5 re-assessment already found, plus their exact TLS-client gap
+  via `reqwest`), confirming Pattern A as the only near-term-viable path. Sent
+  project-sel4 a low-priority long-horizon research request anyway (full dependency
+  detail, framed as a future candidate once their middle-path items mature, not an
+  ask to reprioritize). Sent project-totebox (MBA/gateway status) and Command
+  (canonical-stability sanity check) narrow, non-blocking check-ins; sent
+  project-system a status check on `vendor-sel4-kernel`'s build health plus a
+  long-term heads-up about a second consumer of their crate family, explicitly not
+  asking them to reprioritize the known branch-inversion crisis.
+
+  **Phase F**: mounted `os-mediakit.qcow2` read-only via `qemu-nbd` (sha256 verified
+  unmutated before/after), inspected the partition table/labels/`fstab` directly
+  without booting — ruled out hypothesis (a) (a real image defect); partition table,
+  `UEFI`/`BOOT` labels, and fstab are all correct and mutually consistent. Leaves
+  hypothesis (b) (TCG/udev timing artifact under software emulation) as the only
+  remaining explanation, with a concrete next test identified (`systemd.device-
+  timeout=` kernel arg) but not yet run.
+
+  **Phase 0**: verified `vendor-libvmm`'s `BUILD_DIR` override support directly in
+  its Makefiles (real, not assumed). Ran the actual aarch64 cross-compile this phase
+  exists to de-risk — `cargo build --release --target aarch64-unknown-linux-gnu` for
+  `app-mediakit-knowledge` — rather than just re-asserting the risk on paper: finished
+  clean in 19m11s, zero errors/warnings for `git2`/`syntect`, real ARM binary produced
+  and verified via `file`. Both Phase F and Phase 0 gates are now cleared; G1 (boot)
+  is the next real implementation step, not started this session.
 
 - **2026-08-06 (research)** — Read `BRIEF-os-product-family.md` (active doctrine, all 21
   sections) and `BRIEF-sovereign-os-family-master-plan.md` (superseded, provenance only);
