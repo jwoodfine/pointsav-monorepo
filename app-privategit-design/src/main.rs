@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
 
-mod ai;
+
 mod component_meta;
 mod component_preview;
 mod config;
@@ -49,6 +49,38 @@ async fn main() {
         index.read().await.len(),
     );
 
+    // Registry-drift guard (2026-08-02): every rendered stat is supposed to trace back to
+    // one source (`exports/tokens.manifest.json`'s `leafCount`), but this has silently
+    // drifted at least once already (tokens_gallery's hardcoded tier list omitted "wcp",
+    // undercounting by exactly 25 leaves against the manifest). Loud, not fatal — a
+    // startup log line an operator will actually see, rather than a page that quietly
+    // shows the wrong number again.
+    {
+        let live_count: usize = tokens_gallery::load_and_flatten(&cfg.vault)
+            .iter()
+            .flat_map(|tier| &tier.groups)
+            .map(|group| group.entries.len())
+            .sum();
+        let manifest_path = cfg.vault.join("exports").join("tokens.manifest.json");
+        match std::fs::read_to_string(&manifest_path) {
+            Ok(raw) => match serde_json::from_str::<serde_json::Value>(&raw) {
+                Ok(manifest) => {
+                    if let Some(expected) = manifest.get("leafCount").and_then(|v| v.as_u64()) {
+                        if expected as usize != live_count {
+                            eprintln!(
+                                "WARNING: token-count drift — rendered gallery sums to {live_count} \
+                                 leaves but {manifest_path:?} declares leafCount={expected}. A tier is \
+                                 likely missing from tokens_gallery::load_and_flatten's hardcoded list."
+                            );
+                        }
+                    }
+                }
+                Err(e) => eprintln!("WARNING: could not parse {manifest_path:?}: {e}"),
+            },
+            Err(e) => eprintln!("WARNING: could not read {manifest_path:?}: {e}"),
+        }
+    }
+
     let (watch_tx, _initial_rx) = watch::channel(());
     let watch_tx = Arc::new(watch_tx);
 
@@ -90,7 +122,6 @@ async fn main() {
         vault: cfg.vault,
         nav,
         tenant: cfg.tenant,
-        doorman_url: cfg.doorman_url,
         watch_tx,
         index,
         edit_token,
@@ -113,7 +144,17 @@ fn is_indexable_md(path: &Path) -> bool {
     path.is_file() && lossy.ends_with(".md") && !lossy.ends_with(".es.md")
 }
 
-async fn reindex_file(path: &Path, _vault: &Path, index: &Arc<RwLock<InvertedIndex>>) {
+async fn reindex_file(path: &Path, vault: &Path, index: &Arc<RwLock<InvertedIndex>>) {
+    // Live edits to a gated section (e.g. research/) must not silently re-enter the
+    // search index -- populate_index already skips these at startup; this is the same
+    // rule applied to the fs-watcher's incremental path so the two can't drift apart.
+    if let Ok(rel) = path.strip_prefix(vault) {
+        if let Some(section) = rel.components().next().and_then(|c| c.as_os_str().to_str()) {
+            if !vault::is_publicly_reachable(section) {
+                return;
+            }
+        }
+    }
     let Ok(content) = tokio::fs::read_to_string(path).await else {
         return;
     };
@@ -163,6 +204,9 @@ fn index_markdown_file(idx: &mut InvertedIndex, path: &Path, name: &str) {
 async fn populate_index(vault: &Path, index: &Arc<RwLock<InvertedIndex>>) {
     let mut idx = index.write().await;
     for (section, _, layout) in SECTIONS {
+        if !vault::is_publicly_reachable(section) {
+            continue;
+        }
         let sec_dir = vault.join(section);
         let Ok(entries) = std::fs::read_dir(&sec_dir) else {
             continue;

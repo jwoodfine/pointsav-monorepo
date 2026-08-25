@@ -1,5 +1,6 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
+
 
 use crate::{
     component_meta, component_preview,
@@ -10,12 +11,24 @@ use crate::{
 };
 use axum::{
     body::Body,
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{header, StatusCode},
     response::{Html, IntoResponse, Redirect, Response},
 };
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::{fs, io::Write};
+
+/// Query-param language switch for vault content pages (`?lang=es`). Added 2026-08-02
+/// -- the `.es.md` sibling-file convention already existed (vault.rs filters them out
+/// of slug/tab discovery) and i18n.rs's own header comment named this exact gap
+/// ("a later pass can extend" translation past the homepage+chrome), but nothing
+/// actually read the sibling file yet. Falls back to English silently rather than a
+/// mixed-language page or a 404 when no `.es.md` exists for a given path -- most
+/// component pages don't have one yet (see NEXT.md's translation backlog).
+#[derive(Deserialize)]
+pub struct LangQuery {
+    lang: Option<String>,
+}
 
 pub async fn index(State(state): State<AppState>) -> Html<String> {
     render_index(&state, Lang::En).await
@@ -66,6 +79,7 @@ async fn render_index(state: &AppState, lang: Lang) -> Html<String> {
         .flat_map(|tier| &tier.groups)
         .map(|group| group.entries.len())
         .sum();
+    let paper_family_count = tokens_gallery::paper_family_count(&state.vault);
 
     // Phase 5 — a live palette strip, not decoration: real swatches pulled from the same
     // primitive.color group the /tokens gallery renders, not invented graphics. Picks one
@@ -99,6 +113,42 @@ async fn render_index(state: &AppState, lang: Lang) -> Html<String> {
         })
         .collect();
 
+    // Phase 6 (2026-07-29) — Paper and Writing get a real live sample on the homepage,
+    // not a text card: a mock document snippet bound to the actual paper.primitive.*
+    // ink/rule values, and the real writing.semantic.register.* scale — same `tiers`
+    // data the /tokens gallery renders from, no invented graphics or placeholder copy.
+    let find_val = |p: &str| -> String {
+        all_entries
+            .iter()
+            .find(|e| e.path == p)
+            .map(|e| e.value.clone())
+            .unwrap_or_default()
+    };
+    let paper_ink = find_val("paper.primitive.color.ink");
+    let paper_rule = find_val("paper.primitive.rule.standard");
+    let paper_rule_emphasis = find_val("paper.primitive.rule.emphasis");
+    let register_paths = [
+        ("how-to", "writing.semantic.register.how-to"),
+        ("reference", "writing.semantic.register.reference"),
+        ("communications", "writing.semantic.register.communications"),
+        ("journal", "writing.semantic.register.journal"),
+        ("legal", "writing.semantic.register.legal"),
+        ("specialist", "writing.semantic.register.specialist"),
+        (
+            "financial-disclosure",
+            "writing.semantic.register.financial-disclosure",
+        ),
+    ];
+    let register_rows: String = register_paths
+        .iter()
+        .map(|(name, path)| {
+            format!(
+                "<div class=\"pillar-preview__row\"><code>{name}</code><span class=\"pillar-preview__row-value\">{}</span></div>",
+                find_val(path)
+            )
+        })
+        .collect();
+
     // Faithful translation of the English copy below, not filler — see PR/commit
     // message for translation-review notes. Both variants kept side by side (rather
     // than an external strings file) since this is the only Spanish page today and a
@@ -111,18 +161,20 @@ async fn render_index(state: &AppState, lang: Lang) -> Html<String> {
          d1_h3, d1_a, d1_b, d1_c, d2_h3, d2_a, d2_b, d2_c, d3_h3, d3_a, d3_b, d3_c, d4_h3, d4_a, d4_b, d4_c,
          proof_h2, proof_intro, proof_l1, proof_l2, proof_l3, proof_l4, proof_example_label, proof_footnote,
          closing_h3, closing_p_pre, closing_p_mid, closing_p_post, closing_cta_text,
-         selfhost_eyebrow, selfhost_h2, selfhost_p, selfhost_cta) = match lang {
+         selfhost_eyebrow, selfhost_h2, selfhost_p, selfhost_cta,
+         pillar_preview_label, paper_preview_h3, paper_preview_body, paper_preview_caption,
+         writing_preview_h3, writing_preview_caption) = match lang {
         Lang::En => (
             "Token documentation &amp; component library",
             "One governed token graph, not a components folder every team forks and drifts&nbsp;from.",
-            "Most design systems ship a components folder — files, a Storybook, a package to \
+            "Most design systems ship a components folder — files, a rendered preview site, a package to \
              install. The moment a team needs something the library doesn't have, they fork it, and the fork drifts \
              from the source. This system ships the token graph itself: DTCG-native, self-hostable, and readable \
              directly by the codegen agents that consume it, not just by designers.",
             "Every token, every component recipe, and every research decision behind it lives \
              in one versioned source — browse it below, or ",
             "download the whole graph as a bundle",
-            "components &amp; elements",
+            "documented items",
             "tokens",
             "DTCG-native",
             "Apache-2.0 tokens &amp; bundles",
@@ -142,16 +194,16 @@ async fn render_index(state: &AppState, lang: Lang) -> Html<String> {
             "Four token domains, one Apache-2.0 graph.",
             "Every domain below is DTCG JSON under Apache-2.0 — pull the whole graph or just the pieces you need into your own build, with no server required.",
             "The full token set", "Color, type, spacing", "Motion, elevation, status", "Accessibility targets",
-            "Recipes, not screenshots", "HTML + CSS + ARIA per component", "Carbon-baseline reference where one exists", "Machine-readable via the registry",
+            "Recipes, not screenshots", "HTML + CSS + ARIA per component", "Accessibility-baseline reference for every recipe", "Machine-readable via the registry",
             "Voice, versioned like tokens", "Voice, registers, mechanics", "Terminology A–Z", "Worked before/after pairs",
             "Document-format tokens", "Page geometry, pagination counters", "Four-step rule-weight ladder", "Built for subscription agreements, disclosure documents, and other regulated print formats",
             "Every number below is live.",
             "There's no separate cached copy of this data — the server reads the same dtcg-vault/ directory the numbers below are counted from, every time.",
-            "Components", "Tokens", "MCP tools", "Paper document families",
+            "Documented items", "Tokens", "MCP tools", "Paper document families",
             "Example response",
             "Every component and token endpoint on this site reads from the same dtcg-vault/ directory the server scans directly.",
             "This registry is real, and it grows.",
-            "", " components and ", " tokens today, across the token graph, its component recipes, and the Paper/Writing pillars — every release adds to the same registry.",
+            "", " documented items and ", " tokens today, across the token graph, its component recipes, and the Paper/Writing pillars — every release adds to the same registry.",
             "See the version history",
             "Optional",
             "Or run the whole publishing stack yourself.",
@@ -161,11 +213,17 @@ async fn render_index(state: &AppState, lang: Lang) -> Html<String> {
              own change history, its own on-prem MCP endpoint, inside its own infrastructure. That's \
              a separate product from what's on this page.",
             "Publish your own design system",
+            "Live from the token graph",
+            "Paper — print &amp; compliance documents",
+            "A regulated print document isn't a font choice — it's a rule weight, an ink color, and a page geometry, all versioned like every other token. This corner is bound to the real paper.primitive.color.ink and paper.primitive.rule.standard values below, not a screenshot.",
+            "Eleven document families — subscription agreements, prospectuses, financial reports, PDF-binder navigation, Mexico FIBRA trust &amp; prospectus — share this same rule-weight ladder.",
+            "Writing — a versioned voice",
+            "Seven registers, each a real token — not a style-guide sentence someone has to remember to apply.",
         ),
         Lang::Es => (
             "Documentación de tokens y biblioteca de componentes",
             "Un grafo de tokens gobernado — no una carpeta de componentes que cada equipo bifurca y termina&nbsp;desalineando.",
-            "La mayoría de los sistemas de diseño distribuyen una carpeta de componentes — archivos, un Storybook, un \
+            "La mayoría de los sistemas de diseño distribuyen una carpeta de componentes — archivos, un sitio de vista previa, un \
              paquete para instalar. En el momento en que un equipo necesita algo que la biblioteca no tiene, la bifurca, \
              y la bifurcación se desalinea de la fuente. Este sistema distribuye el propio grafo de tokens: nativo en \
              DTCG, autoalojable, y legible directamente por los agentes de generación de código que lo consumen, no \
@@ -173,7 +231,7 @@ async fn render_index(state: &AppState, lang: Lang) -> Html<String> {
             "Cada token, cada receta de componente y cada decisión de investigación detrás de ellos vive en una sola \
              fuente versionada — explórela a continuación, o ",
             "descargue todo el grafo como paquete",
-            "componentes y elementos",
+            "elementos documentados",
             "tokens",
             "Nativo en DTCG",
             "Tokens y paquetes con licencia Apache-2.0",
@@ -193,16 +251,16 @@ async fn render_index(state: &AppState, lang: Lang) -> Html<String> {
             "Cuatro dominios de tokens, un solo grafo Apache-2.0.",
             "Cada dominio a continuación es JSON en formato DTCG bajo licencia Apache-2.0 — descargue el grafo completo o solo las partes que necesita para su propio proyecto, sin necesidad de servidor.",
             "El conjunto completo de tokens", "Color, tipografía, espaciado", "Movimiento, elevación, estado", "Objetivos de accesibilidad",
-            "Recetas, no capturas de pantalla", "HTML + CSS + ARIA por componente", "Referencia de línea base Carbon donde exista", "Legible por máquinas a través del registro",
+            "Recetas, no capturas de pantalla", "HTML + CSS + ARIA por componente", "Referencia de línea base de accesibilidad para cada receta", "Legible por máquinas a través del registro",
             "Voz, versionada como los tokens", "Voz, registros, mecánica", "Terminología A–Z", "Pares de antes/después trabajados",
             "Tokens de formato de documento", "Geometría de página, contadores de paginación", "Escala de cuatro niveles de grosor de regla", "Diseñado para acuerdos de suscripción, documentos de divulgación y otros formatos impresos regulados",
             "Cada número a continuación está en vivo.",
             "No hay una copia en caché separada de estos datos — el servidor lee el mismo directorio dtcg-vault/ del que se cuentan los números a continuación, cada vez.",
-            "Componentes", "Tokens", "Herramientas MCP", "Familias de documentos Paper",
+            "Elementos documentados", "Tokens", "Herramientas MCP", "Familias de documentos Paper",
             "Respuesta de ejemplo",
             "Cada endpoint de componentes y tokens en este sitio lee del mismo directorio dtcg-vault/ que el servidor escanea directamente.",
             "Este registro es real, y crece.",
-            "", " componentes y ", " tokens hoy, en el grafo de tokens, sus recetas de componentes y los pilares Paper/Writing — cada versión se suma al mismo registro.",
+            "", " elementos documentados y ", " tokens hoy, en el grafo de tokens, sus recetas de componentes y los pilares Paper/Writing — cada versión se suma al mismo registro.",
             "Ver el historial de versiones",
             "Opcional",
             "O ejecute usted mismo toda la plataforma de publicación.",
@@ -213,6 +271,12 @@ async fn render_index(state: &AppState, lang: Lang) -> Html<String> {
              de su propia infraestructura. Eso es un producto separado de lo que se muestra en esta \
              página.",
             "Publique su propio sistema de diseño",
+            "En vivo desde el grafo de tokens",
+            "Paper — documentos impresos y de cumplimiento",
+            "Un documento impreso regulado no es una elección de fuente — es un grosor de regla, un color de tinta y una geometría de página, todo versionado como cualquier otro token. Este rincón está vinculado a los valores reales de paper.primitive.color.ink y paper.primitive.rule.standard a continuación, no una captura de pantalla.",
+            "Once familias de documentos — acuerdos de suscripción, prospectos, informes financieros, navegación de carpetas PDF, fideicomiso y prospecto FIBRA de México — comparten esta misma escala de grosor de regla.",
+            "Writing — una voz versionada",
+            "Siete registros, cada uno un token real — no una frase de guía de estilo que alguien tiene que recordar aplicar.",
         ),
     };
 
@@ -222,7 +286,7 @@ async fn render_index(state: &AppState, lang: Lang) -> Html<String> {
     // are bound to this page's own real CSS custom properties, not a screenshot --
     // an actual live sample of the token graph the page is about. Real values
     // (not the mockup's illustrative ones) confirmed directly against tokens.css:
-    // --cds-interactive #234ed8, --cds-font-mono 'JetBrains Mono', --cds-radius-md 0.25rem.
+    // --ps-interactive #234ed8, --ps-font-mono 'JetBrains Mono', --ps-radius-md 0.25rem.
     let content = format!(
         "<div class=\"home-body\">\
          <section class=\"home-hero-section\">\
@@ -244,17 +308,17 @@ async fn render_index(state: &AppState, lang: Lang) -> Html<String> {
          <div class=\"token-preview\" aria-hidden=\"true\">\
          <div class=\"token-preview__label\">Live from tokens.css :root</div>\
          <div class=\"token-preview__swatches\">\
-         <span class=\"token-preview__swatch\" style=\"background: var(--cds-interactive)\"></span>\
-         <span class=\"token-preview__swatch\" style=\"background: var(--cds-selected-text)\"></span>\
-         <span class=\"token-preview__swatch\" style=\"background: var(--cds-positive-text)\"></span>\
-         <span class=\"token-preview__swatch\" style=\"background: var(--cds-caution-text)\"></span>\
-         <span class=\"token-preview__swatch\" style=\"background: var(--cds-critical-text)\"></span>\
+         <span class=\"token-preview__swatch\" style=\"background: var(--ps-interactive)\"></span>\
+         <span class=\"token-preview__swatch\" style=\"background: var(--ps-selected-text)\"></span>\
+         <span class=\"token-preview__swatch\" style=\"background: var(--ps-positive-text)\"></span>\
+         <span class=\"token-preview__swatch\" style=\"background: var(--ps-caution-text)\"></span>\
+         <span class=\"token-preview__swatch\" style=\"background: var(--ps-critical-text)\"></span>\
          </div>\
          <div class=\"token-preview__type\">Aa</div>\
          <div class=\"token-preview__rows\">\
-         <div class=\"token-preview__row\"><code>--cds-interactive</code><span class=\"token-preview__row-value\">#234ed8</span></div>\
-         <div class=\"token-preview__row\"><code>--cds-font-mono</code><span class=\"token-preview__row-value\">JetBrains Mono</span></div>\
-         <div class=\"token-preview__row\"><code>--cds-radius-md</code><span class=\"token-preview__row-value\">0.25rem</span></div>\
+         <div class=\"token-preview__row\"><code>--ps-interactive</code><span class=\"token-preview__row-value\">#234ed8</span></div>\
+         <div class=\"token-preview__row\"><code>--ps-font-mono</code><span class=\"token-preview__row-value\">JetBrains Mono</span></div>\
+         <div class=\"token-preview__row\"><code>--ps-radius-md</code><span class=\"token-preview__row-value\">0.25rem</span></div>\
          </div>\
          </div>\
          </section>\
@@ -273,6 +337,30 @@ async fn render_index(state: &AppState, lang: Lang) -> Html<String> {
          <span class=\"product-strip__name\">Org Charts</span>\
          <span class=\"product-strip__stat\">{oc_stat}</span>\
          </a>\
+         </div>\
+         </section>\
+         <section class=\"pillar-preview\" aria-label=\"{pillar_preview_label}\">\
+         <span class=\"product-strip__label\">{pillar_preview_label}</span>\
+         <div class=\"pillar-preview__grid\">\
+         <div class=\"pillar-preview__card\">\
+         <h3>{paper_preview_h3}</h3>\
+         <p class=\"pillar-preview__body\">{paper_preview_body}</p>\
+         <div class=\"pillar-preview__sample\" aria-hidden=\"true\" style=\"color:{paper_ink};border-top:{paper_rule} solid {paper_ink}\">\
+         <div class=\"pillar-preview__sample-heading\" style=\"border-bottom:{paper_rule_emphasis} solid {paper_ink}\">Article 4 — Commission Rebate</div>\
+         <p class=\"pillar-preview__sample-text\">The Registered Dealer shall remit the Commission Rebate to the Corporation within five (5) Business Days of receipt, net of any Offering Costs advanced under Section 3.2.</p>\
+         </div>\
+         <div class=\"pillar-preview__rows\">\
+         <div class=\"pillar-preview__row\"><code>paper.primitive.color.ink</code><span class=\"pillar-preview__row-value\">{paper_ink}</span></div>\
+         <div class=\"pillar-preview__row\"><code>paper.primitive.rule.standard</code><span class=\"pillar-preview__row-value\">{paper_rule}</span></div>\
+         <div class=\"pillar-preview__row\"><code>paper.primitive.rule.emphasis</code><span class=\"pillar-preview__row-value\">{paper_rule_emphasis}</span></div>\
+         </div>\
+         <p class=\"pillar-preview__caption\">{paper_preview_caption}</p>\
+         </div>\
+         <div class=\"pillar-preview__card\">\
+         <h3>{writing_preview_h3}</h3>\
+         <p class=\"pillar-preview__body\">{writing_preview_caption}</p>\
+         <div class=\"pillar-preview__rows\">{register_rows}</div>\
+         </div>\
          </div>\
          </section>\
          <section class=\"act\">\
@@ -325,8 +413,8 @@ async fn render_index(state: &AppState, lang: Lang) -> Html<String> {
          <div class=\"proof-panel__stats\">\
          <div class=\"proof-stat\"><div class=\"proof-stat__value\">{item_total}</div><div class=\"proof-stat__label\">{proof_l1}</div></div>\
          <div class=\"proof-stat\"><div class=\"proof-stat__value\">{token_count}</div><div class=\"proof-stat__label\">{proof_l2}</div></div>\
-         <div class=\"proof-stat\"><div class=\"proof-stat__value\">4</div><div class=\"proof-stat__label\">{proof_l3}</div></div>\
-         <div class=\"proof-stat\"><div class=\"proof-stat__value\">6</div><div class=\"proof-stat__label\">{proof_l4}</div></div>\
+         <div class=\"proof-stat\"><div class=\"proof-stat__value\">5</div><div class=\"proof-stat__label\">{proof_l3}</div></div>\
+         <div class=\"proof-stat\"><div class=\"proof-stat__value\">{paper_family_count}</div><div class=\"proof-stat__label\">{proof_l4}</div></div>\
          </div>\
          <div class=\"curl-block\"><span class=\"curl-prompt\">$ </span><span class=\"curl-cmd\">curl</span> https://design.pointsav.com/components/button/recipe.json\n\
 <span class=\"curl-note\"># {proof_example_label}</span>\n\
@@ -395,6 +483,7 @@ pub async fn tokens_gallery_page(State(state): State<AppState>) -> Html<String> 
         .sum();
     let total_categories: usize = tiers.iter().map(|t| t.groups.len()).sum();
     let total_tiers = tiers.len();
+    let nav_html = render::render_nav_tokens(&state.env, &tiers);
     let body = state
         .env
         .get_template("tokens.html")
@@ -407,7 +496,6 @@ pub async fn tokens_gallery_page(State(state): State<AppState>) -> Html<String> 
         })
         .expect("render tokens.html failed");
 
-    let nav_html = render::render_nav(&state.env, &state.component_groups, "", "");
     Html(render::shell(
         &state.env,
         &state.vault,
@@ -484,12 +572,13 @@ pub async fn adoption_page(State(state): State<AppState>) -> Html<String> {
 
 pub async fn item_redirect(
     Path((section, slug)): Path<(String, String)>,
+    Query(langq): Query<LangQuery>,
     State(state): State<AppState>,
 ) -> Response {
     if slug.contains("..") || slug.contains('/') {
         return (StatusCode::BAD_REQUEST, "invalid").into_response();
     }
-    if !vault::is_known_section(&section) {
+    if !vault::is_publicly_reachable(&section) {
         return (StatusCode::NOT_FOUND, "unknown section").into_response();
     }
     let tabs = vault::discover_tabs(&state.vault, &section, &slug);
@@ -497,17 +586,39 @@ pub async fn item_redirect(
         .into_iter()
         .next()
         .unwrap_or_else(|| vault::default_tab(&section).to_string());
-    Redirect::permanent(&format!("/{}/{}/{}", section, slug, first)).into_response()
+    // Preserve ?lang=es through the redirect -- otherwise a Spanish-language visitor
+    // hitting the bare /section/slug URL silently loses the language signal and lands
+    // back on English content at the resolved tab.
+    let suffix = if langq.lang.as_deref() == Some("es") {
+        "?lang=es"
+    } else {
+        ""
+    };
+    Redirect::permanent(&format!("/{section}/{slug}/{first}{suffix}")).into_response()
 }
 
 pub async fn item_tab(
     Path((section, slug, tab)): Path<(String, String, String)>,
+    Query(langq): Query<LangQuery>,
     State(state): State<AppState>,
 ) -> Response {
-    if slug.contains("..") || slug.contains('/') || tab.contains("..") || tab.contains('/') {
+    // Fable-audit finding (2026-08-02): `tab` was checked for ".." and "/" but not a
+    // bare ".", so a URL like /components/button/usage.es built content_path's
+    // "usage.es" + ".md" = "usage.es.md" -- the deliberately-filtered Spanish sibling
+    // file (vault.rs excludes `.es.md` from discover_tabs/nav/search everywhere else)
+    // -- and served it at an English-labeled URL: wrong `lang` in the page chrome
+    // (based on `?lang=es`, not the tab name), a tab-bar that can't highlight
+    // "usage.es" as active, and a duplicate-content URL search engines could index.
+    // Real tab values are plain slugs (usage/accessibility/code/style) with no dots.
+    if slug.contains("..")
+        || slug.contains('/')
+        || tab.contains("..")
+        || tab.contains('/')
+        || tab.contains('.')
+    {
         return (StatusCode::BAD_REQUEST, "invalid").into_response();
     }
-    if !vault::is_known_section(&section) {
+    if !vault::is_publicly_reachable(&section) {
         return (StatusCode::NOT_FOUND, "unknown section").into_response();
     }
     // A flat section (research/developing/designing/about) has exactly one canonical
@@ -521,7 +632,15 @@ pub async fn item_tab(
         return (StatusCode::NOT_FOUND, "item not found").into_response();
     }
     let md_path = vault::content_path(&state.vault, &section, &slug, &tab);
-    let raw = match fs::read_to_string(&md_path) {
+    let wants_es = langq.lang.as_deref() == Some("es");
+    let es_path = md_path.with_extension("es.md");
+    let es_available = es_path.is_file();
+    let (lang, effective_path) = if wants_es && es_available {
+        (Lang::Es, es_path)
+    } else {
+        (Lang::En, md_path)
+    };
+    let raw = match fs::read_to_string(&effective_path) {
         Ok(s) => s,
         Err(_) => return (StatusCode::NOT_FOUND, "tab not found").into_response(),
     };
@@ -533,7 +652,8 @@ pub async fn item_tab(
     // P1.1 — live component preview (recipe.json variants, sandboxed via iframe).
     // Phase 3 — origin + freshness meta badges, ahead of the preview.
     if section == "components" {
-        let badges = component_meta::render_meta_badges(&state.component_groups, &state.vault, &slug);
+        let badges =
+            component_meta::render_meta_badges(&state.component_groups, &state.vault, &slug);
         if let Some(preview) = component_preview::render_preview(&state.vault, &slug) {
             content = format!("{badges}{preview}{content}");
         } else {
@@ -572,6 +692,15 @@ pub async fn item_tab(
             )
         });
     let path = format!("/{section}/{slug}/{tab}");
+    let page_lang = if es_available {
+        PageLang {
+            lang,
+            alt_en_path: path.clone(),
+            alt_es_path: format!("{path}?lang=es"),
+        }
+    } else {
+        PageLang::en_only()
+    };
 
     Html(render::shell(
         &state.env,
@@ -581,7 +710,7 @@ pub async fn item_tab(
         &format!("{} — PointSav Design System", label),
         &description,
         &path,
-        &PageLang::en_only(),
+        &page_lang,
         &nav_html,
         &tab_bar,
         &label,
@@ -641,7 +770,11 @@ pub async fn component_recipe(Path(slug): Path<String>, State(state): State<AppS
     if slug.contains("..") || slug.contains('/') {
         return (StatusCode::BAD_REQUEST, "invalid").into_response();
     }
-    let recipe_path = state.vault.join("components").join(&slug).join("recipe.json");
+    let recipe_path = state
+        .vault
+        .join("components")
+        .join(&slug)
+        .join("recipe.json");
     match fs::read_to_string(&recipe_path) {
         Ok(raw) => ([(header::CONTENT_TYPE, "application/json")], raw).into_response(),
         Err(_) => (StatusCode::NOT_FOUND, "component not found").into_response(),

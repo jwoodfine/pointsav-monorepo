@@ -11,7 +11,7 @@ alternate_venue: "Computers & Security (Elsevier, IF 7.98); IEEE Transactions on
 authors:
   - name: "Peter M. Woodfine"
     affiliation: "Woodfine Management Corp., New York, NY, USA"
-    email: jmwoodfine@gmail.com
+    email: corporate.secretary@woodfinegroup.com
     orcid: ""
     credit_roles:
       - Conceptualization
@@ -49,7 +49,7 @@ keywords:
   - audit log integrity
 bcsc_class: no-disclosure-implication
 ai_tool_used: "claude-sonnet-4-6 (Anthropic)"
-corresponding_author: jmwoodfine@gmail.com
+corresponding_author: corporate.secretary@woodfinegroup.com
 word_count_body: 6400
 word_count_target: 9000
 submission_status: not-submitted
@@ -127,7 +127,7 @@ notes_for_editor: |
 **Woodfine Management Corp.**
 New York, NY, USA
 
-*Corresponding author:* jmwoodfine@gmail.com
+*Corresponding author:* corporate.secretary@woodfinegroup.com
 
 ---
 

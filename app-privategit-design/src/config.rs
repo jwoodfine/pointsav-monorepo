@@ -1,12 +1,12 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
+
 
 use std::{collections::HashMap, env, path::PathBuf};
 
 pub struct Config {
     pub vault: PathBuf,
     pub bind: String,
-    pub doorman_url: String,
     pub tenant: String,
     /// DESIGN-BUNDLE mounts: bundle name -> canonical source directory owned by
     /// another archive (mounted read-only for serving + /download; never copied).
@@ -30,7 +30,18 @@ pub struct Config {
     /// canonical URLs for itself — the same class of bug templates_dir/static_dir
     /// already hit (a compile-time/hardcoded value silently wrong on another
     /// deployment). Only the promoted foundry-prod deploy should set
-    /// DESIGN_SITE_ORIGIN=https://design.pointsav.com.
+    /// DESIGN_PUBLIC_URL=https://design.pointsav.com.
+    ///
+    /// Fable-audit finding (2026-08-02): this previously read only
+    /// `DESIGN_SITE_ORIGIN`, a variable nothing ever actually sets --
+    /// `local-design.service` (and, presumably, its promoted counterpart) sets
+    /// `DESIGN_PUBLIC_URL` instead, so this had silently fallen back to the
+    /// `http://<bind>` loopback default in every real deployment, confirmed live:
+    /// `robots.txt`/`sitemap.xml`/canonical tags/`llms.txt` were all emitting
+    /// `http://127.0.0.1:9094/...` instead of `https://design.pointsav.com/...`.
+    /// Now reads `DESIGN_PUBLIC_URL` (matching the deployed unit) with
+    /// `DESIGN_SITE_ORIGIN` kept as a fallback alias in case anything else already
+    /// depends on the older name.
     pub site_origin: String,
 }
 
@@ -45,10 +56,17 @@ impl Config {
         );
 
         let mut bundle_mounts = HashMap::new();
+        // Was clones/project-editorial/media-knowledge-documentation/.internal/style-guides —
+        // a real public product feature that happened to sit under a path named .internal/
+        // in a public wiki repo, which a 2026-08-03 AI-tooling-removal sweep correctly deleted.
+        // Moved to pointsav-design-system/editorial-style-guide/ as first-class product content
+        // (no .internal/, no agent vocabulary — structurally out of scope for future sweeps of
+        // that kind), synced to the vault via bin/sync-style-guides.sh (same pattern as
+        // bin/sync-design-tokens.sh for the "tokens" mount below).
         bundle_mounts.insert(
             "editorial-style-guide".to_string(),
             PathBuf::from(env::var("BUNDLE_MOUNT_EDITORIAL_STYLE_GUIDE").unwrap_or_else(|_| {
-                "/srv/foundry/clones/project-editorial/media-knowledge-documentation/.internal/style-guides".to_string()
+                vault.join("editorial-style-guide").to_string_lossy().into_owned()
             })),
         );
         // P1.11 — "Get started / Download tokens" front door: the compiled DTCG bundle
@@ -61,21 +79,23 @@ impl Config {
             ),
         );
 
-        let templates_dir = PathBuf::from(env::var("DESIGN_TEMPLATES_DIR").unwrap_or_else(|_| {
-            concat!(env!("CARGO_MANIFEST_DIR"), "/templates").to_string()
-        }));
-        let static_dir = PathBuf::from(env::var("DESIGN_STATIC_DIR").unwrap_or_else(|_| {
-            concat!(env!("CARGO_MANIFEST_DIR"), "/static").to_string()
-        }));
+        let templates_dir = PathBuf::from(
+            env::var("DESIGN_TEMPLATES_DIR")
+                .unwrap_or_else(|_| concat!(env!("CARGO_MANIFEST_DIR"), "/templates").to_string()),
+        );
+        let static_dir = PathBuf::from(
+            env::var("DESIGN_STATIC_DIR")
+                .unwrap_or_else(|_| concat!(env!("CARGO_MANIFEST_DIR"), "/static").to_string()),
+        );
 
         let bind = env::var("DESIGN_BIND").unwrap_or_else(|_| "127.0.0.1:9094".to_string());
-        let site_origin = env::var("DESIGN_SITE_ORIGIN").unwrap_or_else(|_| format!("http://{bind}"));
+        let site_origin = env::var("DESIGN_PUBLIC_URL")
+            .or_else(|_| env::var("DESIGN_SITE_ORIGIN"))
+            .unwrap_or_else(|_| format!("http://{bind}"));
 
         Config {
             vault,
             bind,
-            doorman_url: env::var("DOORMAN_URL")
-                .unwrap_or_else(|_| "http://127.0.0.1:9092".to_string()),
             tenant: env::var("DESIGN_TENANT").unwrap_or_else(|_| "pointsav".to_string()),
             bundle_mounts,
             templates_dir,
