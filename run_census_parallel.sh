@@ -1,6 +1,6 @@
 #!/bin/bash
-export PYTHONPATH=$PYTHONPATH:/srv/foundry/clones/project-gis/pointsav-monorepo/app-orchestration-gis
-mkdir -p /srv/foundry/deployments/cluster-totebox-personnel-1/service-fs/service-census/logs
+export PYTHONPATH=$PYTHONPATH:"$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+mkdir -p "${GIS_CENSUS_OUTPUT_DIR:?GIS_CENSUS_OUTPUT_DIR must be set (2026-08-19 GitHub-exposure remediation - no real-value default) - point it at the census service output directory}logs"
 
 for iso in usa can mex gbr deu fra nld aut grc dnk pol; do
   echo "Launching background ingest for $iso..."
@@ -11,9 +11,15 @@ import rasterio
 from rasterio.windows import Window
 import numpy as np
 from utils.spatial_filter import ClusterFilter
-CLUSTERS_META = '/srv/foundry/deployments/gateway-orchestration-gis-1/www/data/clusters-meta.json'
-DATA_BASE_DIR = '/srv/foundry/deployments/cluster-totebox-personnel-1/service-fs/service-census/raw/'
-OUTPUT_DIR = '/srv/foundry/deployments/cluster-totebox-personnel-1/service-fs/service-census/'
+CLUSTERS_META = os.environ.get('GIS_CLUSTERS_META')
+if not CLUSTERS_META:
+    raise SystemExit('GIS_CLUSTERS_META must be set (2026-08-19 GitHub-exposure remediation - no real-value default) - point it at the GIS gateway deployment clusters-meta.json')
+DATA_BASE_DIR = os.environ.get('GIS_CENSUS_RAW_DIR')
+if not DATA_BASE_DIR:
+    raise SystemExit('GIS_CENSUS_RAW_DIR must be set (2026-08-19 GitHub-exposure remediation - no real-value default) - point it at the census service raw-data directory')
+OUTPUT_DIR = os.environ.get('GIS_CENSUS_OUTPUT_DIR')
+if not OUTPUT_DIR:
+    raise SystemExit('GIS_CENSUS_OUTPUT_DIR must be set (2026-08-19 GitHub-exposure remediation - no real-value default) - point it at the census service output directory')
 iso = '$iso'
 cf = ClusterFilter(CLUSTERS_META, threshold_km=150.0)
 input_file = os.path.join(DATA_BASE_DIR, f'{iso}_pop_2026.tif')
@@ -47,5 +53,5 @@ with rasterio.open(input_file) as src:
                             lon, lat = transform * (c + col_idx + 0.5, r + row_idx + 0.5)
                             if cf.is_active(lon, lat):
                                 out.write(json.dumps({'lat': round(lat, 6), 'lon': round(lon, 6), 'pop': float(val)}) + '\n')
-" > /srv/foundry/deployments/cluster-totebox-personnel-1/service-fs/service-census/logs/${iso}_ingest.log 2>&1 &
+" > "${GIS_CENSUS_OUTPUT_DIR:?GIS_CENSUS_OUTPUT_DIR must be set (2026-08-19 GitHub-exposure remediation - no real-value default) - point it at the census service output directory}logs/${iso}_ingest.log" 2>&1 &
 done

@@ -1,5 +1,6 @@
-// SPDX-License-Identifier: AGPL-3.0-or-later
+// SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
+
 
 // DESIGN-BUNDLE directory mounts — list, serve, and zip-download an entire
 // externally-owned directory (canonical-source-with-downstream-mount, DOCTRINE §IV.e).
@@ -8,7 +9,7 @@ use crate::{i18n::PageLang, render, schema, state::AppState, vault};
 use axum::{
     extract::{Path, State},
     http::{header, StatusCode},
-    response::{Html, IntoResponse, Response},
+    response::{Html, IntoResponse, Redirect, Response},
 };
 use std::{fs, io::Write, path::Path as StdPath};
 
@@ -51,6 +52,12 @@ fn list_bundle_files(dir: &StdPath) -> Vec<BundleFile> {
 fn content_type_for(filename: &str) -> &'static str {
     if filename.ends_with(".css") {
         "text/css; charset=utf-8"
+    } else if filename == "tokens.full.json" {
+        // DTCG's own registered media type (Format Module, 2025.10) — every other
+        // .json file served through this generic bundle route (component recipes,
+        // other externally-mounted DESIGN-BUNDLE directories) stays plain
+        // application/json below; only the DTCG token export itself gets this.
+        "application/design-tokens+json; charset=utf-8"
     } else if filename.ends_with(".json") {
         "application/json; charset=utf-8"
     } else {
@@ -85,7 +92,9 @@ pub async fn list(Path(name): Path<String>, State(state): State<AppState>) -> Re
         &state.component_groups,
         &state.site_origin,
         &format!("{title} — PointSav Design System"),
-        &format!("Download the {title} bundle from the PointSav Design System — {file_count} files."),
+        &format!(
+            "Download the {title} bundle from the PointSav Design System — {file_count} files."
+        ),
         &path,
         &PageLang::en_only(),
         &nav_html,
@@ -106,14 +115,29 @@ pub async fn file(
     let Some(dir) = state.bundle_mounts.get(&name) else {
         return (StatusCode::NOT_FOUND, "bundle not found").into_response();
     };
-    let Ok(raw) = fs::read_to_string(dir.join(&filename)) else {
+    // Fable-audit finding (2026-08-02): this used to read the file as a String via
+    // `fs::read_to_string`, which errors on any non-UTF-8 file -- silently 404ing
+    // any binary file a DESIGN-BUNDLE mount happens to list (list_bundle_files lists
+    // every file regardless of content type). Both mounts today are text-only, so no
+    // live impact yet, but the route is meant to be a generic bundle-file server, not
+    // text-only. Reading raw bytes first and only decoding to a String for the .md
+    // rendering branch below (the one path that genuinely needs text) makes this
+    // binary-safe for whatever gets mounted next.
+    let Ok(raw_bytes) = fs::read(dir.join(&filename)) else {
         return (StatusCode::NOT_FOUND, "file not found").into_response();
     };
 
     if !filename.ends_with(".md") {
-        return ([(header::CONTENT_TYPE, content_type_for(&filename))], raw).into_response();
+        return (
+            [(header::CONTENT_TYPE, content_type_for(&filename))],
+            raw_bytes,
+        )
+            .into_response();
     }
 
+    let Ok(raw) = String::from_utf8(raw_bytes) else {
+        return (StatusCode::INTERNAL_SERVER_ERROR, "not valid UTF-8").into_response();
+    };
     let (frontmatter, body) = vault::parse_frontmatter(&raw);
     let schema_type = schema::detect(&frontmatter);
     let content = schema::render(schema_type, &frontmatter, &body);
@@ -125,7 +149,10 @@ pub async fn file(
         &state.component_groups,
         &state.site_origin,
         &format!("{filename} — PointSav Design System"),
-        &format!("{filename}, from the {} bundle in the PointSav Design System.", vault::to_title(&name)),
+        &format!(
+            "{filename}, from the {} bundle in the PointSav Design System.",
+            vault::to_title(&name)
+        ),
         &format!("/bundles/{name}/{filename}"),
         &PageLang::en_only(),
         &nav_html,
@@ -173,4 +200,13 @@ pub async fn download(Path(name): Path<String>, State(state): State<AppState>) -
         buf.into_inner(),
     )
         .into_response()
+}
+
+/// `/tokens.json` — documentation (get-started.md, the Foundations page, and the
+/// TOPIC-figma-tokens-studio-integration wiki article all promise this exact path) has
+/// always named the export `/tokens.json`, but the real server route only ever served it
+/// at `/bundles/tokens/tokens.full.json`. A 308 permanent redirect closes that gap without
+/// duplicating the bundle route or renaming the canonical file.
+pub async fn tokens_json_redirect() -> Redirect {
+    Redirect::permanent("/bundles/tokens/tokens.full.json")
 }
