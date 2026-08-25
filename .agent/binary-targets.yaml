@@ -56,11 +56,54 @@ targets:
       timed out) for the full observation window.
       `os-mediakit/scripts/build-image.sh` itself contains zero partition/label/mkfs
       logic — it only customizes an already-partitioned base Ubuntu cloud image via
-      qemu-nbd — so this is either (a) a real defect already present in the shipped
+      qemu-nbd — so this was either (a) a real defect already present in the shipped
       artifact, or (b) a udev/by-label-symlink timing artifact specific to slow
-      QEMU/TCG software emulation (no /dev/kvm on this host) that would not reproduce
-      under KVM. Not yet distinguished between (a) and (b) — needs either a KVM-capable
-      host retest or a longer systemd device-timeout kernel arg to isolate. **Until this
-      is resolved, "Format B is live and working" should be treated as unverified, not
-      confirmed** — full detail and the open follow-up are in
-      BRIEF-os-mediakit-product-family.md.
+      QEMU/TCG software emulation (no /dev/kvm on this host).
+
+      **UPDATE 2026-08-25 — Phase F root cause done, (a) ruled out.** Mounted the same
+      artifact (sha256 re-verified unchanged) read-only via qemu-nbd and inspected the
+      partition table/labels/fstab directly, without booting: GPT layout, filesystem
+      labels (UEFI, BOOT), and /etc/fstab are all present, correctly formatted, and
+      mutually consistent — no defect in the shipped image. This rules out (a) and
+      leaves (b) — a TCG/udev timing artifact under software emulation — as the
+      remaining explanation.
+
+      **UPDATE 2026-08-25 (same day, later) — (b) confirmed and fixed; a second,
+      previously-masked defect found and fixed; artifact rebuilt.** Added
+      `systemd.device-timeout=300` to the kernel cmdline in `build-image.sh` (baked
+      into every future build, not just a one-off patch) — confirmed via two separate
+      boot tests (a hand-patched throwaway copy, then the real rebuilt artifact) that
+      this eliminates the emergency-mode failure: by-label devices are found
+      immediately, `local-fs.target` succeeds, boot reaches the login prompt cleanly.
+      This also surfaced a **second, independent defect** that hypothesis (a)'s
+      emergency-mode failure had been masking: the three `wiki-*.service` units were
+      gated on `network-online.target` (`After=`/`Wants=`), which — separately from
+      the device-timeout issue — never completes under this host's QEMU/TCG+slirp
+      test networking (`systemd-networkd-wait-online.service` hangs with no timeout),
+      so the wiki processes never even attempted to start. Fixed in `build-image.sh`:
+      changed the unit dependency to `network.target` (the app binds `0.0.0.0`
+      locally and doesn't need DHCP/DNS resolved first). Confirmed via a full
+      end-to-end rebuild + boot test: all three `wiki-{documentation,projects,
+      corporate}.service` units now show `Started` in the boot log (previously: zero
+      mentions of any wiki unit anywhere in the log — they never fired at all).
+      Also found and fixed, incidentally, while rebuilding: `build-image.sh`'s
+      hardcoded `IMAGE_SIZE="2G"` default was smaller than the current upstream
+      Ubuntu 24.04 minimal cloud image's own virtual size (3.5 GiB, grown since this
+      pipeline was written), which corrupts the GPT backup header on any default
+      build — script now auto-detects `IMAGE_SIZE` from the downloaded base image.
+
+      **Still unverified: end-to-end HTTP reachability.** With both fixes applied,
+      the rebuilt artifact (sha256
+      921fcb8b2602d27c7146d50aa202114c776f85471924cc522a8310f8f261eb59) boots cleanly
+      and starts all three wiki services, but `/healthz` on all three hostfwd'd ports
+      still timed out (curl exit 28, connection timeout — not connection refused)
+      after 3 separate attempts up to 30s each. No DHCP/link-up evidence appears in
+      the captured serial log either way. Most likely explanation, consistent with
+      the same TCG/software-emulation class of artifact already identified for the
+      original defect (no `/dev/kvm` on this host): the guest's virtio-net interface
+      had not yet completed a slirp DHCP lease by the time of the check, which would
+      make host→guest hostfwd forwarding fail regardless of application readiness.
+      **Not yet confirmed either way** — needs either a longer soak or a
+      KVM-capable-host retest before "Format B is live and working end-to-end" can be
+      called confirmed. Full detail in BRIEF-os-mediakit-product-family.md's
+      Decisions-open #7.
