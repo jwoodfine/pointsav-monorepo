@@ -6,12 +6,14 @@ title: "os-mediakit + app-mediakit-* — product-family architecture and develop
 status: active
 owner: project-knowledge
 created: 2026-08-06
-updated: 2026-08-10 (build-out plan added)
+updated: 2026-08-24 (VM topology ratified at 1 VM — see Work log)
 related_briefs:
   - command-os-product-family
 cites:
   - command-os-product-family
   - command-sovereign-os-family-master-plan
+  - infrastructure/wireguard/README.md
+  - project-infrastructure/BRIEF-ppn-infrastructure-reference.md
 ---
 
 # BRIEF — os-mediakit + app-mediakit-* product family
@@ -70,63 +72,67 @@ first draft, converging on the same fix in D3 especially. See Work log.**
 | D3 | **Ownership split, operator-directed 2026-08-06**: project-knowledge owns `os-mediakit` (base) + `app-mediakit-knowledge` (first product, live) — already true, already done. `app-mediakit-marketing` → project-marketing. `app-mediakit-distributions` → project-newsroom. **Corrected**: `app-mediakit-marketing` is NOT a scaffold — real, deployed, live (~770+ lines of Rust across `server.rs`/`content.rs`/`config.rs`/`mcp.rs`/`pending.rs`, bilingual content for two brands, a deployed binary with month(s) of dated backups, two running systemd units `local-marketing.service`/`local-marketing-pointsav.service`). Only `app-mediakit-distributions` (a 7-line `lib.rs`) is a genuine empty scaffold. This correction changes Decisions-open #4 below materially. |
 | D4 | **Wiki-content record is substantially improved, not fully accurate — verify claims, don't blanket-trust.** `systems/os-mediakit.md` (rewritten 2026-08-06) correctly hedges Phase 3 and matches D1/current-state on the QCOW2 mechanism. **But** its "Phase 1: what's running today" section asserts a `vm-mediakit` VM that does not exist (no such systemd unit, no `/srv/foundry/infrastructure/local-vm-mediakit/`, no running QEMU process — confirmed directly) — the same class of unverified-present-tense claim that caused the original fabricated-article incident, just smaller in scope. Flagged to Command/project-editorial (see Carry-forward) rather than silently absorbed here. |
 | D5 | **project-totebox's own `os-mediakit`/`app-mediakit-knowledge` directories are not a competing effort.** Every archive's `pointsav-monorepo` sub-clone is a full checkout of the same canonical monorepo — project-totebox's copy is a byte-identical scaffold from normal shared-repo structure, and their own `BRIEF-os-orchestration-platform.md` §7b explicitly disclaims ownership. Minor note for them: that disclaimer names the owner as "project-mediakit," which does not exist in `pairings.yaml` — a small phantom-archive citation error on their side, not ours to fix. |
-| D6 | **Pattern A (Microkit + `vendor-libvmm` Linux-guest) is the right mechanism if/when `os-mediakit` migrates to seL4, and should be treated as os-mediakit's *terminal* architecture, not an interim step toward bare metal.** Locked after independent Opus + Fable convergence (both, unprompted, reached the same recommendation with the same reasoning — see Work log): `app-mediakit-knowledge`/`-marketing` are tokio/glibc-linked binaries requiring nginx+certbot in-guest per D2; a `no_std` bare-metal rewrite is a non-starter for an ACME-capable TLS-terminating web tier, unlike `os-totebox`'s data-vault threat model which actually motivates bare-metal PD isolation. Real cost this adds, not previously tracked: Pattern A as practiced is AArch64 (Microkit boards, `qemu-system-aarch64`); today's binaries are x86_64 — Phase 3 includes a cross-arch recompile and rootfs/toolchain rework, not just "port the same binary into a guest." |
+| D6 | **Pattern A (Microkit + `vendor-libvmm` Linux-guest) is the right mechanism if/when `os-mediakit` migrates to seL4, and should be treated as os-mediakit's *terminal* architecture, not an interim step toward bare metal.** Locked after independent Opus + Fable convergence (both, unprompted, reached the same recommendation with the same reasoning — see Work log): `app-mediakit-knowledge`/`-marketing` are tokio/glibc-linked binaries requiring nginx+certbot in-guest per D2; a `no_std` bare-metal rewrite is a non-starter for an ACME-capable TLS-terminating web tier, unlike `os-totebox`'s data-vault threat model which actually motivates bare-metal PD isolation. Real cost this adds, not previously tracked: Pattern A as practiced is AArch64 (Microkit boards, `qemu-system-aarch64`); today's binaries are x86_64 — Phase 3 includes a cross-arch recompile and rootfs/toolchain rework, not just "port the same binary into a guest." **CAVEAT added 2026-08-24**: given this BRIEF's own first draft is confirmed to have fabricated other citations (Decisions-open #1/#3), the "independent Opus + Fable convergence" claim itself was re-checked this session and could not be verified — no git history, session-context entry, or artifact survives for any 2026-08-06 review of this BRIEF (this file's earliest git commit, 2026-08-09, is explicitly marked "recovered after VM crash," and no `.agent/` activity from 2026-08-06 survived that crash at all). This is not proof the review didn't happen — the crash plausibly explains total data loss — but it cannot be confirmed either, and per the operator's standing instruction not to re-assert unconfirmable claims, D6's *provenance* is unconfirmed even though its underlying engineering reasoning (tokio/glibc requiring a Linux guest, AArch64-only Microkit) checks out independently on its own technical merits. |
 
 ## Decisions open
 
-1. **VM topology for Phase 3 — resolved to a specific shape, needs Command sign-off since
-   it touches ratified §L.** The original framing ("1 combined vs. 5 separate") was a false
-   binary — both reviewers independently converged on the same middle position:
-   **VM boundary per *binary*, not per *tenant*, as the Phase 3 floor — 3 VMs
-   (`mediakit-knowledge-vm`, `mediakit-marketing-vm`, `mediakit-dist-vm` once real) —
-   with per-tenant splitting of the knowledge VM (→ the full 5 already named in doctrine
-   §L, `mediakit-knowledge-vm-1/2/3` at PPN 10.42.40.1–.3) reserved as the end state,
-   triggered explicitly rather than done upfront.** Reasoning: the three wiki tenants run
-   the byte-identical `app-mediakit-knowledge` binary — any RCE is exploitable against all
-   three regardless of VM boundaries, so per-tenant VMs buy mainly post-exploit containment,
-   not attack-surface reduction; marketing and distribution are genuinely different code
-   with different exposure (distribution eventually touches payment/license logic), where a
-   VM boundary earns its cost. Doctrine's own §L already accepts same-binary co-tenancy
-   elsewhere (`mediakit-marketing-vm` already co-tenants two brand sites of the same
-   binary) — applying that same standard to knowledge yields 3 VMs, not 5, as the starting
-   shape. **Named split trigger** (not yet operator-confirmed, proposed here): split
-   `mediakit-knowledge-vm` per-tenant when a wiki tenant crosses a trust-domain line —
-   concretely, when `corporate.woodfinegroup.com` starts carrying regulated/BCSC-sensitive
-   content, or a tenant gets an external-facing editor audience per the Record Keeping
-   product vision. **This is a proposed sequencing amendment to ratified §L, not a
-   fait accompli — needs Command's explicit sign-off**, since §L already names the full
-   5-VM end state with allocated PPN IPs; nothing here contradicts that end state, only
-   the order/pace of getting there.
+1. **VM topology for Phase 3 — RATIFIED 2026-08-24: 1 VM, not 3 or 5.**
+   Full arc: this item's original citations (DOCTRINE.md §L, invented 5-VM end state +
+   host IPs) were found fabricated by Command and corrected 2026-08-24, citing the real
+   substrate instead (`infrastructure/wireguard/README.md` reserves `10.42.40.0/24` for
+   media-* standalone VMs — real, but with no host-count or IP-assignment decision in it).
+   The corrected version proposed a fresh 3-VM-per-binary floor. Command brought that to
+   the operator, who initially chose a 5-VM per-tenant shape instead (weighting
+   post-exploit containment over operational cost) — but before that closed out, Command's
+   host-ingress investigation (item 2 below) surfaced a real, previously-unreconciled plan
+   conflict: `project-infrastructure`'s own `BRIEF-ppn-infrastructure-reference.md`
+   (2026-06-30, genuinely real) already has a §2 "Three-VM Layout (Tier B)" budgeting a
+   **single** `vm-mediakit` guest (6 GiB, all 6 media-* deployments combined,
+   self-terminating its own nginx TLS/public-HTTPS) alongside `vm-workspace`/
+   `vm-intelligence` — two months old, different archive, never reconciled against either
+   of today's proposals.
 
-2. **New — host-ingress ownership, surfaced by both reviewers, not previously tracked
-   anywhere.** Once Phase 3 lands (any VM count > 1), multiple VMs sit behind one public
-   IP — port 443 binds once at the host. Nobody owns SNI-based L4 passthrough or per-VM
-   public IP allocation today; D2's OS/app boundary doesn't cover this (it's a host/
-   infrastructure-layer concern, not `os-mediakit`-guest-layer). Needs an explicit owner
-   (likely `os-infrastructure` or `os-network-admin`) before Phase 3, not assumed to fall
-   out of D2 automatically.
+   **Final ruling, operator-directed**: start with **1 VM** (`vm-mediakit`), matching
+   project-infrastructure's existing Tier B budget — not 5, not 3. All 3 wiki tenants +
+   marketing + dist run on this one VM initially; avoid committing to a larger topology
+   ahead of real cost/usage data. The per-binary reasoning from the 3-VM proposal (a
+   byte-identical binary means RCE isn't contained by VM boundaries anyway) still supports
+   *not* over-splitting early, so it's consistent with this outcome even though the VM
+   count differs from what was proposed here. Split beyond 1 VM is a future decision,
+   triggered by real need, not pre-planned now. Command has flagged directly to
+   project-infrastructure that their Tier B plan is being adopted as the actual Phase 3
+   starting point.
 
-3. **Doctrine inconsistencies to flag to Command — three, not one, corrected/expanded from
-   the original single naming-typo finding:**
-   - **Naming**: `app-mediakit-distribution` (singular) appears in doctrine §F's
-     deployments table and §L, and again in §R.2 — not §Q.7 as originally (wrongly) cited
-     here. The real crate is `app-mediakit-distributions` (plural), matching
-     `architecture/six-tier-sovereignty-matrix.md`'s own already-self-flagged correction.
-   - **Bootability contradiction — more consequential than the naming issue**: doctrine
-     §Q.7's base/extension table classifies `os-mediakit` as `Extension` / "Bootable alone:
-     No — layers onto os-console" / Reserved. This directly contradicts §F (describes it as
-     a full OS tier), §L (five standalone VMs with dedicated PPN IPs), §B (a reserved `/24`
-     for media standalone VMs), and the real `build-image.sh` (a genuinely standalone
-     bootable QCOW2 that layers on nothing). §R.1 already tracks an §A-vs-§Q.7 conflict but
-     frames it around `os-interface`, not os-mediakit's bootability — this is a second,
-     separate instance of the same class of doctrine drift, not a duplicate of R.1.
-   - **`software.pointsav.com` co-tenant status is stale**: doctrine §F lists
-     `media-distribution-software-1` → software.pointsav.com as `simulation_status:
-     co-tenant`; the freshly rewritten wiki article states software.pointsav.com is in
-     practice served entirely by `app-privategit-marketplace`/`app-privategit-source`, with
-     no `app-mediakit-distribution*` instance deployed anywhere. One of these is wrong;
-     doctrine is the more likely stale one given the article was written same-day against
-     live verification, but this needs Command's confirmation, not this BRIEF's guess.
+2. **Host-ingress ownership — largely moot for the near term, given the 1-VM ruling above.**
+   A single VM behind a plain host port-forward doesn't need SNI-based multi-VM routing;
+   worth reopening only if/when a real split happens later. Investigation before that
+   ruling landed (kept for record): neither `os-infrastructure` nor `os-network-admin` is
+   documented anywhere as an actual hypervisor/host layer for other products' guest VMs —
+   both are themselves guest-level OS products, same category as `os-mediakit`, not a
+   dom0/host layer. There is no host-assignment decision anywhere yet for where these VMs
+   would even run (GCP Compute Engine vs. a to-be-determined local/PPN-hosted QEMU-KVM
+   host) — that's the real blocker if this ever reopens, not a pick between the two named
+   candidates. Separately, `project-infrastructure`'s own `BRIEF-ppn-infrastructure-
+   reference.md` §1 confirms `os-infrastructure` IS meant to become the hypervisor
+   substrate eventually — worth cross-referencing project-infrastructure's architecture
+   docs directly before any future os-mediakit infra proposal, not just DOCTRINE.md/
+   conventions.
+
+3. **RETRACTED 2026-08-24 — this entire item was built on fabricated citations, not
+   verified this session against any real source.** §F, §L, §Q.7, §B, §R.1, §R.2 do not
+   exist anywhere in DOCTRINE.md (confirmed against its full history, zero matches ever —
+   see Decisions-open #1's correction above for the one exception, the real PPN `/24`
+   reservation, which lives in `infrastructure/wireguard/README.md`, not DOCTRINE.md, and
+   carries no bootability-classification content). I checked for a real base/extension
+   bootability table and a real deployments table with `media-distribution-software-1`
+   co-tenant status elsewhere in the repo (DOCTRINE.md directly, `conventions/architecture-
+   layer-catalog.md`, `conventions/software-distribution-substrate.md`) and found neither —
+   unlike the PPN case, I found no real substrate underneath these three claims. The naming
+   fix (`app-mediakit-distributions`, plural) may still be a real, independently-verifiable
+   correction — but needs re-deriving from an actual current source, not resent with these
+   citations. Not re-investigated further this session; if this is still worth pursuing,
+   it needs a fresh pass citing only content actually found by reading the source, the same
+   discipline applied to Decisions-open #1 above.
 
 4. ~~**Sequencing — the original gate ("wait for another app-mediakit-* product to be real")
    had a false premise per D3's correction — marketing is already real. Both reviewers
@@ -194,29 +200,110 @@ first draft, converging on the same fix in D3 especially. See Work log.**
    the start (Build-out plan, Phase 0) — verify the vendored Makefile's `BUILD_DIR` support
    directly before relying on it, don't assume.
 
-7. **NEW 2026-08-10 — `os-mediakit.qcow2` (Format B) does not boot to a working state;
-   root cause not isolated.** First real end-to-end smoke test (this session): booted
-   headless under `qemu-system-x86_64` with `-snapshot` (artifact confirmed unmutated,
-   sha256 matched before/after), hostfwd'd to non-colliding ports. Kernel/GRUB/root-fs
-   (mounted by `PARTUUID`) all came up cleanly, but `/dev/disk/by-label/BOOT` and a second
-   by-label device (`boot-efi.mount`'s dependency) both timed out at systemd's 90s device
-   wait, `local-fs.target` failed, and the guest dropped into emergency mode and stayed
-   there — none of the 3 wiki systemd units ever started, all 3 `/healthz` endpoints
-   unreachable for the full observation window. `build-image.sh` itself has zero
-   partition/label/mkfs logic (it only customizes an already-partitioned base Ubuntu cloud
-   image via `qemu-nbd`), so this is either (a) a genuine defect already present in the
-   shipped artifact — possibly introduced by the `qemu-nbd`-based customization/resize
-   step, or inherited unnoticed from the base cloud image's own UEFI-oriented partition
-   layout — or (b) a udev/by-label-symlink timing artifact specific to slow QEMU/TCG
-   emulation (no `/dev/kvm` on this host) that would not reproduce under KVM. **Not
-   distinguished between these two — needs either a KVM-capable host retest, a longer
-   systemd device-timeout kernel arg, or a direct look at the partition table/labels via
-   `qemu-nbd` mount to settle it.** Until resolved: BRIEF-binary-distribution.md's claim
-   that "Format B ... LIVE 2026-07-01" should be treated as **unverified at the boot
-   level**, not confirmed-working — Command's 2026-07-01 confirmation was of the upload/
-   listing going live on software.pointsav.com, not evidence anyone booted the image
-   end-to-end. Real customer impact if uninvestigated: BETA customers downloading Format B
+7. **UPDATED 2026-08-25 — Phase F root-cause done: (a) ruled out, points to (b).**
+   `os-mediakit.qcow2` still does not boot to a working state (2026-08-10 finding
+   below stands), but the direct `qemu-nbd` partition/label inspection this BRIEF's own
+   Phase F called for is now done, settling which of the two hypotheses is real.
+
+   Connected the artifact read-only via `qemu-nbd` (sha256 verified unmutated before
+   and after — `cf7b2dc4...`), inspected without booting:
+   - Partition table: standard GPT, 4 partitions (`p1` root 2.5G, `p14` BIOS-boot 4M,
+     `p15` EFI System 106M, `p16` extended-boot 913M) — exactly the shape a genuine
+     Ubuntu 24.04 cloud image should have. No corruption, no missing partitions.
+   - Filesystem labels: `p15` = `UEFI` (vfat), `p16` = `BOOT` (ext4) — both present,
+     both correctly formatted. Mounted `p1` (root) and `p16` (`/boot`) directly, both
+     mount cleanly with no filesystem errors.
+   - `/etc/fstab` on the root partition: `LABEL=BOOT /boot`, `LABEL=UEFI /boot/efi` —
+     matches the on-disk labels exactly. (The original boot log's truncated "U…" is
+     now confirmed to be "UEFI", not some other unexpected label.)
+   - `/boot`'s own contents (kernel, initramfs, grub.cfg) are intact and well-formed;
+     grub's kernel cmdline uses `root=PARTUUID=...` (matching the root partition's real
+     PARTUUID) with no custom `systemd.device-timeout=`/`rd.timeout=` argument — boots
+     with systemd's stock 90s default, consistent with the observed "timed out at 90s"
+     symptom.
+
+   **Conclusion: hypothesis (a) — a real defect in the shipped artifact — is ruled
+   out.** The partition table, filesystem labels, and fstab are internally consistent
+   and correctly matched; there is nothing wrong with the disk image itself. This
+   leaves **hypothesis (b) — a udev/by-label-symlink timing artifact specific to slow
+   QEMU/TCG software emulation (no `/dev/kvm` on this host)** as the far more likely
+   explanation, though a KVM-capable-host retest is still the only way to fully confirm
+   it rather than infer it by elimination. **Recommended next step, cheap and
+   low-risk**: add `systemd.device-timeout=300` (or similar) to the grub kernel cmdline
+   and re-run the original boot smoke test — if that alone gets the guest past
+   `local-fs.target`, it confirms (b) conclusively and is a real, shippable fix
+   (widening a timeout, not patching around a defect). Not yet attempted this session.
+
+   Until that retest lands, `BRIEF-binary-distribution.md`'s claim that "Format B ...
+   LIVE 2026-07-01" should still be treated as **unverified at the boot level**, not
+   confirmed-working — Command's 2026-07-01 confirmation was of the upload/listing
+   going live on software.pointsav.com, not evidence anyone booted the image end to
+   end. Real customer impact if uninvestigated: BETA customers downloading Format B
    today may hit this same emergency-mode hang.
+
+   **UPDATE 2026-08-25 (same day, later) — hypothesis (b) confirmed, real fix landed
+   in `build-image.sh`; a second, independent defect found underneath it; artifact
+   rebuilt; end-to-end reachability still open.**
+
+   Added `systemd.device-timeout=300` to the grub kernel cmdline as a permanent
+   step in `build-image.sh` (patches `grub.cfg` on the BOOT-labelled partition after
+   the systemd-unit-install step; idempotent, warns rather than fails if no
+   BOOT-labelled partition is found). Confirmed via two boot tests — first a
+   hand-patched throwaway copy, then a fully rebuilt real artifact — that this
+   eliminates the emergency-mode failure outright: by-label devices resolve
+   immediately, `local-fs.target` succeeds, the guest reaches the login prompt.
+   **Hypothesis (b) is now confirmed, not just inferred by elimination.**
+
+   Fixing (b) unmasked a **second, previously-hidden defect**: the three
+   `wiki-*.service` units carried `After=network-online.target` /
+   `Wants=network-online.target`. Under this host's QEMU/TCG+slirp test networking,
+   `systemd-networkd-wait-online.service` never completes (no timeout on that job),
+   so the wiki units — gated behind it — never fired at all. This was invisible
+   before because emergency mode always intervened first. Fixed in `build-image.sh`:
+   changed the dependency to plain `network.target` (the app binds `0.0.0.0` locally
+   and needs no DHCP/DNS resolution to start). Confirmed by rebuild + reboot: all
+   three `wiki-{documentation,projects,corporate}.service` units now log `Started`
+   (previously: zero mentions of any wiki unit in the boot log, ever).
+
+   Incidental third fix, found while rebuilding: `build-image.sh`'s hardcoded
+   `IMAGE_SIZE="2G"` default is smaller than the current upstream Ubuntu 24.04
+   minimal cloud image's own virtual size (now 3.5 GiB — it has grown since this
+   pipeline was written), which corrupts the overlay's GPT backup header on any
+   default-settings build (`could not detect ext4 root partition` / `Alternate GPT
+   is invalid`). `IMAGE_SIZE` is now auto-detected from the downloaded base image
+   unless explicitly overridden.
+
+   **Still open: end-to-end HTTP reachability.** With all three fixes applied, the
+   rebuilt artifact (sha256
+   `921fcb8b2602d27c7146d50aa202114c776f85471924cc522a8310f8f261eb59`) boots cleanly
+   and starts all three wiki services, but `/healthz` on all three hostfwd'd ports
+   timed out (curl exit 28 — connection timeout, not connection refused) across 3
+   attempts up to 30s. No DHCP/link-up evidence appears in the captured serial log
+   either way, so this can't yet be attributed with confidence. Leading hypothesis,
+   consistent with the same TCG/software-emulation class of artifact as the original
+   defect (no `/dev/kvm` on this host): the guest's virtio-net interface may not
+   have completed its slirp DHCP lease by the time of the check, which would block
+   host→guest hostfwd forwarding regardless of app readiness. **Not yet confirmed
+   either way** — needs a longer soak or a KVM-capable-host retest before "Format B
+   is live and working end-to-end" can be called confirmed, as distinct from "Format
+   B boots and starts its services," which is now confirmed.
+
+   <details><summary>2026-08-10 original finding (superseded above, kept for record)</summary>
+
+   First real end-to-end smoke test (that session): booted headless under
+   `qemu-system-x86_64` with `-snapshot` (artifact confirmed unmutated, sha256 matched
+   before/after), hostfwd'd to non-colliding ports. Kernel/GRUB/root-fs (mounted by
+   `PARTUUID`) all came up cleanly, but `/dev/disk/by-label/BOOT` and a second by-label
+   device (`boot-efi.mount`'s dependency) both timed out at systemd's 90s device wait,
+   `local-fs.target` failed, and the guest dropped into emergency mode and stayed there
+   — none of the 3 wiki systemd units ever started, all 3 `/healthz` endpoints
+   unreachable for the full observation window. `build-image.sh` itself has zero
+   partition/label/mkfs logic (it only customizes an already-partitioned base Ubuntu
+   cloud image via `qemu-nbd`), so this was either (a) a genuine defect already present
+   in the shipped artifact, or (b) a udev/by-label-symlink timing artifact — not
+   distinguished at the time.
+
+   </details>
 
 ## Build-out plan — bootable seL4/Microkit os-mediakit running app-mediakit-knowledge
 
@@ -267,12 +354,20 @@ future third download option.
 `git2 = "0.20"` (binds `libgit2`, a C library) and `syntect = "5"` (default features may pull
 in `onig`, a C Oniguruma binding, unless built with `regex-fancy` instead) — both candidates
 for the same class of FFI/C-dependency pain that cost project-totebox's own build a
-multi-bug cross-compile saga on `LadybugDB`. Check these **first** (Phase 0), don't discover
-them mid-build. Also reconcile a real apparent gap: `conventions/soft-distribution-pipeline.md`
-§4 lists `aarch64-unknown-linux-gnu` as fleet-wide "Planned — requires Docker + `cross`,
-operator decision pending," yet project-totebox clearly has *something* working already (real,
-built, deployed aarch64 binaries) — find out whether their toolchain is directly reusable
-before assuming a fresh one is needed.
+multi-bug cross-compile saga on `LadybugDB`.
+
+**RESOLVED 2026-08-25 — non-issue, real cross-compile attempted, not just checked for risk
+on paper.** Ran the actual Phase 0 build this warned to run first: `cargo build --release
+--target aarch64-unknown-linux-gnu` (with `CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=
+aarch64-linux-gnu-gcc`, `PKG_CONFIG_ALLOW_CROSS=1`) for `app-mediakit-knowledge`, on this
+VM. **Finished clean in 19m11s, zero errors, zero warnings for `git2`/`syntect`/`onig`** —
+both flagged crates cross-compiled without incident. Verified the output is a real ARM
+binary (`file`: "ELF 64-bit LSB pie executable, ARM aarch64... for GNU/Linux"), not just a
+clean exit code. The aarch64 toolchain question is also resolved as a side effect: both the
+`aarch64-unknown-linux-gnu` rustup target and `aarch64-linux-gnu-gcc` were already installed
+on this VM (same toolchain `project-sel4`'s own BRIEF independently confirmed working for
+their Microkit PD builds) — no fresh toolchain setup was needed, `conventions/soft-
+distribution-pipeline.md` §4's "Planned" status is stale for this host specifically.
 
 ### TLS/ACME — new ground, designed in from the start (operator: "this is unique to
 os-mediakit so we need to get it right")
@@ -302,11 +397,15 @@ abandoned H0–H8 native-PD track)
   artifact defect vs. TCG/udev timing artifact. Fix, then re-verify with a real boot (same
   method as the 2026-08-10 smoke test: `-snapshot`, alternate host ports).
 
-- **Phase 0 — Preflight.** Confirm the vendored Makefile's `BUILD_DIR` support (per-product
-  isolation from day one, see Decisions-open #6). Resolve the aarch64 toolchain question
-  above. Attempt a bare `cargo build --release --target aarch64-unknown-linux-gnu` for
-  `app-mediakit-knowledge` to surface `git2`/`syntect` issues immediately, before any
-  guest-rootfs work depends on it succeeding.
+- **Phase 0 — Preflight. DONE 2026-08-25.** `vendor-libvmm`'s Makefiles confirmed to
+  have real, working `BUILD_DIR ?= build` support (`?=` is externally overridable,
+  `export`ed to sub-makes) — verified directly in `vendor-libvmm/examples/virtio/
+  Makefile`, not assumed. Per-product isolation (`make BUILD_DIR=os-mediakit-build ...`)
+  is real and available from day one, closing Decisions-open #6's mitigation. aarch64
+  toolchain and `git2`/`syntect` cross-compile risk both resolved — see the "Known
+  cross-compile risk" note above: real build attempted, finished clean, zero issues.
+  **Phase 0 gate cleared — Phase F and Phase 0 are both done; G1 (boot) is the next
+  real implementation step, not yet started.**
 
 - **G1 — Boot.** Bare `loader.img` boots under `qemu-system-aarch64` (TCG, no KVM needed —
   see above) to a real login prompt.
@@ -358,6 +457,36 @@ indefinitely.
 
 ## Work log
 
+- **2026-08-25 (Phase F + Phase 0, real hands-on work, not planning)** — Cross-checked
+  against `project-sel4`'s real native-seL4 work for os-totebox first (their own
+  BRIEF, 2,479 lines, read in full): confirmed native seL4 PDs are not viable for
+  `app-mediakit-knowledge` (a tokio/axum/tantivy/git2/reqwest service hits every wall
+  their rigorous Phase 5 re-assessment already found, plus their exact TLS-client gap
+  via `reqwest`), confirming Pattern A as the only near-term-viable path. Sent
+  project-sel4 a low-priority long-horizon research request anyway (full dependency
+  detail, framed as a future candidate once their middle-path items mature, not an
+  ask to reprioritize). Sent project-totebox (MBA/gateway status) and Command
+  (canonical-stability sanity check) narrow, non-blocking check-ins; sent
+  project-system a status check on `vendor-sel4-kernel`'s build health plus a
+  long-term heads-up about a second consumer of their crate family, explicitly not
+  asking them to reprioritize the known branch-inversion crisis.
+
+  **Phase F**: mounted `os-mediakit.qcow2` read-only via `qemu-nbd` (sha256 verified
+  unmutated before/after), inspected the partition table/labels/`fstab` directly
+  without booting — ruled out hypothesis (a) (a real image defect); partition table,
+  `UEFI`/`BOOT` labels, and fstab are all correct and mutually consistent. Leaves
+  hypothesis (b) (TCG/udev timing artifact under software emulation) as the only
+  remaining explanation, with a concrete next test identified (`systemd.device-
+  timeout=` kernel arg) but not yet run.
+
+  **Phase 0**: verified `vendor-libvmm`'s `BUILD_DIR` override support directly in
+  its Makefiles (real, not assumed). Ran the actual aarch64 cross-compile this phase
+  exists to de-risk — `cargo build --release --target aarch64-unknown-linux-gnu` for
+  `app-mediakit-knowledge` — rather than just re-asserting the risk on paper: finished
+  clean in 19m11s, zero errors/warnings for `git2`/`syntect`, real ARM binary produced
+  and verified via `file`. Both Phase F and Phase 0 gates are now cleared; G1 (boot)
+  is the next real implementation step, not started this session.
+
 - **2026-08-06 (research)** — Read `BRIEF-os-product-family.md` (active doctrine, all 21
   sections) and `BRIEF-sovereign-os-family-master-plan.md` (superseded, provenance only);
   read project-totebox's `BRIEF-os-orchestration-platform.md` in full and directly
@@ -403,8 +532,68 @@ indefinitely.
   the full **Build-out plan** section (Phase F/0/G1/G2/G2.5/G3/G-TLS/G4/SIGTERM/Deploy) above.
   No G1+ engineering work started — this session's deliverable is the documentation itself.
 
+- **2026-08-24 (fabricated-citation re-verification)** — Command's investigation into item
+  #48 (VM topology sign-off) found Decisions-open #1's DOCTRINE.md §L/§Q.7 citations, and
+  #3's §F/§B/§R.1/§R.2 citations, do not exist anywhere in DOCTRINE.md — confirmed
+  independently this session against DOCTRINE.md's full 30-commit git history (zero matches,
+  ever; not restructuring drift). Operator's explicit direction: distrust the whole BRIEF,
+  not just the citations. Re-verified per Command's checklist
+  (`command-20260824-what-s-needed-before-command-picks-48-ba`):
+  1. Decisions-open #1 corrected — found a *real* substrate underneath the VM-topology claim
+     (`infrastructure/wireguard/README.md` reserves `10.42.40.0/24` for media-* standalone
+     VMs, real and current) but the specific "5-VM end state"/host IPs/DOCTRINE.md §L
+     attribution were invented beyond that real reservation. Rewrote as a fresh proposal
+     citing the real source, keeping the underlying engineering reasoning (sound on its own
+     merits) but dropping the false "already ratified" framing.
+  2. Decisions-open #3 retracted outright — checked DOCTRINE.md directly plus the two
+     conventions files that mention `os-mediakit`
+     (`architecture-layer-catalog.md`, `software-distribution-substrate.md`); found no real
+     base/extension bootability table or deployments-table co-tenant status anywhere. Unlike
+     #1, no real substrate found — not re-derived this session, left as an open task if
+     still wanted.
+  3. D6's "independent Opus + Fable convergence" claim checked for surviving evidence — none
+     found (no `.agent/` git activity from 2026-08-06, no session-context entry, no named
+     artifact). This file's own earliest commit (2026-08-09) is marked "recovered after VM
+     crash," consistent with total data loss rather than the claim being invented from
+     nothing, but genuinely unconfirmable either way. Added an explicit caveat to D6 rather
+     than silently re-asserting the claim.
+  4. Root-cause check (shared with D4's `vm-mediakit` fabrication): not the same session —
+     D4 traces to project-editorial's 2026-08-06 wiki rewrite (a different archive, different
+     file, predating this file's earliest git history by 3 days) — so no provable shared
+     corrupted-source cause, but the same underlying failure pattern (confident, specific,
+     never-verified-against-source claims) recurring a third time across the original
+     fabricated-article incident, D4, and this one.
+
+- **2026-08-24 (VM topology ratified)** — Command independently re-verified the
+  2026-08-24 re-verification pass above (checked the real `10.42.40.0/24` citation, the
+  isolated invented content, the #3 retraction, and the D6 caveat directly against source —
+  not self-certified) and confirmed it met the bar. Brought Decisions-open #1/#2 to the
+  operator. Initial call: 5-VM per-tenant (operator weighted post-exploit containment over
+  the 3-VM proposal's operational-cost reasoning). Superseded same session: Command's
+  host-ingress investigation surfaced `project-infrastructure`'s own
+  `BRIEF-ppn-infrastructure-reference.md` (2026-06-30, real, never reconciled against
+  today's proposals) already budgeting a single `vm-mediakit` guest under its Tier B plan.
+  **Final ruling: 1 VM**, not 5 or 3 — matches project-infrastructure's existing budget,
+  avoids committing to a larger topology ahead of real cost/usage data. Decisions-open #1
+  and #2 rewritten above to reflect this as the ratified outcome, with the superseded 3-VM
+  and 5-VM proposals kept in the Work log (this entry) for provenance, not restated as
+  live options in Decisions-open itself.
+
 ## Carry-forward
 
+- ~~**Resend the sign-off request to Command per their checklist**~~ **RESOLVED 2026-08-24**
+  — item #48 is closed. Sign-off request sent (`command-20260824-re-verified-brief-os-
+  mediakit-product-fa`), Command independently re-verified it and brought Decisions-open
+  #1/#2 to the operator; final ruling (1 VM, not 5 or 3) landed same session — see the
+  new 2026-08-24 (VM topology ratified) Work log entry and the rewritten Decisions-open
+  #1/#2 above. Nothing further pending on this thread.
+- **NEW 2026-08-24 — next concrete step, now that topology is ratified**: the Build-out
+  plan's Phase F/Phase 0 sequencing doesn't change (still binary-per-VM structure, just
+  1 VM total instead of 3), but Phase 0's cross-compile/toolchain work and the G-series
+  gate ladder should be read once more against a single-VM target before implementation
+  starts — e.g. G2.5's guest-rootfs step now installs all of knowledge+marketing+dist
+  into one rootfs rather than per-product ones. Not re-derived this session — flagging so
+  the Build-out plan section isn't read as still assuming the superseded 3-VM shape.
 - ~~**Send Command a consolidated doctrine-correction message**~~ **SENT 2026-08-10**
   (`msg-id: command-20260810-os-mediakit-answer-consolidated-doctrine`, in reply to
   `command-20260806-question-does-os-mediakit-get-the-same-s`). Single message covering:
