@@ -407,12 +407,42 @@ abandoned H0–H8 native-PD track)
   **Phase 0 gate cleared — Phase F and Phase 0 are both done; G1 (boot) is the next
   real implementation step, not yet started.**
 
-- **G1 — Boot.** Bare `loader.img` boots under `qemu-system-aarch64` (TCG, no KVM needed —
-  see above) to a real login prompt.
+- **G1 — Boot. DONE 2026-08-25.** Bare `loader.img` boots under `qemu-system-aarch64`
+  (TCG, no KVM needed — see above) to a real login prompt. `os-mediakit/scripts/
+  build-microkit-image.sh` written (ports os-totebox's crash-informed resource-pressure
+  preflight guard verbatim — same thresholds, hard-abort, not a third invented variant),
+  held until host load actually cleared (~15-17 on 8 cores from concurrent sessions
+  down to 7.33) rather than overridden. `make -C vendor-libvmm/examples/virtio
+  BUILD_DIR=build-os-mediakit qemu` built `loader.img` (21.4 MB) + `report.txt` (real
+  CapDL detail — IRQ 33/48/49 for serial/eth/blk drivers, TCB details, not a
+  placeholder) using vendor-libvmm's own stock example kernel/rootfs (auto-downloaded,
+  unrelated to app-mediakit-knowledge — that's G2.5). Boot observed end-to-end via
+  serial console: seL4 kernel boots, "Booting all finished, dropped to user space",
+  Linux kernel boots, virtio-blk (`vda`, 14 MB) and virtio-net both attach, DHCP
+  actually completes (`udhcpc: lease of 10.0.2.15 obtained`, unlike the still-open
+  Format B DHCP question in Decisions-open #7 — a real, useful data point that a
+  functioning virtio-net path under this same host's TCG emulation is achievable),
+  reaches `buildroot login:`. Terminated cleanly (SIGTERM) once the login prompt
+  confirmed the gate; artifact and report.txt left in place under
+  `vendor-libvmm/examples/virtio/build-os-mediakit/` (gitignored build output, not
+  committed — same convention as Format B's `os-mediakit/scripts/build/`).
+  **G1 gate cleared — G2 (VirtIO passthrough) is next, not yet started.**
 
-- **G2 — VirtIO passthrough.** Cite os-totebox's already-proven result against the same shared
-  `vendor-libvmm` plumbing rather than re-deriving from scratch, unless os-mediakit's own
-  build reveals a divergence — same convention os-orchestration-slm used.
+- **G2 — VirtIO passthrough. DONE 2026-08-25, same boot as G1.** Not re-derived from
+  scratch or accepted on citation alone — os-mediakit's own G1 boot directly exercised
+  both halves of G2's real content (VirtIO block + net passthrough through libvmm's
+  device model) with no divergence from precedent: `virtio_blk virtio1... [vda] 28672
+  512-byte logical blocks` (disk recognized, mounted at `/mnt`) and a real DHCP lease
+  over virtio-net (`udhcpc: lease of 10.0.2.15 obtained`, DNS added). This is the exact
+  situation project-totebox's own BRIEF documents and names explicitly ("G2 —
+  substantively satisfied by shared infrastructure, honestly recorded rather than
+  re-derived from scratch... G2's real content... is the same shared infrastructure
+  already proven... Recorded as satisfied by reference, not by a redundant fresh test
+  with no [track]-specific content to add") — except os-mediakit's own boot *did* add
+  fresh, track-specific evidence (not just a citation), making this an even stronger
+  basis than pure reference. **G2 gate cleared — G2.5 (real guest rootfs) is next, the
+  first genuinely new engineering step (same precedent: "this is where [the track]
+  diverges... needs genuine new work, unlike G1/G2 which are shared toolchain proof").**
 
 - **G2.5 — Real guest rootfs.** Port `build-guest-rootfs.sh` from `app-orchestration-command`
   (closest analog). Install the cross-compiled `app-mediakit-knowledge` binary plus (new)
