@@ -283,11 +283,18 @@ role          = "primary"
 blueprint_set = ["TOPIC"]
 TOML
 
-# Lock down config directory permissions.
-sudo chmod 0750 "${MOUNT_POINT}/etc/wiki"
+# Lock down config directory permissions. File-level chmod/chown BEFORE the
+# directory lockdown below — the *.toml glob expands in the invoking shell,
+# not inside sudo's privileged one; only harmless here because this whole
+# script is normally run via `sudo bash build-image.sh` (root shell can
+# always read the directory regardless of its mode), but fragile against
+# any other invocation style. Found and fixed for real in
+# build-guest-rootfs.sh (2026-08-26) when run without a whole-script sudo
+# wrapper — applying the same defensive ordering here.
 sudo chown "root:${WIKI_GID}" "${MOUNT_POINT}/etc/wiki"
 sudo chmod 0640 "${MOUNT_POINT}/etc/wiki/"*.toml
 sudo chown "root:${WIKI_GID}" "${MOUNT_POINT}/etc/wiki/"*.toml
+sudo chmod 0750 "${MOUNT_POINT}/etc/wiki"
 
 # ── 5e. Install systemd service units ────────────────────────────────────────
 echo "[systemd units]"
