@@ -153,9 +153,16 @@ role          = "primary"
 blueprint_set = ["TOPIC", "GUIDE"]
 TOML
 done
-sudo chmod 0750 "${OVERLAY}/etc/wiki"
 sudo chown -R "root:${WIKI_GID}" "${OVERLAY}/etc/wiki"
+# File-level chmod BEFORE the directory lockdown below — the glob
+# ("${OVERLAY}/etc/wiki/"*.toml) expands in this unprivileged shell, not
+# inside sudo's privileged one; once the directory itself is chmod 0750
+# (root:wiki, unreadable to the invoking user), the glob can no longer
+# match anything and bash passes the literal "*.toml" through, which then
+# 404s against a file that doesn't exist. Real bug, found running this
+# script for real (2026-08-26) — not caught by bash -n syntax checking.
 sudo chmod 0640 "${OVERLAY}/etc/wiki/"*.toml
+sudo chmod 0750 "${OVERLAY}/etc/wiki"
 
 # ── 5. Install /init — a direct appliance-style PID 1, not full systemd ────────
 # Supervises all 3 tenants as background children — the one genuinely new
