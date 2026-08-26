@@ -333,11 +333,11 @@ pub fn footer(tenant: Tenant, legal: &LegalTokens, site_description: Option<&str
                 // falls back to Tenant::tagline() only when no index.md
                 // short_description exists.
                 div."k-footer__brand" {
-                    div."k-footer__brand-mark" {
-                        (logo_mark())
+                    div."k-footer__brand-mark" { (logo_mark()) }
+                    div."k-footer__brand-text" {
                         p."k-footer__brand-name" { (tenant.home_label()) }
+                        p."k-footer__brand-tagline" { (site_description.unwrap_or_else(|| tenant.tagline())) }
                     }
-                    p."k-footer__brand-tagline" { (site_description.unwrap_or_else(|| tenant.tagline())) }
                 }
                 div."k-footer__grid" {
                     div."k-footer__col" {
@@ -378,20 +378,24 @@ pub fn footer(tenant: Tenant, legal: &LegalTokens, site_description: Option<&str
                         }
                     }
                 }
-                // Identity bar — collapsed to 2 rows 2026-08-25 (Command/
-                // project-editorial UI-fix batch, real cross-model live
-                // measurement: the prior 4-row stack measured 113px tall,
-                // 58-67% as tall as the entire nav grid above it). Row 1:
-                // locations+badges+copyright on one baseline. Row 2: one
-                // full-width fine-print paragraph (disclaimer + trademark
-                // merged, no 60ch cap — the cap was what forced the
-                // trademark text to wrap to 5 lines on its own row). The
-                // real mobile-legibility fix from the 2026-07-15
-                // restructure (badges no longer buried under legal text)
-                // is kept — mobile stacking is scoped to <=768px only, see
-                // the media query below, not undone by this collapse.
+                // Identity bar — collapsed to 2 rows 2026-08-25/26 (Command/
+                // project-editorial UI-fix batch, exact diff per msg
+                // command-20260826-footer-redesign-exact-css-layout-rs-mark;
+                // real cross-model live measurement: the prior 4-row stack
+                // measured 113px tall, 58-67% as tall as the entire nav grid
+                // above it). Row 1 (.k-footer__baseline): 3 direct children
+                // (cities, badges, copyright) — justify-content:
+                // space-between spreads them without a manual trailing-
+                // margin hack. Row 2 (.k-footer__fineprint): one full-width
+                // paragraph (disclaimer + trademark merged, no 60ch cap —
+                // the cap was what forced the trademark text to wrap to 5
+                // lines on its own row). The real mobile-legibility fix
+                // from the 2026-07-15 restructure (badges no longer buried
+                // under legal text) is kept — mobile stacking is scoped to
+                // <=768px only, see the media query below, not undone by
+                // this collapse.
                 div."k-footer__identity" {
-                    div."k-footer__identity-row k-footer__identity-row--locations" {
+                    div."k-footer__baseline" {
                         div."k-footer__cities" {
                             // Middot separator, not pipe — site-footer recipe's
                             // content_conventions.separator: "the live sites'
@@ -401,9 +405,6 @@ pub fn footer(tenant: Tenant, legal: &LegalTokens, site_description: Option<&str
                                 @if i > 0 { span."k-footer__cities-sep" aria-hidden="true" { "\u{00b7}" } }
                                 span { (city) }
                             }
-                        }
-                        p."k-footer__copyright" {
-                            "\u{00a9} 2026 " (legal.copyright.holder)
                         }
                         div."k-footer__badges" {
                             // Powered by MediaKit (the engine).
@@ -436,6 +437,9 @@ pub fn footer(tenant: Tenant, legal: &LegalTokens, site_description: Option<&str
                                 }
                             }
                         }
+                        p."k-footer__copyright" {
+                            "\u{00a9} 2026 " (legal.copyright.holder)
+                        }
                     }
                     // Fine-print paragraph — disclaimer + trademark notice merged
                     // (was 2 separate rows, one capped at 60ch which forced the
@@ -445,7 +449,7 @@ pub fn footer(tenant: Tenant, legal: &LegalTokens, site_description: Option<&str
                     // are reserved independently of the CC BY 4.0 content licence,
                     // so no blanket "all rights reserved" (content is openly
                     // licensed).
-                    p."k-footer__legal" {
+                    p."k-footer__fineprint" {
                         (tenant.disclaimer_line())
                         " \u{00b7} "
                         (legal.trademarks.statement)
