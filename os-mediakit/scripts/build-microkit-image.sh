@@ -22,13 +22,26 @@
 # G3 (2026-08-26): G2.5 landed a real os-mediakit guest rootfs
 # (build/guest-rootfs/rootfs.cpio.gz, all 3 wiki tenants baked in) — pass
 # INITRD= pointing at it to boot the real appliance instead of the stock
-# example. LINUX (the kernel) is still the stock example's — os-mediakit
-# doesn't build its own kernel, same as the precedent scripts.
+# example. Also required a CONFIG_UNIX=y guest kernel rebuild
+# (build-guest-kernel.sh) — the stock example kernel panics any real
+# tokio-based service.
+#
+# G4 (2026-08-26): pass FOUNDRY_EXTRA_BOOTARGS='foundry.mode=smoketest' to
+# run /init's smoke-test + SIGTERM self-test path instead of staying up as
+# a production appliance. Ported the substitution mechanism itself (this
+# script's pass-through plus vendor-libvmm/examples/virtio's own
+# linux.dts/@@FOUNDRY_EXTRA_BOOTARGS@@ + virtio.mk changes) from
+# project-totebox's identical fix to this same shared example — QEMU's
+# `-append` doesn't work with this image's `-device loader` boot path, so
+# runtime config has to be baked into the DTB at build time instead.
 #
 # Usage: run from os-mediakit/ (same convention as os-totebox):
 #   bash scripts/build-microkit-image.sh                                # G1: stock example
 #   INITRD=$(pwd)/build/guest-rootfs/rootfs.cpio.gz \
 #     bash scripts/build-microkit-image.sh                              # G3: real rootfs
+#   INITRD=$(pwd)/build/guest-rootfs/rootfs.cpio.gz \
+#     FOUNDRY_EXTRA_BOOTARGS='foundry.mode=smoketest' \
+#     bash scripts/build-microkit-image.sh                              # G4: smoke test
 set -euo pipefail
 
 BUILD_DIR="build-os-mediakit"
@@ -36,6 +49,7 @@ MICROKIT_BOARD="qemu_virt_aarch64"
 MICROKIT_SDK="${MICROKIT_SDK:-/opt/microkit-sdk-2.2.0}"
 LIBVMM_VIRTIO_DIR="../vendor-libvmm/examples/virtio"
 INITRD="${INITRD:-}"
+FOUNDRY_EXTRA_BOOTARGS="${FOUNDRY_EXTRA_BOOTARGS:-}"
 
 [ -d "${MICROKIT_SDK}" ] || {
     echo "error: MICROKIT_SDK not found at ${MICROKIT_SDK}" >&2
@@ -80,18 +94,20 @@ if [ -n "${INITRD}" ]; then
         echo "error: INITRD=${INITRD} not found" >&2
         exit 1
     }
-    echo "  building Microkit/libvmm image (BUILD_DIR=${BUILD_DIR}, INITRD=${INITRD})..."
+    echo "  building Microkit/libvmm image (BUILD_DIR=${BUILD_DIR}, INITRD=${INITRD}, FOUNDRY_EXTRA_BOOTARGS='${FOUNDRY_EXTRA_BOOTARGS}')..."
     exec make -C "${LIBVMM_VIRTIO_DIR}" \
         MICROKIT_BOARD="${MICROKIT_BOARD}" \
         MICROKIT_SDK="${MICROKIT_SDK}" \
         BUILD_DIR="${BUILD_DIR}" \
         INITRD="${INITRD}" \
+        FOUNDRY_EXTRA_BOOTARGS="${FOUNDRY_EXTRA_BOOTARGS}" \
         qemu
 else
-    echo "  building Microkit/libvmm image (BUILD_DIR=${BUILD_DIR}, stock example LINUX/INITRD)..."
+    echo "  building Microkit/libvmm image (BUILD_DIR=${BUILD_DIR}, stock example LINUX/INITRD, FOUNDRY_EXTRA_BOOTARGS='${FOUNDRY_EXTRA_BOOTARGS}')..."
     exec make -C "${LIBVMM_VIRTIO_DIR}" \
         MICROKIT_BOARD="${MICROKIT_BOARD}" \
         MICROKIT_SDK="${MICROKIT_SDK}" \
         BUILD_DIR="${BUILD_DIR}" \
+        FOUNDRY_EXTRA_BOOTARGS="${FOUNDRY_EXTRA_BOOTARGS}" \
         qemu
 fi
