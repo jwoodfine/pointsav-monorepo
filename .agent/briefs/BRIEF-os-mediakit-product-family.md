@@ -444,10 +444,45 @@ abandoned H0–H8 native-PD track)
   first genuinely new engineering step (same precedent: "this is where [the track]
   diverges... needs genuine new work, unlike G1/G2 which are shared toolchain proof").**
 
-- **G2.5 — Real guest rootfs.** Port `build-guest-rootfs.sh` from `app-orchestration-command`
-  (closest analog). Install the cross-compiled `app-mediakit-knowledge` binary plus (new)
-  `nginx`/`certbot` packages into the debootstrap overlay, using Phase 0's `BUILD_DIR`
-  isolation rather than the shared, twice-bitten path.
+- **G2.5 — Real guest rootfs. DONE 2026-08-26.** Ported `build-guest-rootfs.sh` from
+  `app-orchestration-command`, adapted for the one real technical difference: 3 supervised
+  processes of the SAME binary (documentation/projects/corporate tenants), not 2 different
+  binaries. G-TLS (nginx/certbot) deliberately not part of this build — descoped this pass,
+  no real public reachability in this test environment to terminate TLS against (see G-TLS
+  below, still not started).
+
+  Two real bugs found and fixed running this for real, not caught by planning or `bash -n`:
+  (1) the host's shared `cargo-target/` directory is swept by a disk-pressure-triggered
+  systemd timer (`foundry-cargo-target-cleanup.timer`, ~every 30 min) that correctly
+  protects a directory while a cargo process is actively building into it, but NOT once
+  that process exits — so the freshly cross-compiled aarch64 binary was deleted mid-way
+  through the ~90-minute debootstrap step that needed it as a later input. Reported to
+  Command (msg project-knowledge-20260826-real-gap-found-in-cargo-target-cleanup-s);
+  workaround used: copy the binary out of `cargo-target/` to `os-mediakit/build/
+  cross-compiled-aarch64/` immediately after building, before starting any long
+  downstream step. (2) `etc/wiki/*.toml`'s chmod/chown ordering: the directory was locked
+  down (0750, root:wiki) BEFORE the `*.toml` glob-based chmod ran — the invoking
+  (unprivileged) shell expands that glob before `sudo` executes, so once the directory
+  was unreadable to it the glob matched nothing and bash passed the literal `*.toml`
+  through, 404ing. Fixed by reordering (file-level chmod before directory lockdown);
+  `build-image.sh` has the identical pattern, only silently protected by its own
+  `sudo bash build-image.sh` whole-script invocation convention — fixed defensively there
+  too.
+
+  Also had to add `FOUNDRY_RESOURCE_GUARD_BYPASS=1` to the preflight guard — host load
+  stayed at 8-21 on 8 cores for the entire build sequence (other concurrent Totebox
+  sessions), never settling on its own; operator explicitly approved overriding rather
+  than waiting indefinitely. Matches this workspace's existing override-env-var idiom
+  (`FOUNDRY_SECRET_PATTERN_BYPASS`, `FOUNDRY_CONFIRM_DESTRUCTIVE`) — the guard itself
+  stays a hard default for any future unattended run.
+
+  Final artifact: `os-mediakit/build/guest-rootfs/rootfs.cpio.gz`, 93,279,402 bytes
+  (~89 MiB compressed, ~306 MiB uncompressed), sha256
+  `8584ad93183c50ec1da41209013d91e1ea2705baf45703ca00e7c8e09b9f5b73`. Contains the real
+  `app-mediakit-knowledge` binary, all 3 tenants' TOML configs + content dirs baked in,
+  and the custom 3-process-supervising `/init` (including an all-3-processes SIGTERM
+  self-test — see `build-guest-rootfs.sh`'s own header for why that matters). Not yet
+  booted under Microkit — that's G3, not yet started.
 
 - **G3 — Real binary as guest init's child.** Custom `/init` (not systemd), ported from the
   same source, adapted: brings up networking (bridged, not just user-mode NAT — needed for
