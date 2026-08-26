@@ -130,7 +130,25 @@ ${INITRD}:
 	tar xf $@.tar.gz -C initrd_download_dir
 	cp initrd_download_dir/${INITRD}/rootfs.cpio.gz ${INITRD}
 
-client_vm/rootfs.cpio.gz: ${INITRD} \
+# client_vm/rootfs.cpio.gz was previously keyed only on ${INITRD}'s mtime,
+# not its resolved path — an INITRD path switch (stock example -> a real
+# product rootfs, or vice versa) with the new file's mtime older than the
+# last-built target left Make considering it up to date, silently reusing
+# the WRONG rootfs. Hit for real 2026-08-26 building os-mediakit's G3 (had
+# to manually rm -rf client_vm/ to force a rebuild). Ported from
+# project-totebox's own identical fix to this same shared example (their
+# 2026-08-02 incident, same root cause) — adopting their proven guard
+# rather than re-deriving it or continuing to work around it manually.
+client_vm/.last_initrd_path: FORCE |client_vm
+	@echo "${INITRD}" > client_vm/.last_initrd_path.tmp
+	@cmp -s client_vm/.last_initrd_path.tmp client_vm/.last_initrd_path 2>/dev/null \
+		&& rm -f client_vm/.last_initrd_path.tmp \
+		|| mv client_vm/.last_initrd_path.tmp client_vm/.last_initrd_path
+
+.PHONY: FORCE
+FORCE:
+
+client_vm/rootfs.cpio.gz: ${INITRD} client_vm/.last_initrd_path \
 	$(CLIENT_VM_USERLEVEL_INIT) $(CLIENT_VM_USERLEVEL_HOME) |client_vm
 	$(LIBVMM)/tools/packrootfs ${INITRD} \
 		client_vm/rootfs_staging -o $@ \
@@ -140,9 +158,27 @@ client_vm/rootfs.cpio.gz: ${INITRD} \
 blk_storage:
 	$(SDDF)/tools/mkvirtdisk $@ $(BLK_NUM_PART) $(BLK_SIZE) $(BLK_MEM) GPT
 
+# FOUNDRY_EXTRA_BOOTARGS substitution — see linux.dts's own
+# @@FOUNDRY_EXTRA_BOOTARGS@@ comment for the full story. Ported from
+# project-totebox's identical fix to this same shared example. Empty by
+# default — a build with no override behaves exactly as before this fix.
+FOUNDRY_EXTRA_BOOTARGS ?=
+
+# Same staleness-guard pattern as client_vm/.last_initrd_path above: vm.dts's
+# real file dependencies (linux.dts, the GIC overlay) don't change when only
+# FOUNDRY_EXTRA_BOOTARGS changes between invocations, so without this Make
+# would consider an already-built vm.dts up to date and silently reuse the
+# previous build's bootargs.
+client_vm/.last_bootargs: FORCE |client_vm
+	@echo "${FOUNDRY_EXTRA_BOOTARGS}" > client_vm/.last_bootargs.tmp
+	@cmp -s client_vm/.last_bootargs.tmp client_vm/.last_bootargs 2>/dev/null \
+		&& rm -f client_vm/.last_bootargs.tmp \
+		|| mv client_vm/.last_bootargs.tmp client_vm/.last_bootargs
+
 client_vm/vm.dts: $(CLIENT_VM)/linux.dts $(CLIENT_VM)/$(GIC_DT_OVERLAY) \
-	$(CHECK_FLAGS_BOARD_MD5) |client_vm
-	$(LIBVMM)/tools/dtscat $^ > $@
+	client_vm/.last_bootargs $(CHECK_FLAGS_BOARD_MD5) |client_vm
+	$(LIBVMM)/tools/dtscat $(CLIENT_VM)/linux.dts $(CLIENT_VM)/$(GIC_DT_OVERLAY) > $@
+	sed -i 's|@@FOUNDRY_EXTRA_BOOTARGS@@|$(FOUNDRY_EXTRA_BOOTARGS)|' $@
 
 client_vm/vm.dtb: client_vm/vm.dts
 	$(DTC) -q -I dts -O dtb $< > $@
