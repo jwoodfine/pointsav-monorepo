@@ -44,7 +44,19 @@
 	};
 
 	chosen {
-		bootargs = "console=hvc0 earlycon=hvc0 earlyprintk=serial debug loglevel=8";
+		/* @@FOUNDRY_EXTRA_BOOTARGS@@ is a substitution token, not a real
+		 * value — see virtio.mk's client_vm/vm.dts rule. QEMU's `-append`
+		 * only works with the `-kernel` boot path, not the `-device
+		 * loader` mechanism this seL4/Microkit image uses, so runtime
+		 * config (e.g. `foundry.mode=smoketest` for os-mediakit's G4
+		 * smoke-test path) has to be baked into the DTB at build time
+		 * instead. Ported from project-totebox's own identical fix to
+		 * this same shared vendor-libvmm example (their Session 24,
+		 * found live trying to inject boot-time config the same way) —
+		 * adopting their proven mechanism rather than re-deriving it.
+		 * `FOUNDRY_EXTRA_BOOTARGS='foundry.mode=smoketest' make ...`
+		 */
+		bootargs = "console=hvc0 earlycon=hvc0 earlyprintk=serial debug loglevel=8 @@FOUNDRY_EXTRA_BOOTARGS@@";
 		linux,initrd-start = <0x48000000>;
 		linux,initrd-end = <0x54000000>;
 	};
