@@ -127,7 +127,9 @@ pub fn parse_index_topic(raw_body_md: &str) -> Option<IndexTopic> {
             intro_end = h_start;
             intro_end_set = true;
         }
-        let next_bound = next_h2(text, h_after).map(|(s, _, _)| s).unwrap_or(text.len());
+        let next_bound = next_h2(text, h_after)
+            .map(|(s, _, _)| s)
+            .unwrap_or(text.len());
         let Some((group_marker_pos, group_content_start)) =
             marker_end(text, h_after, next_bound, GROUP_OPEN)
         else {
@@ -142,7 +144,9 @@ pub fn parse_index_topic(raw_body_md: &str) -> Option<IndexTopic> {
         let members_md = &text[group_content_start..group_close_pos];
         let members = parse_members(members_md)?;
         groups.push(Group {
-            title: strip_trailing_heading_attr(raw_title.trim()).trim().to_string(),
+            title: strip_trailing_heading_attr(raw_title.trim())
+                .trim()
+                .to_string(),
             intro_html: (!group_intro.is_empty()).then(|| render(group_intro).html),
             members,
         });
@@ -239,7 +243,10 @@ fn parse_members(text: &str) -> Option<Vec<Member>> {
         let slug = slugify(&target);
         let link_end = rest.find("]]").map(|i| i + 2).unwrap_or(0);
         let after_link = rest[link_end..].trim();
-        let annotation_md = after_link.strip_prefix('\u{2014}').unwrap_or(after_link).trim();
+        let annotation_md = after_link
+            .strip_prefix('\u{2014}')
+            .unwrap_or(after_link)
+            .trim();
         members.push(Member {
             href: format!("/wiki/{slug}"),
             label,
@@ -357,8 +364,16 @@ mod tests {
         assert_eq!(sh.label, "Capability-based security");
         assert!(sh.prose_html.contains("access-control"));
         assert!(!sh.prose_html.contains("START-HERE"));
-        assert!(!sh.prose_html.contains("<!--"), "leaked comment marker: {}", sh.prose_html);
-        assert!(!topic.intro_html.contains("<!--"), "leaked comment marker: {}", topic.intro_html);
+        assert!(
+            !sh.prose_html.contains("<!--"),
+            "leaked comment marker: {}",
+            sh.prose_html
+        );
+        assert!(
+            !topic.intro_html.contains("<!--"),
+            "leaked comment marker: {}",
+            topic.intro_html
+        );
 
         assert_eq!(topic.groups.len(), 5);
 
@@ -368,10 +383,16 @@ mod tests {
         assert_eq!(g0.count(), 5);
         let g0_intro = g0.intro_html.as_deref().unwrap();
         assert!(g0_intro.contains("Who is known"));
-        assert!(!g0_intro.contains("<!--"), "leaked comment marker: {}", g0_intro);
+        assert!(
+            !g0_intro.contains("<!--"),
+            "leaked comment marker: {}",
+            g0_intro
+        );
         assert_eq!(g0.members[0].href, "/wiki/capability-based-security");
         assert_eq!(g0.members[0].label, "Capability-based security");
-        assert!(g0.members[0].annotation_html.contains("access-control model"));
+        assert!(g0.members[0]
+            .annotation_html
+            .contains("access-control model"));
         assert!(!g0.members[0].annotation_html.starts_with('\u{2014}'));
         assert!(
             !g0.members[4].annotation_html.contains("<!--"),
