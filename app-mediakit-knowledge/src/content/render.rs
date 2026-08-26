@@ -207,7 +207,10 @@ pub fn render_journal_doc(
 /// so the golden-fixture suite (`tests/journal_golden.rs`, SPEC §0.5) can
 /// build its normalized comparison summary directly from the same id-order
 /// data `render_journal_doc` uses, without re-parsing rendered HTML.
-pub fn resolve_citations(md: &str, registry: &CitationRegistry) -> (String, Vec<String>, Vec<String>) {
+pub fn resolve_citations(
+    md: &str,
+    registry: &CitationRegistry,
+) -> (String, Vec<String>, Vec<String>) {
     let mut order: Vec<String> = Vec::new();
     let mut numbers: HashMap<String, usize> = HashMap::new();
     let mut unresolved: Vec<String> = Vec::new();
@@ -224,7 +227,14 @@ pub fn resolve_citations(md: &str, registry: &CitationRegistry) -> (String, Vec<
             out.push_str(line);
             continue;
         }
-        resolve_citations_in_line(line, registry, &mut order, &mut numbers, &mut unresolved, &mut out);
+        resolve_citations_in_line(
+            line,
+            registry,
+            &mut order,
+            &mut numbers,
+            &mut unresolved,
+            &mut out,
+        );
     }
     (out, order, unresolved)
 }
@@ -256,8 +266,7 @@ fn resolve_citations_in_line(
             let escaped = i > 0 && bytes[i - 1] == b'\\';
             // A `[[...` (wikilink) or `[^...` (footnote marker) is never a
             // citation bracket — leave both for their own resolvers.
-            let other_bracket_form =
-                i + 1 < bytes.len() && matches!(bytes[i + 1], b'[' | b'^');
+            let other_bracket_form = i + 1 < bytes.len() && matches!(bytes[i + 1], b'[' | b'^');
             if !escaped && !other_bracket_form {
                 if let Some(close_rel) = line[i + 1..].find(']') {
                     let close_abs = i + 1 + close_rel;
@@ -673,7 +682,8 @@ mod tests {
         let registry = test_registry(
             "citations:\n  rfc-9162:\n    type: technical-specification\n    title: RFC 9162\n    url: https://x\n",
         );
-        let (body, order, unresolved) = resolve_citations("Certificate Transparency [rfc-9162] is a log.\n", &registry);
+        let (body, order, unresolved) =
+            resolve_citations("Certificate Transparency [rfc-9162] is a log.\n", &registry);
         assert_eq!(order, vec!["rfc-9162".to_string()]);
         assert!(unresolved.is_empty());
         assert!(body.contains(r"\[[1](#ref-1)\]"));
@@ -684,7 +694,8 @@ mod tests {
         let registry = test_registry(
             "citations:\n  a:\n    type: vendor-doc\n    title: A\n    url: https://x/a\n  b:\n    type: vendor-doc\n    title: B\n    url: https://x/b\n",
         );
-        let (body, order, _) = resolve_citations("Supported by the literature [a][b].\n", &registry);
+        let (body, order, _) =
+            resolve_citations("Supported by the literature [a][b].\n", &registry);
         assert_eq!(order, vec!["a".to_string(), "b".to_string()]);
         assert!(body.contains(r"\[[1](#ref-1)\]\[[2](#ref-2)\]"));
     }
@@ -704,7 +715,8 @@ mod tests {
         let registry = test_registry(
             "citations:\n  a:\n    type: vendor-doc\n    title: A\n    url: https://x/a\n  b:\n    type: vendor-doc\n    title: B\n    url: https://x/b\n",
         );
-        let (body, order, _) = resolve_citations("First [b], then [a], then [b] again.\n", &registry);
+        let (body, order, _) =
+            resolve_citations("First [b], then [a], then [b] again.\n", &registry);
         assert_eq!(order, vec!["b".to_string(), "a".to_string()]);
         assert!(body.contains(r"\[[1](#ref-1)\]"), "first [b] is ref 1");
         assert!(body.contains(r"\[[2](#ref-2)\]"), "[a] is ref 2");
@@ -718,16 +730,21 @@ mod tests {
     #[test]
     fn citation_inside_code_fence_is_left_untouched() {
         let registry = test_registry("citations: {}\n");
-        let (body, order, _) = resolve_citations("```\nlet x: [u8; 32] = [rfc-9162];\n```\n", &registry);
+        let (body, order, _) =
+            resolve_citations("```\nlet x: [u8; 32] = [rfc-9162];\n```\n", &registry);
         assert!(order.is_empty());
-        assert!(body.contains("[rfc-9162]"), "literal bracket text must survive: {body}");
+        assert!(
+            body.contains("[rfc-9162]"),
+            "literal bracket text must survive: {body}"
+        );
         assert!(!body.contains("#ref-1"));
     }
 
     #[test]
     fn citation_inside_inline_code_span_is_left_untouched() {
         let registry = test_registry("citations: {}\n");
-        let (body, order, _) = resolve_citations("The type is `[u8; 32]`, not a citation.\n", &registry);
+        let (body, order, _) =
+            resolve_citations("The type is `[u8; 32]`, not a citation.\n", &registry);
         assert!(order.is_empty());
         assert!(body.contains("`[u8; 32]`"));
     }
@@ -735,7 +752,8 @@ mod tests {
     #[test]
     fn ordinary_bracket_text_that_is_not_id_shaped_is_untouched() {
         let registry = test_registry("citations: {}\n");
-        let (body, order, _) = resolve_citations("See [Note] below, and [Some Text] here.\n", &registry);
+        let (body, order, _) =
+            resolve_citations("See [Note] below, and [Some Text] here.\n", &registry);
         assert!(order.is_empty());
         assert!(body.contains("[Note]"));
         assert!(body.contains("[Some Text]"));
@@ -746,8 +764,12 @@ mod tests {
         let registry = test_registry(
             "citations:\n  rfc-9162:\n    type: technical-specification\n    title: RFC 9162\n    url: https://x\n",
         );
-        let (body, order, _) = resolve_citations("See [rfc-9162](https://example.com) directly.\n", &registry);
-        assert!(order.is_empty(), "a real markdown link must not be treated as a citation");
+        let (body, order, _) =
+            resolve_citations("See [rfc-9162](https://example.com) directly.\n", &registry);
+        assert!(
+            order.is_empty(),
+            "a real markdown link must not be treated as a citation"
+        );
         assert!(body.contains("[rfc-9162](https://example.com)"));
     }
 
