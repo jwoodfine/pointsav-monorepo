@@ -484,20 +484,68 @@ abandoned H0–H8 native-PD track)
   self-test — see `build-guest-rootfs.sh`'s own header for why that matters). Not yet
   booted under Microkit — that's G3, not yet started.
 
-- **G3 — Real binary as guest init's child.** Custom `/init` (not systemd), ported from the
-  same source, adapted: brings up networking (bridged, not just user-mode NAT — needed for
-  real public reachability per the TLS section above), starts `app-mediakit-knowledge` on
-  guest-loopback, mounts a persistent `/data` disk for both the wiki content dir and
-  `/etc/letsencrypt`.
+- **G3 — Real binary as guest init's child. DONE 2026-08-26 — all 3 wikis confirmed
+  live and reachable, real content served, not just a boot log.** G-TLS/bridged
+  networking descoped this pass per operator direction (no real public reachability
+  needed for this milestone); QEMU user-mode NAT + hostfwd is what's verified here,
+  same as every other gate this session.
+
+  **A real, previously-unknown bug blocked the first attempt**: all 3
+  `app-mediakit-knowledge` processes panicked identically at startup —
+  `thread 'main' panicked at tokio-1.53.1/src/signal/unix.rs:71:53: failed to create
+  UnixStream: Os { code: 97, kind: Uncategorized, message: "Address family not
+  supported by protocol" }`. Root cause: `vendor-libvmm/examples/virtio`'s shared
+  example guest kernel has `# CONFIG_UNIX is not set` in `client_vm/linux_config` —
+  its own tiny BusyBox demo never needed `AF_UNIX`, but tokio's signal driver does
+  (a `UnixStream` self-pipe for async signal delivery) — any real tokio-based service
+  hits this wall. **Exact same root cause project-totebox already found and fixed**
+  for os-totebox (`BRIEF-os-totebox-platform.md`, 2026-07-29 session) — adopted their
+  proven recipe rather than re-deriving it (`os-mediakit/scripts/build-guest-kernel.sh`,
+  new): shallow-clone `torvalds/linux.git` v6.13, flip the one `CONFIG_UNIX` line,
+  cross-compile with `aarch64-linux-gnu-` (all required packages — flex, bison,
+  libssl-dev, libelf-dev — already installed system-wide, no `apt-get` needed),
+  isolated under os-mediakit's own `BUILD_DIR` per Phase 0's isolation decision
+  (project-totebox's original fix used the shared default `build/` — their pre-built
+  kernel artifact didn't survive on disk to copy directly, each archive has its own
+  separate monorepo clone, so this rebuilt from their documented recipe rather than
+  reusing a binary). Real 15 MiB `Image` produced, `CONFIG_UNIX=y` verified present
+  in the actual `.config` used, not just the pre-substitution source.
+
+  **Rebuilt + rebooted with the fixed kernel — zero panic.** Boot log: seL4 →
+  Microkit → CLIENT_VMM → `os-mediakit appliance init starting...` → all 3
+  processes started → **no panic** → real axum bind-success log lines for all 3:
+  `Documentation Wiki — listening on http://0.0.0.0:9090`, `Projects Wiki —
+  ...9093`, `Corporate Wiki — ...9095`. Verified independently from the host, not
+  just trusting the guest's own log: the Makefile's own `qemu` target hardcodes
+  hostfwd to unrelated ports (1236/1237/1235), so ran a manual `qemu-system-aarch64`
+  invocation (replicating the Makefile recipe exactly, `loader.img`
+  sha256 `4f3db79f533d4d0b9fc466ab083eed85ba8d55f5d2e6b56cd5886b193202bbe4`) with
+  hostfwd to the real wiki ports. `curl /healthz` on all 3 (19090/19093/19095 →
+  9090/9093/9095): **HTTP 200 "ok", all 3**. `curl /` on documentation: real,
+  complete rendered HTML (13,895 bytes, correct `<title>PointSav Documentation</title>`,
+  correct tenant branding, correct canonical URL) — genuine content serving, not a
+  stub. **This is the "three wikis running in their own VM" milestone the operator
+  originally asked for** — confirmed for real, not just booted.
+
+  Not yet wired: `/data` persistence (content is still baked into the image at
+  build time, per G2.5's own scope note); real public reachability (G-TLS, still
+  not started, needs the host-ingress/bridged-networking decision below resolved
+  first if/when it's picked up).
 
 - **G-TLS (new, no precedent).** nginx + certbot running inside the guest, reverse-proxying
   to the app on loopback, ACME HTTP-01 challenge path, cert persistence across guest restarts
   via `/data`. Needs the host-ingress/bridged-networking decision from Decisions-open #2
-  resolved, not assumed.
+  resolved, not assumed. Not started — deliberately descoped this pass (operator
+  direction, 2026-08-25): no real public reachability in the test environment used
+  for G1-G3 to terminate TLS against.
 
 - **G4 — Full smoke test.** HTTP through the entire chain — both loopback (direct app check)
   and through nginx/TLS once G-TLS lands — via a Python `urllib` polling loop embedded in
-  `/init`, matching precedent's retry/backoff discipline for TCG boot-time variance.
+  `/init`, matching precedent's retry/backoff discipline for TCG boot-time variance. G3's
+  own manual curl checks above are real evidence toward this but not a substitute for it —
+  G4 specifically wants this automated inside `/init`'s own smoke-test mode
+  (`foundry.mode=smoketest`, already wired in `build-guest-rootfs.sh`'s `/init` but not yet
+  exercised end-to-end) plus the SIGTERM self-test for all 3 processes.
 
 - **SIGTERM.** `kill -TERM` to **every** process the guest starts (app binary AND nginx — not
   just one). This directly avoids a real gap found in project-totebox's own
