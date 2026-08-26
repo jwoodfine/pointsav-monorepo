@@ -658,32 +658,39 @@ html[data-nav="open"] .k-sidebar--reading .k-sidenav__browse { display: block; }
   padding: var(--k-gutter-lg) var(--k-gutter) var(--k-gutter);
 }
 .k-footer__brand {
+  /* Exact spec from Command/project-editorial's reconciled Fable+Opus diff
+     (msg command-20260826-footer-redesign-exact-css-layout-rs-mark,
+     2026-08-26) — supersedes this file's own first-pass values. Full-width
+     banner row (not a 4-column restructure, per the earlier correction):
+     logo mark + name/tagline stack, capped at 60ch so the real
+     paragraph-length captions (~46-47 words, landed 2026-08-25) wrap to
+     3-4 readable lines instead of sprawling edge-to-edge. */
+  max-width: 60ch;
+  display: flex;
+  align-items: center;
+  gap: var(--k-space-3);
   margin-bottom: var(--k-gutter-lg);
 }
 .k-footer__brand-mark {
-  display: flex;
-  align-items: center;
-  gap: var(--k-space-2);
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
   color: var(--k-accent);   /* logo_mark() SVG uses fill:currentColor */
+}
+.k-footer__brand-text {
+  min-width: 0;   /* let the tagline wrap inside the flex row, not overflow it */
 }
 .k-footer__brand-name {
   margin: 0;
+  font-size: 1.125rem;   /* up from 13px — brand should be louder than nav headings, not quieter */
   font-weight: var(--k-weight-semibold);
-  font-size: var(--k-text-sm);
   color: var(--k-ink);
 }
 .k-footer__brand-tagline {
   margin: var(--k-space-1) 0 0;
-  /* Real paragraph-length captions landed 2026-08-25 (~46-47 words) — was
-     unconstrained-width, so the longest of the 3 (300 chars, pre-rewrite)
-     sprawled full-bleed as a 2-line data-abstract block. Wrap to 3-4
-     readable lines instead — this was a WIDTH problem, not a column-
-     layout problem (Command's correction to the original 4-column
-     proposal, confirmed by cross-model re-check). */
-  max-width: 68ch;
   color: var(--k-ink-muted);
-  font-size: var(--k-text-xs);
-  line-height: var(--k-leading-relaxed);
+  font-size: var(--k-text-sm);
+  line-height: 1.5;
 }
 .k-footer__grid {
   display: grid;
@@ -692,23 +699,23 @@ html[data-nav="open"] .k-sidebar--reading .k-sidenav__browse { display: block; }
 }
 .k-footer__col { min-width: 0; }
 .k-footer__col-title {
-  /* Restored 2026-08-25 (Command/project-editorial UI-fix batch) —
+  /* Restored 2026-08-25/26 (Command/project-editorial UI-fix batch) —
      git-verified regression, commit c406f6a70 (2026-07-15): this went
      from an 11px muted uppercase tracked micro-label to 17px/700/full-ink
      — 4px LARGER and one weight heavier than the site's own brand name 4
-     lines above it. Real institutional-footer comparison (KKR, Brookfield,
-     MS Learn) found headings differentiated from links by weight +
-     uppercase + letter-spacing, never by size (KKR: both 14px). Back to
-     --k-text-xs (12px) + --k-tracking-caps — that token was already named
-     "footer titles" in its own comment before this regression orphaned it.
+     lines above it. Values are the exact reconciled Fable+Opus diff (msg
+     command-20260826-footer-redesign-exact-css-layout-rs-mark) — letter-
+     spacing is a literal 0.09em (KKR measured 1.392px on 14px ≈ 0.1em),
+     not --k-tracking-caps (that token is shared with the sitenotice
+     entity label and wasn't meant to move together with this).
      --k-text-footer-heading (17px) is now unused by this rule; left
      defined in tokens.css in case another surface wants it. */
-  margin: 0 0 0.875rem;
+  margin: 0 0 var(--k-space-4);
   font-size: var(--k-text-xs);
   font-weight: var(--k-weight-bold);
   text-transform: uppercase;
-  letter-spacing: var(--k-tracking-caps);
-  color: var(--k-ink-muted);
+  letter-spacing: 0.09em;
+  color: var(--k-ink-secondary);
 }
 .k-footer__col-fact {
   margin: 0 0 var(--k-space-3);
@@ -724,16 +731,21 @@ html[data-nav="open"] .k-sidebar--reading .k-sidenav__browse { display: block; }
 .k-footer__list li { margin-bottom: 0.375rem; }
 .k-footer__list li:last-child { margin-bottom: 0; }
 .k-footer__link {
-  /* Near-ink, not saturated link-blue 2026-08-25 (Command/project-editorial
-     UI-fix batch) — real institutional-footer comparison (KKR, Brookfield,
-     MS Learn) found links use near-ink or brand-dark color, accent only on
-     hover; the body-text --k-link blue reads as web-1.0 in a footer. */
-  color: var(--k-ink-secondary);
-  font-size: inherit;
+  /* Near-ink, not saturated link-blue — real institutional-footer
+     comparison (KKR, Brookfield, MS Learn) found links use near-ink or
+     brand-dark color, accent only on hover; the body-text --k-link blue
+     reads as web-1.0 in a footer. Exact values per msg
+     command-20260826-footer-redesign-exact-css-layout-rs-mark. */
+  color: var(--k-ink);
+  text-decoration: none;
+  font-size: var(--k-text-sm);
 }
-.k-footer__link:hover,
+.k-footer__link:hover {
+  color: var(--k-accent);
+  text-decoration: underline;
+}
 .k-footer__link:active { color: var(--k-accent); }
-.k-footer__link:visited { color: var(--k-ink-secondary); }
+.k-footer__link:visited { color: var(--k-ink); }
 .k-footer__link:focus-visible { outline: var(--k-focus-outline); outline-offset: 2px; border-radius: var(--k-radius-xs); }
 
 /* Identity bar — collapsed 2026-08-25 (Command/project-editorial UI-fix
@@ -748,37 +760,33 @@ html[data-nav="open"] .k-sidebar--reading .k-sidenav__browse { display: block; }
    prefix (same reasoning as the brand block commit: the shared accent
    scale doesn't apply here). */
 .k-footer__identity {
-  margin-top: var(--k-gutter-lg);
-  padding-top: var(--k-space-4);
-  border-top: 1px solid var(--k-border-subtle);
-  display: flex;
-  flex-direction: column;
-  gap: var(--k-space-2);
+  margin-top: var(--k-space-7);
+  padding-top: var(--k-space-5);
+  border-top: 1px solid var(--k-border-subtle, var(--k-border));
 }
-.k-footer__identity-row {
+.k-footer__baseline {
+  /* 3 direct children (cities, badges, copyright) — justify-content:
+     space-between spreads them without needing a manual trailing-margin
+     hack on copyright. */
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--k-space-2);
+  justify-content: space-between;
+  gap: var(--k-space-3) var(--k-space-6);
   font-size: var(--k-text-xs);
   color: var(--k-ink-secondary);
 }
-.k-footer__identity-row--locations {
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: var(--k-space-3) var(--k-space-5);
-}
-.k-footer__copyright {
-  margin: 0 0 0 auto;   /* trails the row on wide viewports; see mobile override below */
-  color: var(--k-ink-muted);
-}
-.k-footer__legal {
-  margin: 0;
+.k-footer__copyright { color: var(--k-ink-muted); }
+.k-footer__fineprint {
+  margin: var(--k-space-4) 0 0;
   font-size: var(--k-text-2xs);
-  color: var(--k-ink-muted);
   line-height: var(--k-leading-snug);
+  color: var(--k-ink-muted);
+  opacity: 0.82;
   /* No 60ch cap — that was what forced the old, separate trademark row to
      wrap to 5 lines. Full width of .k-footer__inner (now itself capped at
      84rem, see above) is the actual fix. */
+  max-width: none;
 }
 
 /* --- Important Information band (above the footer) ------------------------- */
@@ -925,16 +933,14 @@ html[data-nav="open"] .k-sidebar--reading .k-sidenav__browse { display: block; }
   .k-footer__inner { padding: var(--k-gutter) var(--k-gutter); }
   .k-shell { padding-inline: var(--k-space-4); }
 
-  /* Mobile-only stacking for the collapsed identity row (2026-08-25) — the
-     real mobile-legibility fix the 2026-07-15 restructure introduced
+  /* Mobile-only stacking for the collapsed identity row (2026-08-25/26) —
+     the real mobile-legibility fix the 2026-07-15 restructure introduced
      (badges not buried under legal text) still applies, just scoped here
      instead of being the default at every width. */
-  .k-footer__identity-row--locations {
+  .k-footer__baseline {
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--k-space-3);
   }
-  .k-footer__copyright { margin-left: 0; }
 }
 
 @media (min-width: 769px) {
