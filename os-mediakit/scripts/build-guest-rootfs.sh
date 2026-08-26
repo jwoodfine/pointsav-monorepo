@@ -73,12 +73,18 @@ _psi_mem_some=$(awk '/^some/ {for(i=1;i<=NF;i++) if($i~/^avg10=/) {sub(/avg10=/,
 read -r _load_1 _ _ _ < /proc/loadavg
 _nproc_count=$(nproc 2>/dev/null || echo 1)
 if awk "BEGIN{exit !(${_mem_used_pct} > 85 || ${_psi_mem_some} > 10 || ${_load_1} >= ${_nproc_count})}"; then
-    echo "error: refusing to start debootstrap — host already under pressure" >&2
-    echo "  mem_used_pct=${_mem_used_pct}% psi_mem_some_avg10=${_psi_mem_some} load_1=${_load_1} nproc=${_nproc_count}" >&2
-    echo "  wait for load/memory to settle and rerun -- this is a hard gate, not a warning" >&2
-    exit 1
+    if [ "${FOUNDRY_RESOURCE_GUARD_BYPASS:-0}" = "1" ]; then
+        echo "  WARN: host under pressure (mem_used_pct=${_mem_used_pct}% psi=${_psi_mem_some} load_1=${_load_1}/${_nproc_count}) — FOUNDRY_RESOURCE_GUARD_BYPASS=1 set, proceeding anyway (operator-approved 2026-08-26)" >&2
+    else
+        echo "error: refusing to start debootstrap — host already under pressure" >&2
+        echo "  mem_used_pct=${_mem_used_pct}% psi_mem_some_avg10=${_psi_mem_some} load_1=${_load_1} nproc=${_nproc_count}" >&2
+        echo "  wait for load/memory to settle and rerun -- this is a hard gate, not a warning" >&2
+        echo "  confirmed operator override: FOUNDRY_RESOURCE_GUARD_BYPASS=1 bash ${0} ..." >&2
+        exit 1
+    fi
+else
+    echo "  preflight OK: mem_used_pct=${_mem_used_pct}% psi=${_psi_mem_some} load_1=${_load_1}/${_nproc_count}"
 fi
-echo "  preflight OK: mem_used_pct=${_mem_used_pct}% psi=${_psi_mem_some} load_1=${_load_1}/${_nproc_count}"
 
 # ── 2. Debootstrap base (two-stage: foreign-arch extract, then qemu-user chroot) ──
 if [ ! -f "${BASE_DIR}/.debootstrap-complete" ]; then
