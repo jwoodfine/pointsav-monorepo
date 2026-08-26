@@ -20,7 +20,9 @@
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine as _;
 use chrono::Utc;
-use ed25519_dalek::{Signature, Signer as _, SigningKey, VerifyingKey};
+#[cfg(test)]
+use ed25519_dalek::VerifyingKey;
+use ed25519_dalek::{Signature, Signer as _, SigningKey};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 
@@ -68,9 +70,9 @@ impl Identity {
     pub fn load_or_generate(seed_path: &Path) -> std::io::Result<Self> {
         let seed: [u8; 32] = if seed_path.exists() {
             let bytes = std::fs::read(seed_path)?;
-            bytes
-                .try_into()
-                .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "bad seed length"))?
+            bytes.try_into().map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "bad seed length")
+            })?
         } else {
             let mut s = [0u8; 32];
             let mut f = std::fs::File::open("/dev/urandom")?;
@@ -152,12 +154,7 @@ impl Identity {
 /// Nanosecond-timestamp-based nonce — no `rand`/`uuid` dependency needed;
 /// uniqueness only needs to hold within this process's own request stream.
 pub fn fresh_nonce() -> String {
-    format!(
-        "og-{}",
-        Utc::now()
-            .timestamp_nanos_opt()
-            .unwrap_or(0)
-    )
+    format!("og-{}", Utc::now().timestamp_nanos_opt().unwrap_or(0))
 }
 
 /// Default identity seed path: `$ORCHESTRATION_GRAPH_STATE_DIR/identity.seed`,
@@ -193,7 +190,10 @@ mod tests {
         let sig_arr: [u8; 64] = sig_bytes.try_into().unwrap();
         let sig = Signature::from_bytes(&sig_arr);
         use ed25519_dalek::Verifier as _;
-        assert!(id.verifying_key().verify(payload_b64.as_bytes(), &sig).is_ok());
+        assert!(id
+            .verifying_key()
+            .verify(payload_b64.as_bytes(), &sig)
+            .is_ok());
     }
 
     #[test]

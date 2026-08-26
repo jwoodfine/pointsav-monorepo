@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
 
-
 use minijinja::Environment;
 use moonshot_index::InvertedIndex;
 use std::{collections::HashMap, path::PathBuf, sync::Arc};
