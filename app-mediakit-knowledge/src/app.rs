@@ -103,7 +103,7 @@ impl AppState {
         let important_info = primary_root.as_ref().and_then(|root| {
             std::fs::read_to_string(root.join("important-information.md"))
                 .ok()
-                .map(|text| content::render(&content::parse(&text).body_md).html)
+                .map(|text| content::render(&content::parse(&text).body_md, &index, Lang::En).html)
         });
         // Per-wiki category nav + redirects from the content repo root.
         let root = primary_root;
@@ -378,7 +378,7 @@ async fn home(State(state): State<AppState>) -> Response {
         .and_then(|doc| content::load(doc).ok());
     let lede = index_parsed
         .as_ref()
-        .map(|p| content::render(&p.body_md).html)
+        .map(|p| content::render(&p.body_md, &state.index, Lang::En).html)
         .unwrap_or_default();
     // The home page is the highest-value URL on the site — never leave its
     // description empty (a prior audit found this was the only page type
@@ -672,7 +672,7 @@ async fn research_landing(State(state): State<AppState>, Path(slug): Path<String
         .frontmatter
         .abstract_text
         .as_deref()
-        .map(|a| content::render(a).html)
+        .map(|a| content::render(a, &state.index, doc.lang).html)
         .unwrap_or_default();
     let description = parsed
         .frontmatter
@@ -754,7 +754,7 @@ async fn research_fulltext(State(state): State<AppState>, Path(slug): Path<Strin
         .clone()
         .unwrap_or_default();
     let cite_as = parsed.frontmatter.cite_as.as_deref();
-    let rendered = content::render_journal_doc(&parsed, &state.citations);
+    let rendered = content::render_journal_doc(&parsed, &state.citations, &state.index, doc.lang);
     let body = ui::research_fulltext(
         &title,
         &parsed.frontmatter.authors,
@@ -826,13 +826,16 @@ async fn render_index_topic_category(
     let prefix = if lang == Lang::Es { "/es" } else { "" };
     let lang_code = if lang == Lang::Es { "es" } else { "en" };
     let raw = content::load_raw(index_doc).ok()?;
-    let mut topic = content::parse_index_topic(&raw.body_md)?;
+    let mut topic = content::parse_index_topic(&raw.body_md, &state.index, lang)?;
     // A bare `[[slug]]` member link (no `|label`) carries the raw slug text
     // as its label rather than the article's real title — resolve it now
-    // that we have index access, which the parser itself doesn't.
+    // that we have index access, which the parser itself doesn't. Uses
+    // `lang` (the requested language), not a hardcoded `Lang::En` — real
+    // bug fixed 2026-08-26 (Command/project-editorial finding): Spanish
+    // category pages were showing English titles for unlabeled members.
     if let Some(sh) = topic.start_here.as_mut() {
         if !sh.explicit_label {
-            if let Some(doc) = state.index.resolve(&sh.slug, Lang::En) {
+            if let Some(doc) = state.index.resolve(&sh.slug, lang) {
                 sh.label = doc.title.clone();
             }
         }
@@ -840,7 +843,7 @@ async fn render_index_topic_category(
     for group in &mut topic.groups {
         for member in &mut group.members {
             if !member.explicit_label {
-                if let Some(doc) = state.index.resolve(&member.slug, Lang::En) {
+                if let Some(doc) = state.index.resolve(&member.slug, lang) {
                     member.label = doc.title.clone();
                 }
             }
@@ -1441,7 +1444,7 @@ async fn serve_article(
             return not_found(&state, &format!("No such revision: {rev}."));
         };
         let parsed = content::parse(&text);
-        let rendered = content::render_doc(&parsed);
+        let rendered = content::render_doc(&parsed, &state.index, lang);
         let title = parsed
             .frontmatter
             .title
@@ -1518,7 +1521,7 @@ async fn serve_article(
         }
         Err(_) => return (StatusCode::INTERNAL_SERVER_ERROR, "internal error").into_response(),
     };
-    let rendered = content::render_doc(&parsed);
+    let rendered = content::render_doc(&parsed, &state.index, lang);
     let title = parsed
         .frontmatter
         .title
