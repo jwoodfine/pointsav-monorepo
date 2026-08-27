@@ -21,6 +21,14 @@
 # terminate TLS against, so G3's target is direct reachability to each
 # wiki tenant, matching how Format B's own systemd units work today.
 #
+# /data persistence (2026-08-26): /init bind-mounts a product-agnostic
+# /data/app-mediakit-knowledge/<instance>/{content,state} layout onto each
+# tenant's /var/lib/wiki{,-state}/<instance>, seeding content from the
+# baked-in sample on first boot. Per BRIEF-os-mediakit-product-family.md
+# Decisions-open #9 — keyed by product+instance so a later app-mediakit-
+# marketing/-distributions port onto this same disk doesn't collide with
+# or require redoing this layout.
+#
 # Requires: debootstrap, qemu-user-static (for the aarch64 chroot second
 #           stage), cpio.
 #
@@ -198,10 +206,8 @@ FOUNDRY_MODE="$(cmdline_param mode)"  # "smoketest" or empty (default: productio
 # /dev/vda1 partition device ever appears in this guest, only the whole-disk
 # /dev/vda; mount needs an explicit -t ext4; mke2fs's destructive-
 # confirmation prompt reads /dev/tty directly so it must be pre-wiped, not
-# answered). Not wired into the wiki content paths yet (those are baked
-# into the image at build time this pass, matching Format B's approach) —
-# left mounted at /data for a future phase to actually use, so the mount
-# logic itself is proven now rather than deferred and re-derived later.
+# answered). Wired into the wiki content/state paths below (2026-08-26) via
+# bind-mount, product-agnostic layout — see that block's own comment.
 DATA_DEV=""
 if [ -b /dev/vda1 ]; then
     DATA_DEV=/dev/vda1
@@ -231,9 +237,48 @@ if [ -n "${DATA_DEV}" ]; then
         fi
     fi
     if mountpoint -q /data 2>/dev/null; then
-        echo "persistent data disk mounted at /data (${DATA_DEV}) — not yet wired to wiki content (G2.5 scope: baked-in content only)"
+        echo "persistent data disk mounted at /data (${DATA_DEV})"
+        # ── Wire /data into the wiki content/state paths — product-agnostic
+        # layout (/data/<product>/<instance>/...), per BRIEF-os-mediakit-
+        # product-family.md Decisions-open #9: this appliance is not assumed
+        # to be the only product that will ever use this disk. Bind-mount,
+        # not a path rewrite in /etc/wiki/*.toml — keeps the baked-in config
+        # paths stable and means the appliance still works (non-persistently,
+        # falling back to the baked-in sample content) on a boot with no data
+        # disk attached at all, e.g. a plain G1-style dev boot with no
+        # blk_storage passed.
+        for INSTANCE in documentation projects corporate; do
+            DATA_CONTENT="/data/app-mediakit-knowledge/${INSTANCE}/content"
+            DATA_STATE="/data/app-mediakit-knowledge/${INSTANCE}/state"
+            mkdir -p "${DATA_CONTENT}" "${DATA_STATE}"
+            if [ -z "$(ls -A "${DATA_CONTENT}" 2>/dev/null)" ]; then
+                echo "  ${INSTANCE}: /data content empty (first boot on this disk) — seeding from baked-in sample content"
+                cp -a /var/lib/wiki/"${INSTANCE}"/. "${DATA_CONTENT}"/
+            fi
+            chown -R 990:990 "${DATA_CONTENT}" "${DATA_STATE}"
+            if mount --bind "${DATA_CONTENT}" /var/lib/wiki/"${INSTANCE}" \
+                && mount --bind "${DATA_STATE}" /var/lib/wiki-state/"${INSTANCE}"; then
+                echo "  ${INSTANCE}: /var/lib/wiki/${INSTANCE} and /var/lib/wiki-state/${INSTANCE} now backed by ${DATA_CONTENT} / ${DATA_STATE} — live edits persist across reboots"
+            else
+                echo "  WARNING: ${INSTANCE}: bind-mount of ${DATA_CONTENT}/${DATA_STATE} failed — falling back to non-persistent baked-in content this boot"
+            fi
+        done
+        # Explicit sync — real bug found 2026-08-26 running this for real, not
+        # caught by sh -n: without this, an abrupt guest kill (this harness's
+        # own smoke-test path never cleanly unmounts /data, and neither does a
+        # real production shutdown yet — the guest DTS has no ACPI/power-button
+        # device, see the BRIEF's Phase Deploy note on this same gap) loses
+        # whatever seed/edit writes hadn't reached the block device yet.
+        # Reproduced directly: a two-boot test on the same disk showed
+        # `documentation`'s seed survive but `projects`/`corporate`'s did not
+        # (both re-seeded on boot 2 as if still first-boot) — an unsynced
+        # writeback race, not a logic bug in the loop above. This covers the
+        # seed write; ongoing live-edit durability across an abrupt kill is a
+        # broader question Phase Deploy's real shutdown path still needs to
+        # solve properly (sync+umount /data before the VM is killed).
+        sync
     else
-        echo "WARNING: ${DATA_DEV} present but could not be mounted — /data unavailable this boot"
+        echo "WARNING: ${DATA_DEV} present but could not be mounted — /data unavailable this boot, all 3 tenants running on non-persistent baked-in content"
     fi
 else
     echo "no attached data disk (/dev/vda or /dev/vda1) — /data unavailable this boot (expected for a G2.5 dev boot with no -drive passed)"
