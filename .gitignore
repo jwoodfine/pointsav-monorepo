@@ -70,21 +70,10 @@ __pycache__/
 # Safety-net archive of misplaced repo clones (cannot be committed; deletion review 2026-07-01)
 archive-2026-06-01/
 
-# [Option-A-mailbox-fix] — do not remove this block
-# Per-archive state files — local only; never push to shared origin/main.
-# All archives share origin/main of pointsav-monorepo. Tracking these
-# files causes cross-archive contamination during git rebase because every
-# archive .agent/inbox.md lives at the same path in the shared repo.
-# MCP send_mailbox_message writes to local paths directly; no git tracking needed.
-.agent/inbox.md
-.agent/inbox-archive.md
-.agent/outbox.md
-.agent/memory/session-context.md
-.agent/memory/session-context-archive.md
-.agent/drafts-outbound/
-.agent/outbox-archive.md
-NEXT.md
-# [/Option-A-mailbox-fix]
+# [Option-A-mailbox-fix] removed 2026-08-27 (Command, at provisioning time) — same
+# retired sovereign_sync.sh-era block already removed from project-marketing/-system/
+# -console/-construction; see those archives' .gitignore history for the full
+# rationale. NEXT.md is legitimately real per-repo content and should stay tracked.
 
 # service-slm/router-trainer — local runtime artifacts (provisioned per-operator,
 # not tracked in Git). Kept here so the Python workflow can still find them on
@@ -105,7 +94,7 @@ system-gateway-mba/vault_identity.key
 system-gateway-mba/keys/gcp_node_mba_ed25519
 *.key
 
-# Canonical-mirror repos never carry real per-archive .agent/ state — that lives in
-# clones/<archive>/.agent/ only. Untracked .agent/ residue here previously caused
-# false-positive CRITICAL drift alerts in bin/foundry-health.sh (root-caused 2026-07-09).
-.agent/
+# Blanket `.agent/` rule removed 2026-08-27 (Command, at provisioning time) — same
+# known-bug-patterns.md #2 class already found and fixed in project-marketing/-system/
+# -console/-construction; would have silently untracked this archive's real .agent/
+# state. Only ephemeral session locks stay ignored, per the narrow block above.
