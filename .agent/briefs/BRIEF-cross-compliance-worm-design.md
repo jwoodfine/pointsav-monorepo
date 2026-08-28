@@ -280,10 +280,56 @@ delete, which breaks the WORM invariant on a single record rather than at
 natural expiry. No research finding so far requires supporting this; not
 worth designing for until a specific deployment actually asks.
 
+**Refinement (2026-08-29, operator direction): permission-to-delete, not
+automatic deletion.** Retention-window expiry does not trigger an automatic
+purge job. It changes a record's state from "cannot be deleted" (structurally
+enforced, identical to today) to "**eligible** for deletion" — an explicit,
+deliberate, separately-authorized, logged action, never a silent background
+process. This closes the litigation-hold gap for free: nothing ever
+auto-fires, so a hold is simply "don't exercise the now-available
+permission yet" — no separate override mechanism needs to be designed.
+It also narrows the doctrine tension considerably: the attack surface
+DOCTRINE.md's language worries about ("a future maintainer toggling a
+flag") is a system-wide immutability switch; "permission to delete one
+specific eligible record, deliberately, with a logged authorization" is a
+categorically smaller, harder-to-abuse surface than that.
+
 **Status: recommended, not yet ratified.** This supersedes crypto-shredding
 + mandatory register as the *default* direction — that mechanism remains
 documented above (§"Uniform encryption...") as a fallback only for the
 narrow residual edge case just described, not as the primary design.
+
+## Doctrine tension — DOCTRINE.md §IX (2026-08-29)
+
+`DOCTRINE.md` §IX ("External WORM standards alignment") already made a
+deliberate, reasoned choice directly relevant here: for SEC Rule 17a-4(f),
+Foundry "targets the **WORM path** explicitly (not the Audit-Trail
+alternative introduced in the 2022 amendment)," specifically because
+"a policy-layer WORM enforcement can be undone by a future maintainer
+toggling a flag" while "a storage-substrate WORM enforcement... cannot."
+`conventions/worm-ledger-design.md` (the spec DOCTRINE cites as
+authoritative) has **zero mentions of retention, deletion, erasure, or
+GDPR** — the audit-trail-vs-WORM choice was ruled on; the narrower
+retention-bounded-deletion question this BRIEF is proposing was not.
+
+Per `CLAUDE.md`'s own standing rule — "where this file and DOCTRINE.md
+disagree, DOCTRINE.md wins; surface the conflict as a NEXT.md cleanup
+item" — this tension is logged here and will be logged to NEXT.md, not
+silently resolved.
+
+**Operator direction (2026-08-29):** research both framings rather than
+pre-committing — but the working assumption is that DOCTRINE.md's current
+language may simply be out of date with what the new research and ideas
+support, and updating it is in scope if the cross-check research holds up
+(not staying fixed by default). A promising reconciliation hypothesis,
+**to be verified by the cross-check research pass now underway**: SEC
+17a-4(f)'s WORM requirement may have only ever meant "immutable for (at
+least) the mandatory retention period," never literally eternal — in which
+case "WORM during the mandatory window, eligible-for-deletion (not
+automatic) after it expires" is fully *within* the WORM path DOCTRINE
+already chose, not a departure from it, and no doctrine amendment is even
+needed — only a clarification that resolves apparent-not-real tension.
+This needs a primary-source check before treating it as settled either way.
 
 ## Self-contained records — eliminating even the retention register (2026-08-29)
 
