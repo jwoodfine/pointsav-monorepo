@@ -331,6 +331,126 @@ already chose, not a departure from it, and no doctrine amendment is even
 needed — only a clarification that resolves apparent-not-real tension.
 This needs a primary-source check before treating it as settled either way.
 
+## Cross-check research results (2026-08-29) — 5 parallel primary-source passes
+
+Operator directive: "double check everything" before touching any docs.
+Five independent research passes, each targeting one regime/standard.
+**Net verdict across all five: the reconciliation hypothesis above holds.
+No regime checked requires eternal retention. Retention-bounded WORM +
+permission-to-delete (not automatic) + litigation-hold suspension is not
+just compliant — it is how records management is already, formally,
+supposed to work.** This is closer to a clarification of DOCTRINE.md's
+existing WORM-path commitment than a reversal of it.
+
+### 1. SEC 17a-4(f) / FINRA 4511 — bounded, not eternal
+
+Verdict: **confirmed bounded.** The SEC's own language (2022 amendment) for
+*both* the WORM path and the audit-trail alternative is scoped to "the
+required retention period" — not open-ended. Standard periods: most
+transaction records ≥3yr, financial ledgers ≥6yr; the one real "permanent"
+exception is entity-formation records, retained for the *life of the firm*
+(a different bounded window — firm existence — not literal eternity).
+Disposal after expiry is standard, permitted, expected industry practice;
+FINRA enforcement focus is entirely on *premature* destruction, never on
+disposal-after-expiry being impermissible. **Caveat**: the Federal Register
+primary text itself was bot-blocked during this pass; verdict rests on
+convergent practitioner-legal secondary sources (Dechert, ACA Global,
+Archive360, Smarsh), not the raw rule text directly. A follow-up primary
+pull (SEC.gov rule-text page or FINRA's own PDF chart-of-changes) is worth
+doing before treating this as fully closed — flagged as decisions-open #10.
+
+### 2. CFTC 1.31 — most permissive regime checked
+
+Verdict: **confirmed, primary source (eCFR/Cornell LII 17 CFR §1.31).** No
+WORM mandate — only "authenticity and reliability" controls (§1.31(c)(2)).
+Retention periods explicit, bounded minimums ("not less than" 5yr swaps,
+1yr oral comms, 5yr other records) — never eternal. The rule is entirely
+**silent** on disposal after expiry, which is the standard reading that
+firms may dispose once the floor is met. No tension with the proposed
+design at all.
+
+### 3. GDPR Art 17 + MiFID II — confirmed, with two real refinements needed
+
+Art 17(3)(b)'s legal-obligation exemption is confirmed via primary text
+(gdpr-info.eu) plus a real regulatory-tier source found this pass: the
+**EDPB's 2025 Coordinated Enforcement Action report on the right to
+erasure** (32 DPAs). It confirms the exemption's validity but flags a real
+enforcement failure mode worth designing against: DPAs found controllers
+treating the exemption as automatically applicable *without case-by-case
+assessment*. **Design requirement, new**: every deletion decision (granted
+or withheld) must log *why* — the specific retention schedule/legal basis
+— not just *that* a decision was made. An audit trail of reasoning, not
+just of state.
+
+MiFID II *lex specialis*: **downgrade confidence** — no ESMA-authored
+primary source was found confirming this in either research pass. Every
+source (Lexology, SteelEye, RBC, KSF) is practitioner/secondary; the legal
+logic itself is sound and uncontested across all of them, but this BRIEF
+should describe it as "well-reasoned legal argument, not adjudicated
+regulatory precedent," not overclaim ESMA authority.
+
+**New gap identified, real and unaddressed until now**: for personal data
+that is genuinely NOT covered by any retention exemption, GDPR Art 17(1)'s
+erasure obligation is *affirmative* — "without undue delay," ~30 days.
+"Permission to delete" alone does not satisfy this; nobody is obligated to
+act on a mere permission. **This needs a second, distinct trigger**,
+separate from retention-window expiry: an erasure request against
+non-exempt content must open a tracked, SLA-bound task (logged, escalates
+if unactioned) that closes by someone exercising the deletion permission
+within the legal window. Retention-expiry eligibility has no undue-delay
+clock (17(3)(b) fully exempts it) — this is a second, different mechanism,
+not a variant of the first.
+
+### 4. NARA Bulletins + federal disposal practice — pattern confirmed as standard, not novel
+
+Bulletins read in full (primary, archives.gov): 2014-04 (format
+tables, now updated by 2018-01) sets required/preferred/acceptable formats
+per record category; 2015-04 sets required item-level metadata — File Name,
+Record ID, Title, Description, Creator, Creation Date, Rights (+ optional
+Coverage, Relation), built on Dublin Core, with Appendix B platform-
+independent naming conventions. **Permanent records confirmed as true
+no-expiry**: records default to permanent absent an approved disposition
+schedule; destruction requires an Archivist-approved schedule (44 U.S.C.
+Ch. 33); a narrow reappraisal-as-temporary pathway exists but is rare and
+formal, not a normal lifecycle event.
+
+**The exact mechanic this BRIEF proposed — retention-expiry makes a record
+eligible for disposal, disposal is a deliberate authorized action (never
+automatic), and a litigation hold suspends the disposition cycle — is
+confirmed as existing, standard federal records practice**, not an
+invention (36 CFR Parts 1225/1230; agencies route eligible records through
+legal-counsel litigation-hold review before destruction proceeds).
+
+### 5. eIDAS + ISO 15489/ARMA GARP — confirmed bounded; confirmed established practice
+
+EU CIR 2025/1946 (primary, eur-lex.europa.eu): **not eternal** — it defines
+technical fidelity requirements "until the end of the preservation period,"
+a defined endpoint left to the record owner or other governing law; the
+regulation governs *how* preservation is done, not *how long*. No tension
+with a bounded-retention design.
+
+**ISO 15489-1 and ARMA GARP's Principle of Disposition — both primary
+standards, not secondary commentary — describe this exact pattern as
+correct practice**: retention runs per a documented schedule; "once the
+life of a record has been satisfied... and there are no legal holds
+pending, it is authorized for final disposition"; US practice extends the
+retention clock automatically once litigation/claim/audit begins before
+expiry. This is the litigation-hold-suspension mechanism this BRIEF
+proposed, described in the field's own foundational standard.
+
+### Synthesis
+
+No regime surveyed — SEC, FINRA, CFTC, GDPR, MiFID II, NARA, eIDAS —
+requires eternal, no-exceptions retention. Every regime's retention
+requirement is a **minimum**, not a permanent mandate, and disposal after
+the minimum (subject to litigation-hold suspension) is either explicitly
+permitted or the field's own standard practice (ISO 15489/ARMA GARP). Two
+concrete design requirements emerged that weren't in the BRIEF before this
+pass: (1) log the *reasoning*, not just the state, behind every deletion
+decision (EDPB finding); (2) a second, SLA-bound, "without undue delay"
+trigger for GDPR erasure requests against non-exempt personal data — distinct
+from the passive, no-deadline retention-expiry-eligibility trigger.
+
 ## Self-contained records — eliminating even the retention register (2026-08-29)
 
 Operator direction (2026-08-29): "build something radically different that
@@ -400,6 +520,15 @@ retention-class expiry, the same product-identity question raised above.
 
 ## Architectural implication — the "one unified floor" question, revisited
 
+**Superseded 2026-08-29 — kept for reference, not the current direction.**
+This section's crypto-shredding-based mechanism is superseded by
+"No-register alternative" and "Self-contained records" above, both
+confirmed against primary sources in the cross-check research pass. The
+*reframing itself* — "one unified mechanism, modular policy layer on top"
+— still holds and now maps onto the newer design: the mechanism is
+retention-bounded self-contained WORM records; the modular policy layer is
+each deployment's retention-class vocabulary and duration mapping.
+
 The operator initially chose "one maximally-strict unified floor," then
 reconsidered toward "modular may be the only way to achieve cross-
 compliance" once the GDPR/WORM tension surfaced. The research suggests a
@@ -431,16 +560,20 @@ design decision — this BRIEF proposes it, does not decide it.
 
 ## Decisions open
 
-1. Ratify (or reject) the "one mechanism + modular policy layer" framing
-   above as the actual design direction.
+1. ~~Ratify "one mechanism + modular policy layer" framing~~ — **the
+   reframing survives, done 2026-08-29**; now maps onto the
+   retention-bounded self-contained design, not crypto-shredding. See
+   superseded-note above.
 2. Confirm Woodfine/PointSav's actual registration status (broker-dealer?
    investment adviser? neither?) — determines whether SEC 17a-4/FINRA/
    Reg S-P are binding-now requirements or aspirational-for-future-
    customers requirements. Do not build as if they're binding without
-   this confirmed.
-3. Read NARA Bulletin 2014-04's actual format table and Bulletin 2015-04's
-   actual metadata table in full — `service-input`'s metadata schema
-   should be designed against these directly, not from this summary alone.
+   this confirmed. **Still open — no research pass has addressed this.**
+3. ~~Read NARA Bulletin 2014-04/2015-04 in full~~ — **done 2026-08-29**,
+   findings in "Cross-check research results" §4 above. Format/metadata
+   tables summarized; `service-input`'s metadata schema should still
+   consult the bulletins directly for the full field-by-field spec before
+   final implementation, but the "what's required" question is answered.
 4. ~~Research CFTC Rule 1.31~~ — **done 2026-08-28**, findings folded into
    §1 above and the "does any of this require WORM?" synthesis. No new
    open question from this item; commodity-trading registration status
@@ -473,15 +606,44 @@ design decision — this BRIEF proposes it, does not decide it.
    deletion after natural expiry, "no expiry" setting for permanent-record
    deployments). See "No-register alternative" section above. **Ratify or
    reject as the primary direction** — recommended, not yet ratified.
-9. **(2026-08-29, new)** Ratify or reject the deviation itself: item 8
-   requires `service-fs` to support a real (non-cryptographic) delete
-   operation, gated by retention-window expiry — a change to
-   `topic-totebox-archive.draft.md`'s current documented claim that "no
-   `DELETE` operation... is structural, not a configuration option." This
-   is a product-identity question (is eternal, provably-permanent WORM
-   itself the sellable promise, independent of compliance minimums?), not
-   an implementation detail — needs explicit operator sign-off before any
-   code reflects it.
+9. Ratify or reject the deviation itself: item 8 requires `service-fs` to
+   support a real (non-cryptographic) delete operation, gated by
+   retention-window expiry — a change to `topic-totebox-archive.draft.md`'s
+   current documented claim that "no `DELETE` operation... is structural,
+   not a configuration option." **Substantially de-risked by the
+   cross-check research (2026-08-29)**: every regime surveyed treats
+   retention as a bounded minimum, and "eligible-for-disposal, deliberate
+   not automatic, litigation-hold-suspended" is confirmed as the field's
+   own established standard practice (ISO 15489/ARMA GARP), not a novel
+   weakening. Operator's own framing: current docs may simply be out of
+   date and due for an update, not a doctrine reversal. Still needs a
+   final explicit sign-off before any code or DOCTRINE.md text changes —
+   the research supports proceeding, but hasn't been asked to proceed yet.
+10. **(2026-08-29, new)** Pull the SEC 17a-4(f) 2022-amendment primary text
+    directly (Federal Register release 2022-22670, or FINRA's own
+    chart-of-changes PDF) — the cross-check pass's SEC/FINRA verdict rests
+    on convergent secondary/practitioner-legal sources because the Federal
+    Register page itself was bot-blocked during the pass. The verdict
+    (bounded, not eternal) is well-supported but not yet primary-source-closed.
+11. **(2026-08-29, new)** Downgrade the MiFID II *lex specialis* claim in
+    this BRIEF's §3 (EU findings) from implied regulatory precedent to
+    "well-reasoned legal argument, uncontested across practitioner sources,
+    not confirmed by any ESMA-authored primary document" — no primary
+    source was found in either research pass despite two attempts.
+12. **(2026-08-29, new)** Design a second, distinct deletion-trigger path
+    for GDPR erasure requests against personal data with **no** applicable
+    retention exemption: an SLA-bound, logged, escalating task (~30-day
+    "without undue delay" clock) that closes by someone exercising the
+    deletion permission — separate from the passive, no-deadline
+    retention-expiry-eligibility trigger, which has no undue-delay clock
+    at all (fully exempted under Art 17(3)(b)). A bare "permission to
+    delete" satisfies nothing on its own for this specific case.
+13. **(2026-08-29, new)** Every deletion decision — granted or withheld —
+    must log the specific reasoning (retention schedule reference, legal
+    basis, or GDPR ground), not just the resulting state. Real EDPB
+    enforcement finding: DPAs found controllers applying the legal-obligation
+    exemption automatically, without case-by-case assessment — the audit
+    trail needs to capture *why*, not just *that*.
 
 ## Work log
 
@@ -518,6 +680,36 @@ design decision — this BRIEF proposes it, does not decide it.
   software-shipped retention-class vocabulary remains external, and its
   loss is never a data-loss event. Matches `os-totebox`'s own existing
   self-containment claim at the appliance level, extended to file level.
+  Found `DOCTRINE.md` §IX already made a deliberate, reasoned pure-WORM
+  choice for SEC 17a-4(f) specifically to resist "a future maintainer
+  toggling a flag" — logged as a real tension per `CLAUDE.md`'s own
+  conflict-surfacing rule, not silently resolved. Corrected an earlier
+  session error: "DARP" is a real, existing workspace term (Data Archive
+  Retrieval Protocol, `DOCTRINE.md` §IX) meaning plain-text/self-describing
+  readability — not FedRAMP, as an earlier turn incorrectly told the
+  operator. Operator refined the deletion model to "permission to delete,
+  not automatic" and asked for a web cross-check before any doc edits;
+  launched 5 parallel primary-source research passes (SEC/FINRA, CFTC,
+  GDPR/MiFID II, NARA, eIDAS+records-management standards).
+- **2026-08-29 (cross-check complete)**: all 5 passes returned. Net
+  verdict: no regime surveyed requires eternal retention; the proposed
+  design (retention-bounded WORM, permission-to-delete not automatic,
+  litigation-hold suspension) is confirmed compliant across SEC/FINRA/
+  CFTC/GDPR/MiFID II/NARA/eIDAS, and is literally how ISO 15489/ARMA GARP
+  define correct records disposition practice — not a novel invention.
+  Full findings in "Cross-check research results" section above. Three
+  real refinements surfaced and added to decisions-open: (1) SEC/FINRA
+  verdict needs a primary-source follow-up (Federal Register was
+  bot-blocked this pass); (2) MiFID II *lex specialis* downgraded to
+  "sound legal argument, not confirmed regulatory precedent" — no ESMA
+  primary source found; (3) a second, SLA-bound deletion trigger is needed
+  for GDPR erasure requests on non-exempt personal data (distinct from the
+  passive retention-expiry-eligibility trigger); (4) every deletion
+  decision needs its specific legal reasoning logged, not just the
+  resulting state (real EDPB enforcement finding). Doctrine tension
+  substantially de-risked — reads as a clarification of DOCTRINE.md's
+  existing WORM-path commitment, not a reversal, pending final operator
+  sign-off before any DOCTRINE.md/TOPIC/GUIDE text actually changes.
 
 ## Carry-forward
 
