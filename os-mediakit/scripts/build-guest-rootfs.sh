@@ -123,27 +123,39 @@ echo "wiki:x:${WIKI_GID}:" | sudo tee -a "${OVERLAY}/etc/group" > /dev/null
 # build time, same convention as Format B's build-image.sh — not generated
 # dynamically by /init) ──
 echo "  wiki content + config..."
+declare -A PORTS=( [documentation]=9090 [projects]=9093 [corporate]=9095 )
+declare -A BRANDS=( [documentation]=pointsav [projects]=woodfine [corporate]=woodfine )
 for INSTANCE in documentation projects corporate; do
     sudo mkdir -p "${OVERLAY}/var/lib/wiki/${INSTANCE}" "${OVERLAY}/var/lib/wiki-state/${INSTANCE}"
 done
-sudo tee "${OVERLAY}/var/lib/wiki/documentation/getting-started.md" > /dev/null << 'EOF'
+# All 3 instances get a sample article, not just documentation — real bug
+# found 2026-08-26 chasing an unrelated /data-persistence investigation:
+# projects/corporate had no baked-in content at all (mkdir-only), so every
+# boot's /init correctly saw their /data seed source as empty and correctly
+# copied zero files — three separate "durability fix" attempts (explicit
+# sync, QEMU cache=writethrough, 65s elapsed time before kill) all failed to
+# change this because none of them addressed the real cause: there was
+# never anything to persist. The evidence was already visible in every
+# prior boot's own log (`indexed 0 article(s)` x2, `indexed 1 article(s)`
+# x1) and went unnoticed until directly instrumented with df/find counts.
+for INSTANCE in documentation projects corporate; do
+    sudo tee "${OVERLAY}/var/lib/wiki/${INSTANCE}/getting-started.md" > /dev/null << EOF
 ---
 title: Getting Started
-description: Welcome to your PointSav Knowledge Wiki
+description: Welcome to your ${BRANDS[${INSTANCE}]^} ${INSTANCE^} Wiki
 date: 2026-01-01
 quality: stub
 ---
 
 # Getting Started
 
-This is your PointSav Knowledge Wiki. Add Markdown files to this directory to create articles.
+This is your ${BRANDS[${INSTANCE}]^} ${INSTANCE^} Wiki. Add Markdown files to this directory to create articles.
 EOF
+done
 sudo chown -R "${WIKI_UID}:${WIKI_GID}" "${OVERLAY}/var/lib/wiki" "${OVERLAY}/var/lib/wiki-state"
 sudo chmod 0750 "${OVERLAY}/var/lib/wiki" "${OVERLAY}/var/lib/wiki-state"
 
 sudo mkdir -p "${OVERLAY}/etc/wiki"
-declare -A PORTS=( [documentation]=9090 [projects]=9093 [corporate]=9095 )
-declare -A BRANDS=( [documentation]=pointsav [projects]=woodfine [corporate]=woodfine )
 for INSTANCE in documentation projects corporate; do
     sudo tee "${OVERLAY}/etc/wiki/${INSTANCE}.toml" > /dev/null << TOML
 # /etc/wiki/${INSTANCE}.toml — G2.5 guest build, no ACME/nginx (G-TLS descoped)
@@ -263,19 +275,18 @@ if [ -n "${DATA_DEV}" ]; then
                 echo "  WARNING: ${INSTANCE}: bind-mount of ${DATA_CONTENT}/${DATA_STATE} failed — falling back to non-persistent baked-in content this boot"
             fi
         done
-        # Explicit sync — real bug found 2026-08-26 running this for real, not
-        # caught by sh -n: without this, an abrupt guest kill (this harness's
-        # own smoke-test path never cleanly unmounts /data, and neither does a
-        # real production shutdown yet — the guest DTS has no ACPI/power-button
-        # device, see the BRIEF's Phase Deploy note on this same gap) loses
-        # whatever seed/edit writes hadn't reached the block device yet.
-        # Reproduced directly: a two-boot test on the same disk showed
-        # `documentation`'s seed survive but `projects`/`corporate`'s did not
-        # (both re-seeded on boot 2 as if still first-boot) — an unsynced
-        # writeback race, not a logic bug in the loop above. This covers the
-        # seed write; ongoing live-edit durability across an abrupt kill is a
-        # broader question Phase Deploy's real shutdown path still needs to
-        # solve properly (sync+umount /data before the VM is killed).
+        # Explicit sync so a first-boot seed write is durable before any
+        # abrupt guest kill (this harness's smoke-test path never cleanly
+        # unmounts /data, and neither does a real production shutdown yet —
+        # the guest DTS has no ACPI/power-button device, see the BRIEF's
+        # Phase Deploy note). NOTE 2026-08-26: an apparent durability bug
+        # chased at length here (documentation's seed persisting,
+        # projects'/corporate's not) turned out to have nothing to do with
+        # sync/flush/cache timing at all — the real cause was upstream, in
+        # 4b above (projects/corporate had no baked-in sample content to
+        # seed from in the first place, so `cp -a` of an empty source
+        # correctly copied zero files every time). Fixed there. `sync` here
+        # is still correct defensive practice, just wasn't the fix.
         sync
     else
         echo "WARNING: ${DATA_DEV} present but could not be mounted — /data unavailable this boot, all 3 tenants running on non-persistent baked-in content"
