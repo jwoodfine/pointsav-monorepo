@@ -6,7 +6,7 @@ title: Cross-Compliance WORM Design — service-fs / service-input
 status: active
 owner: project-input
 created: 2026-08-28
-updated: 2026-08-28
+updated: 2026-08-29
 ---
 
 # Cross-Compliance WORM Design — service-fs / service-input
@@ -62,11 +62,19 @@ everything below as informing a decision, not as already decided.
   written incident-response + disposal policies, if any customer PII is
   involved. Compliance deadlines Dec 2025 (large entities) / June 2026
   (smaller entities).
-- **Flagged, not yet researched**: CFTC Rule 1.31 — another US WORM-storage
-  mandate (commodity trading records) that surfaced adjacent to 17a-4 but
-  wasn't covered in this pass.
+- **CFTC Rule 1.31** (commodity trading/derivatives/swaps records,
+  researched 2026-08-28): applies to a different registration category
+  than SEC broker-dealer status (futures commission merchants, swap
+  dealers, and related registrants) — confirming Woodfine/PointSav's
+  actual registration status remains the same open prerequisite as for
+  17a-4. Substantively, 1.31 requires only "authenticity and reliability"
+  of the records system plus a records-system inventory — **it does not,
+  and apparently never did (even pre-2022, unlike the earlier vintage of
+  17a-4), mandate pure physical WORM.** Adds no new technical requirement
+  beyond what 17a-4/FINRA 4511 already established.
 - Sources: sec.gov (FAQ + amendments pages, Reg S-P press release),
-  finra.org/rules-guidance/rulebooks/finra-rules/4511.
+  finra.org/rules-guidance/rulebooks/finra-rules/4511, cftc.gov (Rule 1.31
+  text + guidance).
 
 ### 2. US federal government (FedRAMP, NIST 800-53, NARA, FISMA)
 
@@ -128,6 +136,222 @@ everything below as informing a decision, not as already decided.
   (crypto-shredding pattern, secondary/practitioner sources), EDPB
   (data-transfer guidance, primary).
 
+## Does any of this actually require WORM?
+
+Direct answer to the operator's question (2026-08-28): **no — none of the
+regimes surveyed mandate pure, physical, irreversible WORM as the only
+compliant path.**
+
+- **SEC 17a-4**: WORM was the *original* reading, but the 2022 amendments
+  added an explicit audit-trail alternative — a system that permits
+  modification/deletion is compliant if it preserves enough audit trail to
+  recreate the original record.
+- **FINRA 4511**: incorporates 17a-4's format rules directly — same
+  conclusion, not a separate stricter requirement.
+- **CFTC 1.31**: requires "authenticity and reliability" + a records-system
+  inventory — never had a pure-WORM mandate, not even before 17a-4's 2022
+  loosening.
+- **NARA** (Bulletins 2014-04/2015-04): the closest thing to a real
+  immutability requirement found — "able to capture immutable records" for
+  *permanent* federal record transfers. This is the one regime where
+  immutability language is closest to load-bearing, but the actual bulletin
+  text hasn't been read in full yet (Decisions open #3) — don't treat this
+  as confirmed-strict until that's done.
+- **GDPR/EU**: the opposite of a WORM requirement — erasure rights are in
+  active tension with permanent immutability, resolved via crypto-shredding
+  (destroy the key, never the ciphertext), not by GDPR demanding WORM.
+
+**Implication**: WORM/immutability is a strong, defensible *design choice*
+for this appliance (integrity guarantees, tamper-evidence, audit
+simplicity) — but across every regime checked so far, it is not the
+*compliance floor* itself. The compliance floor is closer to "authentic,
+reliable, tamper-evident, with a real audit trail," which content-addressed
+immutable storage satisfies more easily than it's *required* to. This
+matters for the "one mechanism + modular policy layer" framing below: the
+mechanism doesn't need to be WORM to pass compliance — WORM is chosen
+because it's a good mechanism, not because any surveyed regulator demands
+it by name.
+
+## Uniform encryption vs. selective classification (2026-08-28)
+
+Operator question: should *all* content be treated like personal data
+(uniformly encrypted with a destroyable per-record key), to eliminate the
+"is this personal data" classification judgment call at ingest time?
+
+**Assessment**: a reasonable simplification, not a free one — a real
+tradeoff, not a default to assume either way.
+
+Gains:
+- One ingest code path instead of two (no per-file personal-data judgment
+  call).
+- Safer default — never accidentally under-protects a document that turns
+  out to contain personal data nobody flagged (a signature block, a
+  handwritten annotation, a name buried in a financial statement).
+
+Costs:
+- The register/key-store becomes a single point of failure for *all*
+  content, not just the subset that has real personal data in it.
+- Most business records (financial statements, floor plans, aggregate
+  proforma models) have no real "right to erasure" use case at all — no
+  individual could invoke GDPR Article 17 over a floor plan. Encrypting
+  those anyway adds a register dependency without adding real compliance
+  value.
+
+**Recommendation**: worth doing, conditional on two things holding, both
+non-negotiable if adopted:
+1. **Filenames/metadata stay plaintext regardless of content encryption**
+   — preserves the disaster-recovery property (a human with just a file
+   browser can still interpret the archive with zero software, even if
+   every file's *content* now depends on the register).
+2. **The register/key-store gets a redundant backup strategy designed in
+   from day one**, not bolted on later — since everything now depends on
+   it, this stops being a nice-to-have and becomes the single most
+   load-bearing piece of the design.
+
+Not yet ratified — captured here as a reasoned recommendation pending
+operator sign-off, same status as the "one mechanism + modular policy
+layer" framing below.
+
+## No-register alternative — retention-bounded WORM (2026-08-29)
+
+Operator pushback (2026-08-29): "people shouldn't have to encrypt data if
+they don't want to — is there a way to not have a register at all?" Re-read
+the actual `os-totebox`/`service-fs` design docs before answering (not
+assumed): the `content-wiki-projects` draft `topic-totebox-archive.draft.md`
+states the WORM invariant as absolute — "There is no `DELETE` operation and
+no `UPDATE` operation — only append... The immutability guarantee is
+structural, not a configuration option." `BRIEF-OS-FAMILY.md` confirms the
+same: `service-fs` is "WORM append-only," "VMs cannot [modify/delete]."
+**Neither doc mentions encryption or a key-register anywhere — that
+mechanism was this BRIEF's own proposal, not an existing product
+commitment.** The operator is right to push back on it as an unnecessary
+addition, not an established requirement.
+
+**A genuinely register-free alternative exists, and the compliance
+research already gathered supports it:**
+
+Instead of "immutable forever + crypto-shred to forget," use **immutable
+for a bounded retention window, then real physical deletion** — no
+encryption, no keys, no register, for anyone, ever:
+
+- While a record is inside its applicable legal retention window (6yr
+  FINRA, 5yr MiFID II, whatever a given deployment's regime sets), it is
+  fully WORM — no update, no delete, exactly as documented today.
+- A GDPR erasure request arriving during that window is lawfully refused
+  under Article 17(3)(b)'s legal-obligation exemption (already verified in
+  §3 above) — no crypto-shred needed to "honor" it, because the law doesn't
+  require honoring it yet.
+- Once the retention window naturally expires (and no other legal hold
+  applies), the record becomes eligible for real, physical deletion — a
+  true filesystem/object delete, not a key-destruction trick.
+- For a deployment where retention is meant to be genuinely permanent (a
+  NARA federal permanent-record deployment, or a customer who simply wants
+  "forever" as their own policy), set that deployment's retention window to
+  "no expiry" — the record is then eternal WORM exactly as documented
+  today, with zero behavior change from the current design.
+
+**Why this beats crypto-shredding as the default:** it removes the register
+entirely as a dependency, for all content, personal-data or not — nobody
+"has to encrypt," because nothing needs a destroyable key at all. Retention
+windows are just metadata (a date + a deployment policy), and losing that
+metadata is a low-stakes failure (worst case: over-retention, which is
+inconvenient, not a compliance violation and never a data-loss event) —
+categorically safer than losing an encryption-key register, which is
+irreversible data loss.
+
+**Real tension this creates, needing explicit ratification, not a silent
+override:** `topic-totebox-archive.draft.md`'s current language — "no
+`DELETE` operation... structural, not a configuration option" — is written
+as an absolute, permanent product identity, not merely a compliance
+mechanism. It may be a deliberate sellable promise ("your record is
+provably permanent, we structurally cannot alter or delete it, forever")
+independent of what any specific regulation actually requires. Introducing
+*any* real delete path — even one gated behind a long retention window and
+disabled-by-default for permanent-record deployments — changes that
+documented invariant. This needs the operator's explicit sign-off, not an
+AI judgment call, because it revises a stated architectural commitment
+rather than just picking an implementation detail.
+
+**Residual edge case, out of scope unless a real customer need surfaces:**
+a customer wanting to honor an erasure request *during* an active
+retention-mandate window, beyond what the law requires — without a
+register/key mechanism, the only way to grant that is a targeted in-place
+delete, which breaks the WORM invariant on a single record rather than at
+natural expiry. No research finding so far requires supporting this; not
+worth designing for until a specific deployment actually asks.
+
+**Status: recommended, not yet ratified.** This supersedes crypto-shredding
++ mandatory register as the *default* direction — that mechanism remains
+documented above (§"Uniform encryption...") as a fallback only for the
+narrow residual edge case just described, not as the primary design.
+
+## Self-contained records — eliminating even the retention register (2026-08-29)
+
+Operator direction (2026-08-29): "build something radically different that
+covers all these scenarios but is entirely self-contained." Taken literally
+against the retention-bounded-WORM proposal above: that proposal still
+implied *some* external record of each file's retention window (creation
+date + which regime applies) — smaller and lower-stakes than a crypto
+register, but still a thing that could exist separately from the file and
+drift or go missing.
+
+**Push the same principle one level further: encode retention policy, not
+just classification, directly into each record itself, so no external
+register — for classification, for retention, or for anything else — is
+needed to correctly interpret or correctly purge a single file.**
+
+Proposed self-contained record shape (filename or embedded header,
+whichever the format supports):
+
+```
+<sha256>--<chart-of-accounts-stem>--<retention-class>--<created-ISO8601>.<ext>
+```
+
+Example: `9f8a3c...--WCP-ADM-2026-financial-statement--finra-6y--2026-08-29.pdf`
+
+- `sha256` — content identity (existing pattern, from the live ledger.jsonl
+  format).
+- `chart-of-accounts-stem` — human-readable classification (existing
+  decisions-open item 6, still needs Jennifer's real input).
+- `retention-class` — a short tag from a small, fixed, versioned vocabulary
+  (`finra-6y`, `mifid-5y`, `nara-permanent`, `internal-90d`, etc.). The
+  tag→duration mapping lives in the *product's own documentation/code* —
+  a static spec, not a growing per-record database. Losing it doesn't lose
+  any file or any file's identity; it only pauses the ability to compute
+  new expiry dates until it's restored, and it ships with the software
+  itself (recoverable from any install, any git history, any backup of the
+  binary) rather than being unique per-deployment state.
+- `created-ISO8601` — the retention clock's start point, carried by the
+  record itself.
+
+**What this achieves**: a purge job (or a human, or a from-scratch restore
+after total data loss) can correctly determine every record's classification
+*and* retention/deletion eligibility by reading that one record alone — no
+lookup against any separate system. An index/database on top is still
+useful for fast search, but becomes purely a performance cache: if it's
+lost, it is mechanically rebuildable by rescanning the archive and
+re-parsing filenames, never a data-loss event and never a compliance risk.
+This is the same "entirely self-contained" principle `os-totebox` already
+claims at the appliance level ("the archive's identity, keys, and data
+travel with the disk image unchanged" — `topic-totebox-archive.draft.md`
+§"Storage model") — this proposal just carries that same self-containment
+down to the level of a single file inside the archive, rather than
+introducing a new principle the product doesn't already stand for.
+
+**Net effect across all three open threads this operator conversation has
+covered:** zero mandatory encryption (nobody has to encrypt anything to
+participate), zero mandatory register for classification (item 6, already
+proposed), zero mandatory register for retention/deletion (this section) —
+the record is the single source of truth for everything about itself. The
+only thing external to any single record is a small, static,
+software-shipped spec (retention-class vocabulary + duration mapping),
+which is categorically different from a growing, per-deployment,
+must-be-backed-up register.
+
+**Still needs ratification** (folds into decisions-open item 9): this
+still requires `service-fs` to support a real delete operation gated on
+retention-class expiry, the same product-identity question raised above.
+
 ## Architectural implication — the "one unified floor" question, revisited
 
 The operator initially chose "one maximally-strict unified floor," then
@@ -171,8 +395,10 @@ design decision — this BRIEF proposes it, does not decide it.
 3. Read NARA Bulletin 2014-04's actual format table and Bulletin 2015-04's
    actual metadata table in full — `service-input`'s metadata schema
    should be designed against these directly, not from this summary alone.
-4. Research CFTC Rule 1.31 (flagged, not yet done) if commodity-trading-
-   adjacent records are ever in scope.
+4. ~~Research CFTC Rule 1.31~~ — **done 2026-08-28**, findings folded into
+   §1 above and the "does any of this require WORM?" synthesis. No new
+   open question from this item; commodity-trading registration status
+   folds into open item 2 (registration status generally).
 5. Decide the chart-of-accounts naming question this BRIEF grew out of:
    confirmed (2026-08-27, separate conversation) that the chart of
    accounts needs to be developed fresh with real accounting-domain input
@@ -192,6 +418,24 @@ design decision — this BRIEF proposes it, does not decide it.
    plaintext filename itself may need the same per-subject-key treatment
    as other personal-data fields, if it ever encodes personal data) —
    not yet fully reasoned through.
+7. ~~Ratify uniform encryption vs. selective personal-data
+   classification~~ — **superseded 2026-08-29** by item 8: retention-bounded
+   WORM removes the register/encryption dependency entirely, for all
+   content, making this question moot rather than answered either way.
+8. **Done 2026-08-29** — no-register alternative proposed: retention-bounded
+   WORM (immutable during the legal retention window, real physical
+   deletion after natural expiry, "no expiry" setting for permanent-record
+   deployments). See "No-register alternative" section above. **Ratify or
+   reject as the primary direction** — recommended, not yet ratified.
+9. **(2026-08-29, new)** Ratify or reject the deviation itself: item 8
+   requires `service-fs` to support a real (non-cryptographic) delete
+   operation, gated by retention-window expiry — a change to
+   `topic-totebox-archive.draft.md`'s current documented claim that "no
+   `DELETE` operation... is structural, not a configuration option." This
+   is a product-identity question (is eternal, provably-permanent WORM
+   itself the sellable promise, independent of compliance minimums?), not
+   an implementation detail — needs explicit operator sign-off before any
+   code reflects it.
 
 ## Work log
 
@@ -202,6 +446,32 @@ design decision — this BRIEF proposes it, does not decide it.
 - **2026-08-27/28**: 3 parallel research passes (US financial, US federal,
   EU) — findings above. First research attempt hit a transient server-side
   rate limit on all 3 forks simultaneously; retried successfully.
+- **2026-08-28**: CFTC Rule 1.31 researched — no WORM mandate, consistent
+  with 17a-4/FINRA. Added an explicit "does any of this require WORM?"
+  synthesis (answer: no, not as a hard mandate, across every regime
+  checked so far — NARA is the closest, still unconfirmed pending full
+  bulletin read). Operator asked whether to treat all content as personal
+  data (uniform encryption) to simplify design — recommendation given,
+  not yet ratified.
+- **2026-08-29**: Operator pushed back on mandatory encryption/register —
+  read the actual `os-totebox`/`service-fs` TOPIC/BRIEF docs directly
+  (`topic-totebox-archive.draft.md`, `BRIEF-OS-FAMILY.md`) to confirm
+  neither one ever specified encryption or a key-register; that was this
+  BRIEF's own addition, not existing product commitment. Proposed a
+  register-free alternative: retention-bounded WORM (immutable during the
+  legal retention window, real deletion after natural expiry, "no expiry"
+  for permanent-record deployments) — no crypto, no keys, no register, for
+  anyone. Flagged one real tension needing explicit ratification: this
+  requires a genuine delete capability in `service-fs`, which the current
+  docs state does not exist "structurally... not a configuration option."
+  Operator then asked for something "radically different... but entirely
+  self-contained" — extended the proposal so retention policy, not just
+  classification, is encoded directly in each record's own filename
+  (content hash + chart-of-accounts stem + retention-class tag + creation
+  date), eliminating the retention register too — only a small, static,
+  software-shipped retention-class vocabulary remains external, and its
+  loss is never a data-loss event. Matches `os-totebox`'s own existing
+  self-containment claim at the appliance level, extended to file level.
 
 ## Carry-forward
 
