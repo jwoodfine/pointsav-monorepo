@@ -231,6 +231,74 @@ as the first concrete joint-development item under it — it directly answers yo
 two archives' concerns, so it's a good proving ground for whatever coordination shape
 we land on.
 
+### project-totebox's contribution (2026-07-28)
+
+Independent seL4/shipping build-out planning session (extensive operator
+interrogation + Opus/Fable research passes, full detail in this archive's
+`BRIEF-os-totebox-platform.md` Session 18). Surfacing one real conflict
+with this shared BRIEF's own prior resolution before either side commits
+further — this is a proposal for joint reconciliation, not a unilateral
+override.
+
+**1. Conflict: this session locked libvmm-VMM-hosted-guest for BOTH
+os-totebox AND os-orchestration — your 2026-07-17 carry-forward committed
+os-orchestration to seL4-native (`capability-broker-pd`), explicitly
+abandoning a guest-VM approach.** Neither side had visibility into the
+other's decision when made. Facts from this side, verified this session:
+
+- `vendor-libvmm` (UNSW's real, working seL4/Microkit VMM) is fully
+  vendored in project-totebox's tree and its `examples/simple` genuinely
+  builds (`build/loader.img`, 40MB, real — confirmed on disk, not from
+  docs) — but has never been booted.
+- The operator's own resource-split decision (VM-totebox: cheap, GPU-less,
+  DataGraph + Tier-0 Doorman; os-orchestration: hosts actual inference
+  compute + LoRA training) drove the choice toward "unmodified Linux
+  binary in a seL4-isolated guest" for *both* products, specifically
+  because os-totebox's `service-content` depends unconditionally on `lbug`
+  (LadybugDB, C++/cmake FFI) with zero `no_std`/native-PD path — the
+  storage-semantics blocker your own `capability-broker-pd` spec doesn't
+  need to solve for a control-plane-only PD, but which rules out
+  native-PD for the data-vault side entirely.
+- Your own carry-forward's honest effort assessment (`os-orchestration.toml`
+  boot to userspace 2-3 sessions; full capability-chokepoint enforcement
+  2-4 sessions if static-topology, weeks-to-months if dynamic) is real,
+  useful data this session didn't have — worth weighing directly against
+  the libvmm path's own now-confirmed unknowns (G2's VirtIO passthrough via
+  libvmm's own device model, unresearched; a real custom guest rootfs
+  needed since the example's is bare BusyBox/uClibc with no Python/glibc
+  toolchain).
+
+**Proposing, not deciding unilaterally**: adopt libvmm-guest for both
+products as the near-term shipping path (unifies the toolchain across both,
+sidesteps the storage-semantics blocker entirely, and the operator has
+already locked this for os-totebox specifically). Treat
+`capability-broker-pd`/native-PD as the longer-term R&D track your own
+carry-forward already scoped it as — not abandoned, just not the
+near-term critical path for shipping either product. This needs your
+side's explicit sign-off given it directly reverses a decision recorded
+here, not just project-totebox's read of the tradeoff.
+
+**2. `app-orchestration-slm` physical relocation** — confirmed still
+outstanding on this side too (crate still lives in project-totebox's tree,
+actively receiving commits this session). This session's plan explicitly
+flagged the same "coordinated cut-over, not a live yank" caveat your
+carry-forward already states — no new information, just confirming both
+sides still agree on the constraint.
+
+**3. Licensing note relevant to the `app-orchestration-graph` fork
+reconciliation** (your Decisions-open item): this session cross-checked
+the canonical `LICENSE-MATRIX.md`/`repo-license-map.yaml` directly —
+`app-orchestration-*` (prefix, inherits `os-interface`'s classification) is
+correctly `PointSav-ARR` (permanent proprietary, Doctrine claim #23) as of
+the 2026-07-07 correction. If project-totebox's fork of
+`app-orchestration-graph` is still carrying `Apache-2.0 OR MIT` as your
+open item describes, that's the side that's wrong relative to the
+canonical matrix, not `PointSav-ARR` — worth confirming directly against
+`vendor/factory-release-engineering/LICENSE-MATRIX.md` §4.1/§4.1a before
+reconciling the fork, since that's the authoritative source (AGENT.md
+priority list #1 after DOCTRINE.md), not either archive's own prior
+assumption.
+
 ## Decisions locked
 
 Ratified by Command 2026-07-16 (msg-id `command-20260716-ratified-app-orchestration-slm-ownership`)
