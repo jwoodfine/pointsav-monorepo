@@ -388,6 +388,23 @@ pub fn footer(
                             li { a."k-footer__link" href=(other_url) target="_blank" rel="noopener" { (other_label) } }
                         }
                     }
+                    // Added 2026-09-01 (operator-directed footer redesign, Fable+Opus
+                    // "best of both" consult): both bim.woodfinegroup.com and
+                    // design.pointsav.com declare a real machine-readable surface in
+                    // their footer — this one links only routes that actually exist
+                    // and actually resolve. NOT /mcp: both models independently
+                    // verified against this crate's own src/main.rs that MCP here is
+                    // stdio-only (`Command::Mcp`, provisional), no HTTP route — a
+                    // literal bim/design-style "/mcp" link would 404.
+                    div."k-footer__col" {
+                        h2."k-footer__col-title" { "Machine-readable" }
+                        ul."k-footer__list" {
+                            li { a."k-footer__link" href="/llms.txt" { "llms.txt" } }
+                            li { a."k-footer__link" href="/feed.atom" { "Atom feed" } }
+                            li { a."k-footer__link" href="/sitemap.xml" { "Sitemap" } }
+                            li { a."k-footer__link" href="/healthz" { "Health" } }
+                        }
+                    }
                 }
                 // Identity bar — collapsed to 2 rows 2026-08-25/26 (Command/
                 // project-editorial UI-fix batch, exact diff per msg
@@ -555,18 +572,6 @@ pub fn article(
     alt_lang: Option<(&str, &str)>,
     badge: Option<&str>,
     body_html: &str,
-    // Adjacent articles in the same category, by title order — `(slug, title)`.
-    // `None`/`None` when the article has no category or sits at either end
-    // of it. A real UX-review finding: no prev/next navigation existed
-    // anywhere, forcing article -> back to category -> next article.
-    prev: Option<(&str, &str)>,
-    next: Option<(&str, &str)>,
-    // Display label for the category prev/next are drawn from. Labelled
-    // "More in <category>" rather than "Previous/Next" — the underlying
-    // order is alphabetical-by-title (Command/project-editorial finding,
-    // 2026-08-25), not an editorial sequence, so "Previous/Next" promised a
-    // reading order that doesn't exist.
-    pager_category: Option<&str>,
 ) -> Markup {
     html! {
         article."k-article" {
@@ -604,25 +609,6 @@ pub fn article(
                 }
             }
             div."k-prose" { (PreEscaped(body_html)) }
-            @if prev.is_some() || next.is_some() {
-                nav."k-article-pager" aria-label={ "More in " (pager_category.unwrap_or("this category")) } {
-                    @if let Some(cat) = pager_category {
-                        span."k-article-pager__label" { "More in " (cat) }
-                    }
-                    @if let Some((p_slug, p_title)) = prev {
-                        a."k-article-pager__link"."k-article-pager__link--prev" href={ "/wiki/" (p_slug) } {
-                            span."k-article-pager__dir" { "\u{2190}" }
-                            span."k-article-pager__title" { (p_title) }
-                        }
-                    }
-                    @if let Some((n_slug, n_title)) = next {
-                        a."k-article-pager__link"."k-article-pager__link--next" href={ "/wiki/" (n_slug) } {
-                            span."k-article-pager__dir" { "\u{2192}" }
-                            span."k-article-pager__title" { (n_title) }
-                        }
-                    }
-                }
-            }
             @if asof.is_none() {
                 // Print-only citation stamp (Phase 9 — .k-print-citation is
                 // display:none on screen, shown only in @media print).

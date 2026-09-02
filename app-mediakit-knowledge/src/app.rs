@@ -1398,12 +1398,9 @@ async fn serve_article(
     // Stamping `<html lang>` and the toggle from the *requested* `lang`
     // instead of this would mislabel English fallback content as Spanish.
     let lang_code = if doc.lang == Lang::Es { "es" } else { "en" };
-    // "In this topic" sidebar list + prev/next pager — real UX-review
-    // findings: the sidebar only ever showed categories, never sibling
-    // articles (reading flow was strictly article -> back to category page
-    // -> next article), and no prev/next navigation existed at all.
-    // `in_category` is already title-sorted, so index-of-current +/- 1 is
-    // the adjacent article with zero new lookups.
+    // "In this topic" sidebar list — real UX-review finding: the sidebar
+    // only ever showed categories, never sibling articles (reading flow was
+    // strictly article -> back to category page -> next article).
     let current_category = doc.category.as_deref();
     let category_docs: Vec<(String, String)> = current_category
         .map(|cat| {
@@ -1416,20 +1413,6 @@ async fn serve_article(
                 .collect()
         })
         .unwrap_or_default();
-    let self_index = category_docs.iter().position(|(s, _)| s == &doc.slug);
-    let prev = self_index
-        .filter(|&i| i > 0)
-        .and_then(|i| category_docs.get(i - 1))
-        .map(|(s, t)| (s.as_str(), t.as_str()));
-    let next = self_index
-        .and_then(|i| category_docs.get(i + 1))
-        .map(|(s, t)| (s.as_str(), t.as_str()));
-    // Pager label — "More in <category>", not "Previous/Next": the adjacency
-    // above is alphabetical-by-title, not an editorial sequence (Command/
-    // project-editorial finding, 2026-08-25).
-    let pager_category_label = (prev.is_some() || next.is_some())
-        .then(|| current_category.map(|c| category_label(&state, c)))
-        .flatten();
     let siblings: Vec<(String, String)> = category_docs
         .iter()
         .filter(|(s, _)| s != &doc.slug)
@@ -1452,8 +1435,6 @@ async fn serve_article(
             .unwrap_or_else(|| doc.title.clone());
         let short = rev.chars().take(8).collect::<String>();
         let badge = content_type_badge(parsed.frontmatter.index_type.as_deref(), doc.lang);
-        // A historical snapshot doesn't get prev/next pager links — those
-        // navigate the current article set, not this point-in-time view.
         let body = ui::article(
             &title,
             &doc.slug,
@@ -1463,9 +1444,6 @@ async fn serve_article(
             None,
             badge,
             &rendered.html,
-            None,
-            None,
-            None,
         );
         // Canonical points at the CURRENT version, not this historical snapshot —
         // an as-of view shouldn't compete with the live article for indexing.
@@ -1583,9 +1561,6 @@ async fn serve_article(
         alt_ref,
         badge,
         &rendered.html,
-        prev,
-        next,
-        pager_category_label.as_deref(),
     );
     // Breadcrumb — a real finding: no page anywhere had one. Home -> Category
     // (when the article has one) -> current article (not a link).
