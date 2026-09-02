@@ -15,11 +15,20 @@
 # this guest runs ONE binary as THREE independent processes (documentation/
 # projects/corporate tenants, ports 9090/9093/9095 — matching the ratified
 # 1-VM topology, BRIEF-os-mediakit-product-family.md Decisions-open #1),
-# not two different binaries. G-TLS (nginx/certbot/ACME) is deliberately
-# NOT part of this build — descoped this pass (operator direction,
-# 2026-08-25): no real public reachability in this test environment to
-# terminate TLS against, so G3's target is direct reachability to each
-# wiki tenant, matching how Format B's own systemd units work today.
+# not two different binaries.
+#
+# G-TLS (2026-09-01): nginx + certbot core are now installed and nginx
+# reverse-proxies each of the 3 backends by server_name (real public domains
+# — documentation.pointsav.com, projects.woodfinegroup.com,
+# corporate.woodfinegroup.com), with an ACME HTTP-01 webroot wired and
+# /etc/letsencrypt bind-mounted to /data for future cert persistence.
+# Structure only — no real cert exists and no real `certbot certonly` request
+# is made anywhere in this build: there is still no real public DNS/
+# reachability in this test environment to issue against (operator
+# direction, 2026-08-25, still true). What changed 2026-09-01 is scoped to
+# what doesn't need a real target: the reverse-proxy scaffolding, verified
+# live (M-SMOKE's nginx routing checks below), not the actual TLS/ACME parts,
+# which stay genuinely blocked on Phase T2A providing a real target.
 #
 # /data persistence (2026-08-26): /init bind-mounts a product-agnostic
 # /data/app-mediakit-knowledge/<instance>/{content,state} layout onto each
@@ -106,6 +115,43 @@ else
     echo "  cached: ${BASE_DIR} (debootstrap already complete)"
 fi
 
+# ── 2b. G-TLS scaffolding — nginx only, cached into BASE_DIR alongside the
+# debootstrap base (2026-09-01, revised same day — see real bug below).
+# `nginx-light` was the original intent (smaller — this is a reverse proxy
+# in front of 3 backends, no extra modules needed) but it no longer exists
+# as a separate package in noble (apt names `nginx` as its direct
+# replacement), so plain `nginx` is installed instead.
+#
+# REAL BUG, same-day revision: the first version of this step also
+# installed `certbot` (`apt-get install nginx certbot`, after adding the
+# `universe` component certbot lives in — `main` alone gives "no
+# installation candidate"). That build succeeded, but the guest **panicked
+# on boot**: certbot's Python dependency chain (cryptography, requests,
+# acme, josepy, ~10 packages) grew the compressed rootfs from 89M to 127M
+# (392MB uncompressed) — enough to blow past this guest's actual RAM
+# ceiling. `-m size=2G` on the QEMU/Microkit VMM invocation is NOT the
+# guest kernel's own RAM: `vendor-libvmm/examples/virtio/client_vm/
+# linux.dts`'s `memory@40000000` node declares exactly 0x40000000 bytes —
+# 1GiB — as what the guest Linux kernel is told it has, a hard ceiling
+# separate from the VMM-level pool. Panic was `Initramfs unpacking failed:
+# write error` → `VFS: Unable to mount root fs`. certbot cannot actually
+# issue anything until a real target with real public DNS exists anyway
+# (Phase T2A, still deferred) — so the fix is scope, not a bigger VM:
+# certbot is NOT installed in this build. nginx alone (no Python
+# dependency chain) stays well within the 1GiB ceiling. Re-add certbot at
+# whatever point Phase T2A actually needs it — either a rebuild at that
+# time, or installed directly on the real target rather than baked into
+# every dev-loop guest-rootfs rebuild.
+if [ ! -f "${BASE_DIR}/.nginx-installed" ]; then
+    echo "  installing nginx (G-TLS reverse-proxy scaffolding only — certbot deferred to Phase T2A, see comment above)..."
+    sudo cp "$(command -v qemu-aarch64-static)" "${BASE_DIR}/usr/bin/"
+    sudo chroot "${BASE_DIR}" /bin/sh -c "export DEBIAN_FRONTEND=noninteractive; apt-get update && apt-get install -y --no-install-recommends nginx"
+    sudo rm -f "${BASE_DIR}/usr/bin/qemu-aarch64-static"
+    sudo touch "${BASE_DIR}/.nginx-installed"
+else
+    echo "  cached: ${BASE_DIR} (nginx already installed)"
+fi
+
 # ── 3. Assemble overlay (copy base, don't mutate it — keep it re-usable/cached) ──
 sudo rm -rf "${OVERLAY}"
 sudo cp -a "${BASE_DIR}" "${OVERLAY}"
@@ -155,17 +201,24 @@ done
 sudo chown -R "${WIKI_UID}:${WIKI_GID}" "${OVERLAY}/var/lib/wiki" "${OVERLAY}/var/lib/wiki-state"
 sudo chmod 0750 "${OVERLAY}/var/lib/wiki" "${OVERLAY}/var/lib/wiki-state"
 
+declare -A DOMAINS=( [documentation]=documentation.pointsav.com [projects]=projects.woodfinegroup.com [corporate]=corporate.woodfinegroup.com )
+
 sudo mkdir -p "${OVERLAY}/etc/wiki"
 for INSTANCE in documentation projects corporate; do
     sudo tee "${OVERLAY}/etc/wiki/${INSTANCE}.toml" > /dev/null << TOML
-# /etc/wiki/${INSTANCE}.toml — G2.5 guest build, no ACME/nginx (G-TLS descoped)
+# /etc/wiki/${INSTANCE}.toml — G2.5 guest build; canonical_url points at the
+# real public domain ahead of G-TLS actually being live (2026-09-01) — nginx
+# (below) proxies to this backend by Host header, but nginx itself has no
+# real cert/DNS reachability yet in this test environment (see BRIEF's G-TLS
+# section). Direct curl against 127.0.0.1:${PORTS[${INSTANCE}]}/healthz (M-SMOKE) is
+# unaffected by this value either way.
 [site]
 title         = "${INSTANCE^} Wiki"
 brand         = "${BRANDS[${INSTANCE}]}"
 bind          = "0.0.0.0:${PORTS[${INSTANCE}]}"
 state_dir     = "/var/lib/wiki-state/${INSTANCE}"
 instance      = "${INSTANCE}"
-canonical_url = "http://localhost:${PORTS[${INSTANCE}]}"
+canonical_url = "https://${DOMAINS[${INSTANCE}]}"
 
 [[mount]]
 path          = "/var/lib/wiki/${INSTANCE}"
@@ -183,6 +236,48 @@ sudo chown -R "root:${WIKI_GID}" "${OVERLAY}/etc/wiki"
 # script for real (2026-08-26) — not caught by bash -n syntax checking.
 sudo chmod 0640 "${OVERLAY}/etc/wiki/"*.toml
 sudo chmod 0750 "${OVERLAY}/etc/wiki"
+
+# ── 4c. G-TLS scaffolding — nginx reverse proxy + ACME HTTP-01 webroot
+# (2026-09-01). Structure only: no real cert exists, no real ACME request is
+# made anywhere in this build. Once a real target has real public DNS
+# pointing at it (Phase T2A), the commented `certbot certonly` command in
+# /init's startup comment below is the documented next real step — not run
+# here. Single conf.d file, not systemd — this appliance has no systemctl,
+# so nginx's default sites-enabled/default is removed rather than
+# relying on any systemd-triggered reload path.
+sudo rm -f "${OVERLAY}/etc/nginx/sites-enabled/default"
+sudo mkdir -p "${OVERLAY}/var/www/acme-challenge/.well-known/acme-challenge"
+sudo mkdir -p "${OVERLAY}/etc/nginx/conf.d"
+{
+    for INSTANCE in documentation projects corporate; do
+        cat << NGINX
+server {
+    listen 80;
+    server_name ${DOMAINS[${INSTANCE}]};
+
+    # ACME HTTP-01 challenge path — shared webroot across all 3 server
+    # blocks, matches the --webroot argument the future real certbot
+    # invocation (documented in /init below) will use.
+    location /.well-known/acme-challenge/ {
+        root /var/www/acme-challenge;
+    }
+
+    # TODO (Phase T2A, once real certs exist under
+    # /etc/letsencrypt/live/${DOMAINS[${INSTANCE}]}/): add a matching
+    # \`listen 443 ssl;\` server block referencing fullchain.pem/privkey.pem,
+    # and redirect this plain :80 block to https instead of proxying
+    # directly. Not added yet — no cert to reference would just be a
+    # broken config, not real scaffolding.
+    location / {
+        proxy_pass http://127.0.0.1:${PORTS[${INSTANCE}]};
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+NGINX
+    done
+} | sudo tee "${OVERLAY}/etc/nginx/conf.d/os-mediakit.conf" > /dev/null
 
 # ── 5. Install /init — a direct appliance-style PID 1, not full systemd ────────
 # Supervises all 3 tenants as background children — the one genuinely new
@@ -275,6 +370,21 @@ if [ -n "${DATA_DEV}" ]; then
                 echo "  WARNING: ${INSTANCE}: bind-mount of ${DATA_CONTENT}/${DATA_STATE} failed — falling back to non-persistent baked-in content this boot"
             fi
         done
+        # Cert persistence (2026-09-01, G-TLS scaffolding) — shared, not
+        # per-instance: certbot organizes all domains' certs under one
+        # /etc/letsencrypt tree regardless of how many domains are issued
+        # for, so this uses a single "_shared" slot rather than the
+        # per-instance layout above. No real certs exist yet (nothing has
+        # run `certbot certonly` anywhere in this build), so this mount is
+        # empty scaffolding today — it exists so cert persistence doesn't
+        # need a second round of /init changes once real issuance happens.
+        DATA_TLS="/data/app-mediakit-knowledge/_shared/letsencrypt"
+        mkdir -p "${DATA_TLS}" /etc/letsencrypt
+        if mount --bind "${DATA_TLS}" /etc/letsencrypt; then
+            echo "  /etc/letsencrypt now backed by ${DATA_TLS} — future real certs persist across reboots"
+        else
+            echo "  WARNING: bind-mount of ${DATA_TLS} onto /etc/letsencrypt failed — certs (once issued) would not survive a reboot"
+        fi
         # Explicit sync so a first-boot seed write is durable before any
         # abrupt guest kill (this harness's smoke-test path never cleanly
         # unmounts /data, and neither does a real production shutdown yet —
@@ -305,6 +415,24 @@ for INSTANCE in documentation projects corporate; do
     echo "  ${INSTANCE} started (pid ${PID})"
 done
 
+# ── Start nginx (G-TLS scaffolding, 2026-09-01) — reverse proxy in front of
+# the 3 backends above, per-domain server_name matching (see
+# /etc/nginx/conf.d/os-mediakit.conf, templated at build time). Plain HTTP
+# only; no real cert exists. `-t` validates config before starting so a bad
+# template fails loudly here instead of nginx silently not listening.
+# `-g "daemon off;"` keeps it as a normal tracked child, same as the 3 wiki
+# processes above, rather than nginx's own default self-daemonizing behavior.
+echo "validating + starting nginx (G-TLS reverse-proxy scaffolding, no real certs)..."
+if nginx -t 2>&1; then
+    nginx -g "daemon off;" &
+    NGINX_PID=$!
+    PIDS="${PIDS} ${NGINX_PID}"
+    echo "  nginx started (pid ${NGINX_PID})"
+else
+    echo "  WARNING: nginx config validation failed — nginx NOT started this boot, direct backend ports still reachable"
+    NGINX_PID=""
+fi
+
 if [ "${FOUNDRY_MODE}" != "smoketest" ]; then
     echo "production appliance mode — service will stay running (pass foundry.mode=smoketest on the kernel cmdline for the dev smoke-test+self-shutdown path)"
     wait
@@ -319,18 +447,19 @@ import time
 import urllib.error
 import urllib.request
 
-def get(url, timeout=3):
+def get(url, timeout=3, host_header=None):
+    req = urllib.request.Request(url, headers={"Host": host_header} if host_header else {})
     try:
-        resp = urllib.request.urlopen(url, timeout=timeout)
+        resp = urllib.request.urlopen(req, timeout=timeout)
         return resp.status, resp.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as e:
         return e.code, e.read().decode("utf-8", errors="replace")
 
-def check(name, url, expect_status=None, retries=20, delay=1.5):
+def check(name, url, expect_status=None, retries=20, delay=1.5, host_header=None):
     last_exc = None
     for attempt in range(1, retries + 1):
         try:
-            status, body = get(url)
+            status, body = get(url, host_header=host_header)
             ok = expect_status is None or status == expect_status
             marker = "PASS" if ok else "FAIL"
             print(f"[M-SMOKE] {marker} {name}: HTTP {status} (attempt {attempt}) — {body[:200]}")
@@ -347,6 +476,21 @@ results = [
     check("corporate /healthz",     "http://127.0.0.1:9095/healthz", expect_status=200),
 ]
 print(f"[M-SMOKE] SUMMARY: {sum(results)}/{len(results)} reachable and returned an HTTP response")
+
+# G-TLS scaffolding check (2026-09-01) — proves nginx is actually routing by
+# server_name to the right backend, not just that it started. Plain HTTP,
+# port 80, correct Host header per domain — this is the real thing nginx
+# config templating could get wrong (wrong proxy_pass port, wrong
+# server_name) that "nginx -t" validation alone would never catch.
+nginx_results = [
+    check("nginx→documentation (Host: documentation.pointsav.com)", "http://127.0.0.1:80/healthz",
+          expect_status=200, host_header="documentation.pointsav.com"),
+    check("nginx→projects (Host: projects.woodfinegroup.com)", "http://127.0.0.1:80/healthz",
+          expect_status=200, host_header="projects.woodfinegroup.com"),
+    check("nginx→corporate (Host: corporate.woodfinegroup.com)", "http://127.0.0.1:80/healthz",
+          expect_status=200, host_header="corporate.woodfinegroup.com"),
+]
+print(f"[M-SMOKE] NGINX SUMMARY: {sum(nginx_results)}/{len(nginx_results)} routed correctly by server_name")
 SMOKETEST_EOF
 
 # ── SIGTERM graceful-shutdown self-test — ALL 3 processes, not just one.
@@ -389,6 +533,7 @@ results = [
     port_closed("documentation :9090", "http://127.0.0.1:9090/healthz"),
     port_closed("projects :9093",      "http://127.0.0.1:9093/healthz"),
     port_closed("corporate :9095",     "http://127.0.0.1:9095/healthz"),
+    port_closed("nginx :80",           "http://127.0.0.1:80/healthz"),
 ]
 print(f"[SIGTERM-TEST] SUMMARY: {sum(results)}/{len(results)} ports confirmed closed after shutdown")
 PORTCHECK_EOF
@@ -401,9 +546,29 @@ rm -f "${INIT_TMP}"
 sudo chmod +x "${OVERLAY}/init"
 
 # ── 5b. Prune non-server content ────────────────────────────────────────────
+# Real bug found 2026-09-01 chasing the G-TLS kernel panic (see 2b's comment
+# for the full finding): this prune step already removed apt's downloaded
+# .deb archives (var/cache/apt/archives) and package index lists (var/lib/
+# apt/lists), but NOT apt's own internal binary metadata caches
+# (var/cache/apt/pkgcache.bin + srcpkgcache.bin) — these two files alone
+# were 86MB, dwarfing nginx's actual installed footprint, and were the real
+# reason adding nginx (a genuinely small package) blew the rootfs from
+# 89MB to 123-127MB compressed. Both are pure apt-internal caches, safe to
+# delete (apt regenerates them on demand; nothing at runtime reads them —
+# this appliance never runs apt again after build time). Also pruning
+# udev's hwdb (its only consumer, systemd-udevd, never runs here — this
+# appliance's own /init brings up networking directly via `ip`/`udhcpc`,
+# not udev) and Python's __pycache__ (bytecode cache, regenerated on
+# demand, not needed to ship).
 echo "  pruning non-server content..."
 sudo rm -rf "${OVERLAY}/var/cache/apt/archives" \
+    "${OVERLAY}/var/cache/apt/pkgcache.bin" \
+    "${OVERLAY}/var/cache/apt/srcpkgcache.bin" \
+    "${OVERLAY}/var/cache/debconf/templates.dat-old" \
+    "${OVERLAY}/var/cache/debconf/config.dat-old" \
     "${OVERLAY}/var/lib/apt/lists" \
+    "${OVERLAY}/usr/lib/udev/hwdb.bin" \
+    "${OVERLAY}/usr/lib/udev/hwdb.d" \
     "${OVERLAY}/usr/share/doc" \
     "${OVERLAY}/usr/share/man" \
     "${OVERLAY}/usr/share/locale" \
@@ -411,6 +576,7 @@ sudo rm -rf "${OVERLAY}/var/cache/apt/archives" \
     "${OVERLAY}/usr/share/lintian" \
     "${OVERLAY}/usr/share/zoneinfo"
 sudo find "${OVERLAY}/usr/share/locale-langpack" -mindepth 1 -maxdepth 1 ! -name "en*" -exec rm -rf {} \; 2>/dev/null || true
+sudo find "${OVERLAY}" -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
 
 # ── 6. Package via packrootfs ────────────────────────────────────────────────
 echo "  converting overlay directory to cpio.gz..."
