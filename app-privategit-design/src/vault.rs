@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
 
+
 use std::{collections::HashMap, fs, path::Path, path::PathBuf};
 
 /// On-disk layout for a vault section. `Nested` is `section/slug/tab.md` (elements,

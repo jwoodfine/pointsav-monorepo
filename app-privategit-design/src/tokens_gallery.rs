@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
 
+
 // P0.2 — visual token gallery. Flattens tokens.full.json's primitive/theme/extension
 // tiers into renderable entries: color tokens get a swatch + contrast ratio, everything
 // else gets a plain name/value row.

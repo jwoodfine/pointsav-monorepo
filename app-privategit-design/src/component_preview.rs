@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
 
+
 // P1.1 — live component preview rendered from recipe.json's variant HTML + CSS.
 // Sandboxed via iframe srcdoc so the component's own CSS never leaks into (or is
 // polluted by) the portal's own chrome styles.

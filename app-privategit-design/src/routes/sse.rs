@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
 
+
 // D4 — SSE live-reload sidebar.
 // GET /sidebar/sse streams nav HTML fragments when the vault changes.
 // Client replaces nav.sidebar innerHTML on each event; no full reload needed.
