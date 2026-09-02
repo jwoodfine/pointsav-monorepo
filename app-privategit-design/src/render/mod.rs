@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
 
+
 use crate::i18n::{ChromeStrings, Lang, PageLang};
 use minijinja::{context, Environment};
 use pulldown_cmark::{html, Options, Parser};
