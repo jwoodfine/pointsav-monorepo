@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
 
+
 // First-pass Spanish support (2026-07-12): homepage + shared chrome (nav/footer/
 // header) only — matching home.woodfinegroup.com's toggle pattern for the parts that
 // overlap. The ~84 deep vault content pages (tokens/components/research/etc.) are NOT

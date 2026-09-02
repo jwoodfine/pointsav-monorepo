@@ -539,13 +539,30 @@ abandoned H0–H8 native-PD track)
   direction, 2026-08-25): no real public reachability in the test environment used
   for G1-G3 to terminate TLS against.
 
-- **G4 — Full smoke test.** HTTP through the entire chain — both loopback (direct app check)
-  and through nginx/TLS once G-TLS lands — via a Python `urllib` polling loop embedded in
-  `/init`, matching precedent's retry/backoff discipline for TCG boot-time variance. G3's
-  own manual curl checks above are real evidence toward this but not a substitute for it —
-  G4 specifically wants this automated inside `/init`'s own smoke-test mode
-  (`foundry.mode=smoketest`, already wired in `build-guest-rootfs.sh`'s `/init` but not yet
-  exercised end-to-end) plus the SIGTERM self-test for all 3 processes.
+- **G4 — Full smoke test. DONE 2026-08-26 — exercised end-to-end for real, both halves
+  pass.** `foundry.mode=smoketest` couldn't be passed via QEMU `-append` (this image's
+  `-device loader` boot path doesn't support it — same limitation project-totebox
+  already documented) — needed baking into the DTB at build time instead. Ported their
+  `FOUNDRY_EXTRA_BOOTARGS`/`@@FOUNDRY_EXTRA_BOOTARGS@@` substitution mechanism
+  (`linux.dts` + `virtio.mk`, plus their `client_vm/.last_bootargs` staleness guard —
+  and, while there, their `client_vm/.last_initrd_path` guard too, closing the exact
+  class of Make staleness bug that forced a manual `rm -rf client_vm/` during G3)
+  rather than re-deriving any of it independently.
+
+  Rebuilt with `INITRD=` (real rootfs) + `FOUNDRY_EXTRA_BOOTARGS='foundry.mode=smoketest'`
+  — confirmed the bootarg substitution worked end-to-end (`/init` read
+  `foundry.mode=smoketest` from `/proc/cmdline` and switched off production-appliance
+  mode). Real results, not summarized: **M-SMOKE — 3/3 reachable**
+  (`documentation`/`projects`/`corporate` `/healthz` each HTTP 200 "ok" on attempt 1).
+  **SIGTERM-TEST — 3/3 processes exited cleanly** (confirmed via `kill -0` polling,
+  each within 1s) **and 3/3 ports confirmed closed** after shutdown (connection
+  refused/reset, not still answering) — this is the exact gap the BRIEF's own SIGTERM
+  section below flags in `app-orchestration-command`'s precedent (checks only one
+  port, never its spawned children's); os-mediakit's `/init` checks all 3 by design
+  and that design is now confirmed working, not just written.
+
+  G3's own manual curl checks were real evidence toward this but not a substitute —
+  this is the automated, repeatable version, and it now exists and passes.
 
 - **SIGTERM.** `kill -TERM` to **every** process the guest starts (app binary AND nginx — not
   just one). This directly avoids a real gap found in project-totebox's own

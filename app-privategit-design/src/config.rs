@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
 
+
 use std::{collections::HashMap, env, path::PathBuf};
 
 pub struct Config {
@@ -64,14 +65,9 @@ impl Config {
         // bin/sync-design-tokens.sh for the "tokens" mount below).
         bundle_mounts.insert(
             "editorial-style-guide".to_string(),
-            PathBuf::from(
-                env::var("BUNDLE_MOUNT_EDITORIAL_STYLE_GUIDE").unwrap_or_else(|_| {
-                    vault
-                        .join("editorial-style-guide")
-                        .to_string_lossy()
-                        .into_owned()
-                }),
-            ),
+            PathBuf::from(env::var("BUNDLE_MOUNT_EDITORIAL_STYLE_GUIDE").unwrap_or_else(|_| {
+                vault.join("editorial-style-guide").to_string_lossy().into_owned()
+            })),
         );
         // P1.11 — "Get started / Download tokens" front door: the compiled DTCG bundle
         // exports (tokens.css, tokens.full.json), not markdown drafts.

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: FSL-1.1-ALv2
 // SPDX-FileCopyrightText: 2026 Woodfine Capital Projects Inc.
 
+
 // D3 — WYSIWYG edit overlay: raw markdown GET + authenticated PUT save-back.
 
 use crate::{state::AppState, vault};
