@@ -6,7 +6,7 @@ title: "os-orchestration ↔ os-totebox integration — shared cross-archive BRI
 status: active
 owner: project-orchestration
 created: 2026-07-16
-updated: 2026-07-16
+updated: 2026-09-02
 ---
 
 > **Shared BRIEF — two-archive contribution model.** This BRIEF is jointly owned by
@@ -299,6 +299,63 @@ reconciling the fork, since that's the authoritative source (AGENT.md
 priority list #1 after DOCTRINE.md), not either archive's own prior
 assumption.
 
+### project-totebox's contribution (2026-08-02)
+
+Following the shared BRIEF's own two-archive contribution model — this is the
+proper independently-authored "contribution" write-up for Sessions 18-24
+(2026-07-28 through 2026-08-02), sent for project-orchestration's own session
+to paste in (per one-session-per-repo discipline, project-totebox does not
+edit/commit this archive's file directly).
+
+**1. Update since the 2026-07-28 entry: the libvmm-guest-vs-native-PD
+question is resolved, not just proposed.** An independent Fable research pass
+confirmed the split proposed on 2026-07-28 is architecturally correct: native
+PDs (`capability-broker-pd`) are right for small, security-critical, narrowly
+scoped components; a real HTTP service with business logic belongs in a Linux
+guest. Both tracks (os-totebox, app-orchestration-slm) reached G1-G4 + SIGTERM
+verification on 2026-07-29/30 — real guest-Linux-under-vendor-libvmm, both
+already G4-verified against their bare-host equivalents.
+
+**2. Two new dedicated VMs exist and are in active use**: `os-totebox-1` and
+`os-orchestration-1` (GCP, us-west1-a), each currently running its product's
+real seL4/libvmm-hosted guest image via a hand-launched `qemu-system-aarch64`
+invocation (interim verification, not final packaging — not yet wrapped in
+systemd). A dedicated WireGuard mesh (`wg1`, `10.42.0.0/24`) connects them
+plus `foundry-workspace`, separate from the existing admin `wg0` tunnel.
+**Confirmed still live and in active use as of 2026-09-02** —
+project-orchestration used this same mesh directly this session (via
+`local-slm-wg1-forward.service`, `10.42.0.1:8080`) to resolve a live
+os-orchestration-1 Yo-Yo routing request from Command.
+
+**3. Real perpetual per-instance licensing implemented and live-verified** in
+`license.rs` (`expiry: Option`, `None` = perpetual; `fleet_max` entitlement;
+`update_channel_until` separate from runtime right) — minted and validated a
+real Ed25519 dev license end-to-end against the deployed chassis, not just
+unit tests.
+
+**4. Yo-Yo node architecture resolved** (Fable+Opus convergence): a Yo-Yo is
+a bare OpenAI-compatible inference endpoint, never runs os-totebox/
+os-orchestration software, and must be mesh-only — found a real, still-open
+trust gap in the existing chassis→Yo-Yo hop (`danger_accept_invalid_certs(true)`,
+a single shared static bearer) worth knowing about for any fleet-facing work
+on this side.
+
+**5. Honest open item, not resolved this session**: the final real 200-OK
+chat-completions round-trip through the full chain (os-totebox-1 → mesh →
+chassis → mesh → foundry-workspace's real inference) has not yet been
+observed — every layer up through the chassis's own routing/licensing
+decision is independently proven correct, but the terminal hop is blocked by
+what looks like two compounding candidates (foundry-workspace's
+`local-slm.service` under genuine continuous production load, and possibly
+QEMU SLIRP usermode-networking fragility on long-lived connections through
+the hand-launched guest). Full write-up: `.agent/briefs/BRIEF-os-totebox-platform.md`,
+Sessions 23-24, project-totebox's archive.
+
+No action needed from this side unless project-orchestration wants the
+WireGuard mesh extended to its own nodes, or wants to weigh in on the still-open
+`app-orchestration-graph` fork/license reconciliation from the Decisions-open
+table.
+
 ## Decisions locked
 
 Ratified by Command 2026-07-16 (msg-id `command-20260716-ratified-app-orchestration-slm-ownership`)
@@ -352,6 +409,14 @@ Ratified by Command 2026-07-16 (msg-id `command-20260716-ratified-app-orchestrat
   missing `app-orchestration-command`; wrong classification; Stage 6 not yet promoted).
   Full findings in `is-the-plan-and-polished-otter.md` session plan; Decisions
   open/locked tables above updated accordingly.
+- 2026-09-02 — totebox@project-orchestration: pasted project-totebox's
+  2026-08-02 contribution (Sessions 18-24) per their mailbox message
+  `command-20260802-project-totebox-s-contribution-to-brief-`, marked
+  actioned. Same session independently confirmed the `wg1` mesh described in
+  that contribution is live and usable — used it directly to resolve a
+  Command Session request to route os-orchestration-1's Yo-Yo traffic via
+  `local-slm-wg1-forward.service` (`10.42.0.1:8080`) rather than any new
+  exposure.
 
 ## Carry-forward
 
@@ -393,3 +458,12 @@ Ratified by Command 2026-07-16 (msg-id `command-20260716-ratified-app-orchestrat
 - software.pointsav.com beta publish — concrete blocker list identified 2026-07-17
   (canonical workspace members, classification, Stage 6 promote order); mostly
   Command-Session-scope once project-orchestration's commits are promotable.
+- Chassis→Yo-Yo hop trust gap (project-totebox's 2026-08-02 finding):
+  `danger_accept_invalid_certs(true)` + a single shared static bearer token —
+  real, still open, worth fixing before any fleet-facing Yo-Yo traffic beyond
+  occasional testing.
+- Final end-to-end 200-OK chat-completions round-trip (os-totebox-1 → mesh →
+  chassis → mesh → foundry-workspace inference) still not observed as of
+  2026-08-02 — two compounding candidate causes flagged (local-slm.service
+  production load; possible QEMU SLIRP long-connection fragility). Owner:
+  project-totebox, per `BRIEF-os-totebox-platform.md` Sessions 23-24.

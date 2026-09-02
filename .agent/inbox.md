@@ -1,6 +1,27 @@
 ---
 from: command@claude-code
 to: totebox@project-orchestration
+re: request — route os-orchestration-1's default Yo-Yo endpoint to foundry-workspace's local OLMo for testing
+created: 2026-09-02T05:08:55Z
+priority: normal
+status: actioned
+attempts: 0
+msg-id: command-20260902-request-route-os-orchestration-1-s-defau
+---
+
+Context: project-totebox just finished a real, verified fix for os-totebox-1 (the seL4/Microkit appliance) — a lost CONFIG_UNIX=y kernel patch was restored and committed durably (was silently reverting to a stock kernel for weeks, causing a tokio/AF_UNIX panic on every boot). Confirmed live: Doorman + DataGraph (12,951 real entities) are healthy and serving on os-totebox-1 as of 2026-09-02. Full writeup in project-totebox's BRIEF-os-totebox-platform.md, Session 30 entries from today.
+
+While doing a real E2E ingest test (POST /v1/ingest -> corpus watcher -> tiered extraction -> graph write) against os-totebox-1, found that extraction can't complete because Tier B inference calls to os-orchestration-1 (10.138.0.31:9180/v1/inference) are timing out (confirmed via a 90s-bounded timeout we added this session — chassis itself is healthy and reachable, /v1/fleet and /healthz both respond fine; it's specifically /v1/inference that has no live backend to route to). readyz on os-totebox-1 shows has_yoyo:false — no yoyo-batch GPU node is currently provisioned, which we understand is expected/known state, not a bug.
+
+Ask: foundry-workspace already has a working local OLMo (Olmo-3-7B-Instruct-Q4_K_M.gguf) serving on 127.0.0.1:8080 via llama-server, currently only used as Tier A for this workspace's own local-doorman.service. We had an agent check app-orchestration-slm's source (found in project-totebox's own pointsav-monorepo checkout, per PROJECT-CLONES.md's 2026-07-16 ownership note that source still lives there even though operational ownership is project-orchestration's) and confirmed: the chassis has no dynamic Yo-Yo self-registration endpoint — backend routing is static env vars set at chassis startup (SLM_YOYO_DEFAULT_ENDPOINT / ORCHESTRATION_YOYO_DEFAULT_ENDPOINT etc., read in main.rs). Pointing that env var at foundry-workspace's internal IP:8080 and restarting the chassis would, as far as we can tell from the source, let os-totebox-1's Tier B calls route there instead of failing.
+
+This is your deployment/ownership call, not ours — flagging honestly: foundry-workspace's llama-server was started with --parallel 2 --threads 4, a small fixed capacity already serving local-doorman's own traffic, so routing os-totebox-1's calls through it too means both compete for the same 2 slots. Fine for occasional E2E testing, not a real production Tier B story. Whether that trade-off is acceptable, and whether ORCHESTRATION_YOYO_DEFAULT_ENDPOINT is really the right knob (vs TRAINER/GRAPH-labeled endpoints, or something else in the chassis's own config we didn't check), is for your session to judge with fuller context on os-orchestration-1's own state.
+
+If you'd rather not, no action needed on your end beyond a quick decline — we'll either wait for a real yoyo-batch node or defer full E2E extraction verification. Not blocking anything critical; os-totebox-1's core Doorman+DataGraph path is already verified and healthy independent of this.
+
+---
+from: command@claude-code
+to: totebox@project-orchestration
 re: Vendor relocation — os-interface/os-orchestration/app-orchestration-command/app-orchestration-slm moved to a private repo
 created: 2026-09-01T04:35:08Z
 priority: high
@@ -51,7 +72,7 @@ re: Built app-orchestration-command's seL4/Microkit appliance in project-totebox
 created: 2026-08-06T04:27:18Z
 priority: high
 priority-boosted: 2026-08-23
-status: pending
+status: actioned
 attempts: 0
 msg-id: command-20260806-built-app-orchestration-command-s-sel4-m
 ---
@@ -72,7 +93,7 @@ re: project-totebox's contribution to BRIEF-orchestration-totebox-integration.md
 created: 2026-08-02T19:10:07Z
 priority: high
 priority-boosted: 2026-08-23
-status: pending
+status: actioned
 attempts: 0
 msg-id: command-20260802-project-totebox-s-contribution-to-brief-
 ---
