@@ -417,6 +417,22 @@ Ratified by Command 2026-07-16 (msg-id `command-20260716-ratified-app-orchestrat
   Command Session request to route os-orchestration-1's Yo-Yo traffic via
   `local-slm-wg1-forward.service` (`10.42.0.1:8080`) rather than any new
   exposure.
+- 2026-09-02 (same session, later) — totebox@project-orchestration: routing
+  decision executed. Approved routing `os-orchestration-1`'s Yo-Yo default
+  endpoint to the wg1 mesh forwarder, accepting shared/queued capacity with
+  `local-totebox.service`'s own Tier A traffic rather than increasing
+  `--parallel`. Actual guest-config write was Command Session's to run
+  (VM-sysadmin scope per this archive's own `scope-discipline.md`) — routed
+  the request, then flagged before execution that project-totebox had no
+  active session to coordinate with and that its `write-guest-config.sh`/
+  `apply-guest-config.sh` were uncommitted, mixed into ~10 other in-flight
+  files. Command confirmed the env var and disk layout independently, used a
+  standalone adapted copy of the script (did not touch project-totebox's
+  working tree), and executed cleanly: guest stopped, config written,
+  restarted healthy in 6s, verified live (`/readyz` clean,
+  `POST /v1/yoyo/proxy` 401 instead of 503). Carry-forward's end-to-end
+  round-trip item updated below to reflect routing is done but inference
+  completion is still unverified.
 
 ## Carry-forward
 
@@ -462,8 +478,22 @@ Ratified by Command 2026-07-16 (msg-id `command-20260716-ratified-app-orchestrat
   `danger_accept_invalid_certs(true)` + a single shared static bearer token —
   real, still open, worth fixing before any fleet-facing Yo-Yo traffic beyond
   occasional testing.
-- Final end-to-end 200-OK chat-completions round-trip (os-totebox-1 → mesh →
-  chassis → mesh → foundry-workspace inference) still not observed as of
-  2026-08-02 — two compounding candidate causes flagged (local-slm.service
-  production load; possible QEMU SLIRP long-connection fragility). Owner:
-  project-totebox, per `BRIEF-os-totebox-platform.md` Sessions 23-24.
+- **Final end-to-end 200-OK chat-completions round-trip — narrowed 2026-09-02,
+  still not fully observed.** `os-orchestration-1`'s leg of the path is now live:
+  `ORCHESTRATION_YOYO_DEFAULT_ENDPOINT` set to `http://10.42.0.1:8080` (the wg1
+  mesh forwarder, `local-slm-wg1-forward.service`) directly on the guest's
+  `/data/foundry-config.env`, chassis restarted and verified healthy
+  (`/readyz`: `degraded:false`, proxy circuit `closed`,
+  `yoyo_trainer_reachable`/`yoyo_graph_reachable` both `true`); `POST
+  /v1/yoyo/proxy` now returns `401` (auth-gated, reachable) instead of the
+  prior `503` (unconfigured). That confirms the chassis→foundry-workspace hop
+  is reachable, not that a real inference call completes end-to-end — the
+  auth-gated `401` and the two compounding candidate causes flagged 2026-08-02
+  (local-slm.service production load; possible QEMU SLIRP long-connection
+  fragility) are both still unverified/unresolved. Remaining gap: an actual
+  authenticated `POST /v1/yoyo/proxy` (or equivalent) call through the full
+  chain `os-totebox-1 → mesh → chassis → mesh → foundry-workspace`, and
+  resolving the chassis→Yo-Yo trust gap above before this is more than
+  occasional-testing traffic. Owner: joint — routing/chassis-side now
+  project-orchestration's (this change), inference-completion verification
+  still project-totebox's per `BRIEF-os-totebox-platform.md` Sessions 23-24.
