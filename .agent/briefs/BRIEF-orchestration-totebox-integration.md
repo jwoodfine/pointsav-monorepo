@@ -367,12 +367,12 @@ Ratified by Command 2026-07-16 (msg-id `command-20260716-ratified-app-orchestrat
 | `app-orchestration-slm` ownership | **project-orchestration — ratified, recorded in `PROJECT-CLONES.md`** (2026-07-16). This is the *only* ownership record for this crate anywhere — confirmed by direct audit (2026-07-17) after the original BRIEF citation to it turned out to be inaccurate at time of writing. | Fits project-orchestration's command/pairing/broker focus; project-totebox had no strong reason to keep it. Note: ratifies responsibility, not physical relocation — the crate is still 100% in project-totebox's tree, and (as of 2026-07-16) still actively receiving commits there. Relocation is separate follow-up work, not yet scheduled — needs a coordinated cut-over point given active development, not a live yank. |
 | Chassis launch-supervision | Keep independent systemd supervision for now, don't wire `COMMAND_SLM_BINARY` yet | Yo-Yo already has its own kill-switch/budget/retry discipline (`yoyo-daily-cycle.sh`) a generic child-supervisor would need to duplicate or defer to — not obviously an improvement today. |
 | Sync mechanism going forward | Continue this shared-BRIEF model; pilot it on the `app-orchestration-graph` federation-gateway design as the first concrete joint item | Directly answers project-orchestration's own open "Graph federation design" v0.1.0 decision; sits exactly at the boundary of both archives' concerns — good proving ground. |
+| `peer_type` field placement | **Implemented 2026-09-04** — added to `InviteTokenPayload` and `PairRequest` in `orchestration-command-core` (not `PairResponse`), `#[serde(default)]`, stamped at issuance via a new `peer_type` param on `InviteIssuer::issue()`. Commit `6a6f6f7` in the `pointsav-orchestration-private` nested sub-clone (`cluster/project-orchestration`, committed not yet pushed — no staging forks exist for the private repo yet). `cargo build`/`cargo test` clean (14/14 passing, including a new assertion on the field). | Matches `service-content`'s already-live `TokenPayload.peer_type` pattern, per the original 2026-06-30 agreement and the 2026-07-17 placement resolution. |
 
 ## Decisions open
 
 | Question | Status | Owner |
 |---|---|---|
-| `peer_type` field placement | **Resolved 2026-07-17** — goes on `PairRequest`/token payload (matches `service-content`'s already-live `TokenPayload.peer_type`, per the original 2026-06-30 agreement), not `PairResponse`. Neither struct has it yet. | project-orchestration to implement |
 | DataGraph federation design (v0.1.0 graph decision) | project-totebox recommends DataGraph proxy (read-only, capability-gated fan-out) + two new `capability_gate` checks (scope-vs-target, grant-vs-forward). project-orchestration sign-off requested, high priority. | project-orchestration to respond |
 | `app-orchestration-graph` fork — real, not just misplaced | **New finding, 2026-07-17.** Two genuinely different implementations exist: project-orchestration's branch = 33-line stub, `LicenseRef-PointSav-Proprietary`, port 8021. project-totebox's branch = 308 real lines (concurrent fan-out, entity dedup, confidence-sort), **Apache-2.0 OR MIT**, port 9181 — confirmed genuine by direct audit, not overstated. This is a licensing reconciliation, not just a code merge, before either becomes canonical for the (commercially-priced) app-orchestration family. | Both + operator sign-off on relicensing |
 | `app-orchestration-slm` physical relocation | Ownership ratified (see Decisions locked) but files haven't moved; crate still receiving active development in project-totebox. Needs a coordinated cut-over point. | Both, timing TBD |
@@ -433,11 +433,36 @@ Ratified by Command 2026-07-16 (msg-id `command-20260716-ratified-app-orchestrat
   `POST /v1/yoyo/proxy` 401 instead of 503). Carry-forward's end-to-end
   round-trip item updated below to reflect routing is done but inference
   completion is still unverified.
+- 2026-09-04 (same session, later) — totebox@project-orchestration: restored
+  source access after the 2026-09-01 relocation (see `.agent/manifest.md`) and
+  implemented `peer_type` (Decisions locked). Two independent deep-think
+  passes (Opus + Fable) before touching git topology, since the obvious
+  approaches risked re-leaking this content back to the still-unpurged
+  jwoodfine/pwoodfine forks via `self-service-promote.sh`'s missing filter
+  (flagged to Command separately, high priority). Diffed all 4 owned paths
+  against project-totebox's residual copy before trusting the private repo —
+  found real divergence in `app-orchestration-slm`/`os-orchestration` (Carry-
+  forward updated below), confirmed `app-orchestration-command` identical.
+  `peer_type` implemented there since it was safe to (identical file,
+  ratified decision, `cargo build`/`test` both clean). Committed locally in
+  the new nested sub-clone, not pushed — no Stage 6 path exists yet for
+  `pointsav-orchestration-private` (flagged to Command).
 
 ## Carry-forward
 
-- `app-orchestration-slm` physical relocation — ratified but not scheduled; needs a
-  coordinated cut-over point with project-totebox given active development there.
+- **`app-orchestration-slm` + `os-orchestration` physical relocation/reconciliation —
+  now concrete, not just a heading (2026-09-04).** The 2026-09-01 security purge
+  extracted these into `pointsav-orchestration-private` (new private repo,
+  `project-orchestration` restored access via a nested sub-clone this session —
+  see `.agent/manifest.md`). Diffed directly against project-totebox's residual
+  copy: `app-orchestration-slm` genuinely diverged (`fleet.rs`, `license.rs`,
+  `membership.rs`, `yoyo_proxy.rs`, `orchestration-slm-server/{http,main}.rs`
+  all differ; `build-microkit-image.sh`/`deploy-loader-img.sh`/`qmp-shutdown.py`/
+  `systemd/` entirely missing from the private repo) — project-totebox's copy is
+  ahead, not the private repo. `os-orchestration` also diverged (`Cargo.toml`,
+  `src/lib.rs`). `app-orchestration-command` confirmed identical between the two
+  (safe — `peer_type` implemented against it this session, see Decisions locked).
+  Still needs a coordinated cut-over point with project-totebox — not scheduled.
 - `app-orchestration-graph` fork reconciliation — adopt project-totebox's real
   implementation as the functional base, but resolve the Apache/MIT vs
   `LicenseRef-PointSav-Proprietary` mismatch before it becomes canonical. Pair this with
