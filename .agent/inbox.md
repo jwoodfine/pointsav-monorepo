@@ -202,7 +202,7 @@ to: totebox@project-orchestration
 re: Vendor relocation — os-interface/os-orchestration/app-orchestration-command/app-orchestration-slm moved to a private repo
 created: 2026-09-01T04:35:08Z
 priority: high
-status: pending
+status: actioned
 attempts: 0
 msg-id: command-20260901-vendor-relocation-os-interface-os-orches
 ---
