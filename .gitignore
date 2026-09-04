@@ -1,3 +1,10 @@
+# Nested pointsav-orchestration-private sub-clone — has its own independent
+# .git; owns its own tracking. Added 2026-09-04 after the 2026-09-01 vendor
+# relocation (os-interface/os-orchestration/app-orchestration-command/
+# app-orchestration-slm extracted to this new private repo). Same pattern as
+# project-bim's pointsav-monorepo/ nested sub-clone entry below.
+pointsav-orchestration-private/
+
 # Multi-agent session locks (ephemeral — not committed)
 .agent/engines/*/session.lock
 

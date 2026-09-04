@@ -18,10 +18,14 @@ module_id: orchestration
 
 software_footprint:
   target_os: os-orchestration   # planned; ~/Foundry itself will run on this OS (P1.4/P1.5)
-  monorepo: pointsav-monorepo
+  monorepo: pointsav-monorepo   # archive-root .git only ever held .agent/ governance content (orphan branch, no merge-base with origin/main, confirmed 2026-09-04) — this field describes the .agent/ tracking home, not where owned source lives
+  sub_clone: pointsav-orchestration-private   # added 2026-09-04; nested sub-clone at ./pointsav-orchestration-private/ (own .git, gitignored), same multi-clone pattern as project-bim's ./pointsav-monorepo/. Extracted 2026-09-01 (security purge, NOTAM 2026-09-01) from the now-purged pointsav-monorepo public repo.
   branch: cluster/project-orchestration
   owns:
-    - app-orchestration-command/  # v0.0.1 shipped 2026-06-29; confirmed in canonical origin/main (29d0b4a1); v0.0.2 (pairing.rs WORM ledger) pending Stage 6 canonical merge
+    - app-orchestration-command/  # v0.0.1 shipped 2026-06-29; confirmed in canonical origin/main (29d0b4a1) before the 2026-09-01 relocation; v0.0.2 (pairing.rs WORM ledger) status unconfirmed post-relocation — needs re-verification against pointsav-orchestration-private
+    - app-orchestration-slm/   # KNOWN STALE in pointsav-orchestration-private as of 2026-09-04: project-totebox's own residual copy has real newer work not in the private repo (fleet.rs, license.rs, membership.rs, yoyo_proxy.rs, orchestration-slm-server/{http,main}.rs, plus build-microkit-image.sh/deploy-loader-img.sh/qmp-shutdown.py/systemd/ entirely absent) — physical relocation ratified 2026-07-16 but reconciliation with project-totebox's active development not yet done; see BRIEF-orchestration-totebox-integration.md carry-forward
+    - os-interface/
+    - os-orchestration/   # also diverged from project-totebox's copy (Cargo.toml, src/lib.rs differ) — same reconciliation gap as app-orchestration-slm above
 
 # Cluster mission:
 # Implement the Totebox Orchestration transition — Phases 1, 2, and 3.
@@ -38,9 +42,9 @@ software_footprint:
 
 tetrad:
   vendor:
-    - source_repo: pointsav-monorepo
-      project_path: app-orchestration-command/
-      status: v0.0.1 shipped 2026-06-29 (3-crate workspace, 7 tests passing, Axum 0.8 server); confirmed in canonical origin/main (commit 29d0b4a1). v0.0.2 (pairing.rs WORM ledger schema_version + write-through) pushed to promote-queue 2026-07-09, awaiting Command Session canonical merge.
+    - source_repo: pointsav-orchestration-private   # corrected 2026-09-04 (was pointsav-monorepo, stale since the 2026-09-01 relocation — see software_footprint.sub_clone above for the actual nested-clone path)
+      project_path: app-orchestration-command/, app-orchestration-slm/, os-interface/, os-orchestration/
+      status: app-orchestration-command v0.0.1 shipped 2026-06-29 (3-crate workspace, 7 tests passing, Axum 0.8 server); v0.0.2 (pairing.rs WORM ledger schema_version + write-through) confirmed already on canonical since 2026-06-29 (commit 2ea32087cd) — both predate the 2026-09-01 relocation, status against the new repo not yet re-verified. app-orchestration-slm and os-orchestration confirmed STALE relative to project-totebox's own residual copies (diffed directly 2026-09-04) — real reconciliation work needed before pointsav-orchestration-private can be treated as fully authoritative; not yet scheduled. Stage 6 promotion path for this sub-clone does not exist yet (no staging forks provisioned for the private repo) — flagged to Command, not blocking.
   customer:
     - fleet_deployment_repo: woodfine-fleet-deployment
       catalog_subfolder: gateway-orchestration-command/
