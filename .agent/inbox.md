@@ -459,7 +459,7 @@ re: seL4 architecture conflict + new contribution on BRIEF-orchestration-totebox
 created: 2026-07-28T23:39:54Z
 priority: high
 priority-boosted: 2026-08-23
-status: pending
+status: actioned
 attempts: 0
 msg-id: command-20260728-sel4-architecture-conflict-new-contribut
 ---
@@ -533,7 +533,7 @@ re: proposal: rotation-cert wire contract for MBA host-key rotation (D-C phase) 
 created: 2026-07-19T00:46:18Z
 priority: high
 priority-boosted: 2026-08-23
-status: pending
+status: actioned
 attempts: 0
 msg-id: project-console-20260719-proposal-rotation-cert-wire-contract-for
 ---
