@@ -1,11 +1,12 @@
 schema: foundry-binary-targets-v1
 cluster: project-orchestration
-updated: 2026-07-08
+updated: 2026-09-05
 
 targets:
   - product_id: orchestration-command-server
     binary_name: orchestration-command-server
-    source_crate: orchestration-command-server
+    source_crate: app-orchestration-command/crates/orchestration-command-server
+    build_manifest: app-orchestration-command/Cargo.toml
     license: LicenseRef-PointSav-Proprietary
     license_tier: commercial
     class: service-package
@@ -21,3 +22,10 @@ targets:
       software.pointsav.com (product_requires_license=false for the BETA release).
       See data/binary-ledger/orchestration-command-server.jsonl and
       data/binary-ledger/soft-orchestration-command.jsonl for full deploy history.
+      source_crate/build_manifest corrected 2026-09-05 (msg-id
+      command-20260728-build-soft-sh-fixed-standalone-workspace) — was a bare
+      crate name matching no real path, build-soft.sh couldn't resolve it.
+      OPEN QUESTION (routed to project-software, not resolved here): class is
+      service-package (private, license-gated app-repository/), but this
+      entry's own BETA-listing note implies public os-image routing —
+      unconfirmed which is actually correct.
