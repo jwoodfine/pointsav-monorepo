@@ -367,13 +367,13 @@ Ratified by Command 2026-07-16 (msg-id `command-20260716-ratified-app-orchestrat
 | `app-orchestration-slm` ownership | **project-orchestration — ratified, recorded in `PROJECT-CLONES.md`** (2026-07-16). This is the *only* ownership record for this crate anywhere — confirmed by direct audit (2026-07-17) after the original BRIEF citation to it turned out to be inaccurate at time of writing. | Fits project-orchestration's command/pairing/broker focus; project-totebox had no strong reason to keep it. Note: ratifies responsibility, not physical relocation — the crate is still 100% in project-totebox's tree, and (as of 2026-07-16) still actively receiving commits there. Relocation is separate follow-up work, not yet scheduled — needs a coordinated cut-over point given active development, not a live yank. |
 | Chassis launch-supervision | Keep independent systemd supervision for now, don't wire `COMMAND_SLM_BINARY` yet | Yo-Yo already has its own kill-switch/budget/retry discipline (`yoyo-daily-cycle.sh`) a generic child-supervisor would need to duplicate or defer to — not obviously an improvement today. |
 | Sync mechanism going forward | Continue this shared-BRIEF model; pilot it on the `app-orchestration-graph` federation-gateway design as the first concrete joint item | Directly answers project-orchestration's own open "Graph federation design" v0.1.0 decision; sits exactly at the boundary of both archives' concerns — good proving ground. |
+| DataGraph federation design (v0.1.0) | **Signed off 2026-09-04, conditional.** Two independent reviews (Opus + Fable) confirm Command's 2026-07-16 recommendation (read-only DataGraph proxy, capability-gated fan-out over each target's `/v1/graph/context`) is **already built** — `app-orchestration-graph/src/main.rs` holds zero graph state, fans out per-target, dedups, sorts; both "missing" `capability_gate` checks (scope-vs-target, grant-vs-forward) already exist in `service-content/src/http.rs` (`scope_permits_request`, `verify_capability_grant`'s grant ceiling). Design approved as-is. **But: NOT cleared for activation** — both reviews independently found the same real, confirmed vulnerability: `service-content`'s `pair_peer` verifies an invite token against the *public key supplied in the same request body*, never a trusted issuer; `/v1/pair`/`/v1/pair/token` are ungated in the router; the gateway's own `capability.rs::build_pair_request` self-signs an ADMIN-role pairing today — this is how it pairs *now*, not a hypothetical. Any caller reaching the endpoint can self-grant and pass every downstream check, since the "ceiling" only validates against a record the caller itself wrote. Confirmed **not currently deployed anywhere** (`local-orchestration-graph.service` inactive, no live process) — a real hole to close before first activation, not an active incident. Required before go-live: (1) `pair_peer` must verify against Totebox's own `pairing_key` (or Command's), not the caller's key — `project-totebox`, blocking; (2) `build_pair_request` stops self-issuing (obtains a real invite token out-of-band) and the gateway downgrades to least-privilege `INTERFACE` role, not self-claimed `ADMIN` — `project-orchestration`; (3) the gateway authenticates its own inbound callers before it's the fleet's single read path — `project-orchestration`; (4) `service-content` needs a `REQUIRE_CAPABILITY`-style flag so headerless-passthrough isn't permanent — `project-totebox`. Full reviews on file if needed for either side's remediation work. | Joint remediation, (1) blocking on project-totebox |
 | `peer_type` field placement | **Implemented 2026-09-04** — added to `InviteTokenPayload` and `PairRequest` in `orchestration-command-core` (not `PairResponse`), `#[serde(default)]`, stamped at issuance via a new `peer_type` param on `InviteIssuer::issue()`. Commit `6a6f6f7` in the `pointsav-orchestration-private` nested sub-clone (`cluster/project-orchestration`, committed not yet pushed — no staging forks exist for the private repo yet). `cargo build`/`cargo test` clean (14/14 passing, including a new assertion on the field). | Matches `service-content`'s already-live `TokenPayload.peer_type` pattern, per the original 2026-06-30 agreement and the 2026-07-17 placement resolution. |
 
 ## Decisions open
 
 | Question | Status | Owner |
 |---|---|---|
-| DataGraph federation design (v0.1.0 graph decision) | project-totebox recommends DataGraph proxy (read-only, capability-gated fan-out) + two new `capability_gate` checks (scope-vs-target, grant-vs-forward). project-orchestration sign-off requested, high priority. | project-orchestration to respond |
 | `app-orchestration-graph` fork | **Resolved, not previously noticed — checked directly 2026-09-04.** The two copies (project-orchestration's `pointsav-orchestration-private` nested clone vs. project-totebox's residual copy) are now byte-identical: 496 lines, `license = "LicenseRef-PointSav-ARR"` in both `Cargo.toml`s. Reconciled at some point via general canonical-repair activity (commit `11a9715` "reconcile(project-totebox): land 14 preserved commits + vendor-libvmm onto repaired canonical" in the private-repo history) rather than a dedicated fork-reconciliation pass — closing this item, no further action needed. | Closed 2026-09-04 |
 | `app-orchestration-slm` physical relocation | Ownership ratified (see Decisions locked) but files haven't moved; crate still receiving active development in project-totebox. Needs a coordinated cut-over point. | Both, timing TBD |
 | Doctrine claim #40 Tier 0 vs. code-level `SLM_TIER=0` divergence | Real doc gap, neither archive's to fix unilaterally | Command Session (Doctrine amendment) |
@@ -447,22 +447,62 @@ Ratified by Command 2026-07-16 (msg-id `command-20260716-ratified-app-orchestrat
   ratified decision, `cargo build`/`test` both clean). Committed locally in
   the new nested sub-clone, not pushed — no Stage 6 path exists yet for
   `pointsav-orchestration-private` (flagged to Command).
+- 2026-09-04 (same session, later) — totebox@project-orchestration: closed
+  two more Decisions-open items. `app-orchestration-graph` fork confirmed
+  already resolved (checked directly — byte-identical, correct license), not
+  previously noticed. DataGraph federation design (open since 2026-07-16):
+  ran two independent deep-think reviews (Opus + Fable) rather than
+  rubber-stamping a 2-month-old request — both confirmed the design is
+  already built and both "missing" checks already exist, but both
+  independently found the same real, confirmed pairing-bypass vulnerability
+  in `service-content`'s `pair_peer` (self-signed tokens, ungated `/v1/pair`)
+  that the original design request didn't account for. Signed off on the
+  design conditionally; flagged the vulnerability to Command + directly to
+  project-totebox given they own the affected code. Confirmed not currently
+  deployed anywhere (no live process) — real gap, not an active incident.
 
 ## Carry-forward
 
-- **`app-orchestration-slm` + `os-orchestration` physical relocation/reconciliation —
-  now concrete, not just a heading (2026-09-04).** The 2026-09-01 security purge
-  extracted these into `pointsav-orchestration-private` (new private repo,
-  `project-orchestration` restored access via a nested sub-clone this session —
-  see `.agent/manifest.md`). Diffed directly against project-totebox's residual
-  copy: `app-orchestration-slm` genuinely diverged (`fleet.rs`, `license.rs`,
-  `membership.rs`, `yoyo_proxy.rs`, `orchestration-slm-server/{http,main}.rs`
-  all differ; `build-microkit-image.sh`/`deploy-loader-img.sh`/`qmp-shutdown.py`/
-  `systemd/` entirely missing from the private repo) — project-totebox's copy is
-  ahead, not the private repo. `os-orchestration` also diverged (`Cargo.toml`,
-  `src/lib.rs`). `app-orchestration-command` confirmed identical between the two
-  (safe — `peer_type` implemented against it this session, see Decisions locked).
-  Still needs a coordinated cut-over point with project-totebox — not scheduled.
+- **`app-orchestration-slm` + `os-orchestration` + `app-orchestration-command`
+  physical relocation/reconciliation — concrete 3-track proposal drafted
+  2026-09-04, not yet executed, needs project-totebox + operator sign-off
+  first.** The 2026-09-01 security purge extracted these into
+  `pointsav-orchestration-private` (new private repo, `project-orchestration`
+  restored access via a nested sub-clone this session — see
+  `.agent/manifest.md`). A dedicated investigation (this session) diffed every
+  divergent file's actual substance against `BRIEF-os-totebox-platform.md`'s own
+  record, not just noting that files differ:
+  - **`os-interface`: identical, no-op.**
+  - **`app-orchestration-slm`: project-totebox's copy is ahead** — every diff
+    matches a real, tested, already-documented fix from their Session 24
+    Fable bug-hunt audit (`fleet.rs` TTL eviction so dead members don't hold
+    licensed slots; `license.rs`'s real Perpetual Fleet License model —
+    `expiry: Option`, `fleet_max`, `update_channel_until`; `membership.rs`
+    persisting the Ed25519 signing seed to disk so restarts don't invalidate
+    issued tokens; `yoyo_proxy.rs`/`http.rs` real status-propagation,
+    streaming, auth, and timing-attack fixes) — plus entire missing files
+    (`scripts/`, `systemd/`, `Cargo.lock`, `examples/mint_dev_license.rs`,
+    `CLAUDE.md`). Proposal: cherry-pick project-totebox's actual commits onto
+    the private repo's branch (preserves authorship as the record of record,
+    not a raw file copy).
+  - **`os-orchestration`: the diff is a relicense, not a bug fix** — SPDX
+    header changed from `LicenseRef-PointSav-ARR` to `FSL-1.1-ALv2`, isolated
+    to this crate + `build-microkit-image.sh`. Must NOT ride along silently
+    with the `app-orchestration-slm` cherry-pick — needs explicit operator
+    sign-off on whether this relicense was intentional and should propagate.
+  - **`app-orchestration-command`: no longer identical** (diverged in both
+    directions since this session's own `peer_type` commit — private repo has
+    `peer_type`, project-totebox has the seL4 appliance `scripts/`/`systemd/`
+    packaging). Needs a real three-way merge (cherry-pick project-totebox's
+    appliance commit onto the private repo's current HEAD, resolving against
+    the already-landed `peer_type` field), not a copy.
+  - **Before copying anything**: needs project-totebox to confirm the
+    `os-orchestration` relicense was intentional, confirm no uncommitted WIP
+    beyond what's checked in (their tree is still actively worked), and
+    provide or reconstruct `BRIEF-os-orchestration-command-appliance.md` —
+    the mailbox message describing the appliance work cites this file but it
+    does not exist in their briefs directory (the underlying artifact/commit
+    is real and verified, just the cited writeup is missing).
 - Doctrine claim #40's Tier 0 definition vs. the new code-level `SLM_TIER=0` meaning is
   a real divergence worth a NEXT.md note at the workspace root — Command Session's
   document to amend, not either Totebox archive's.
