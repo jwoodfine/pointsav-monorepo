@@ -295,7 +295,7 @@ re: Closing out 3 long-open coordination items (/v1/pair ACK, app-orchestration-
 created: 2026-08-02T18:53:27Z
 priority: high
 priority-boosted: 2026-08-23
-status: pending
+status: actioned
 attempts: 0
 msg-id: command-20260802-closing-out-3-long-open-coordination-ite
 ---
