@@ -27,6 +27,7 @@ use std::collections::HashMap;
 use crate::content::{self, ContentIndex, Lang, MountSet};
 use crate::discovery;
 use crate::legal::{self, LegalTokens};
+use crate::notice_text;
 use crate::search::SearchIndex;
 use crate::sitedata;
 use crate::ui::{self, Tenant};
@@ -79,6 +80,13 @@ pub struct AppState {
     /// "Browse" column fact line (bim.woodfinegroup.com pattern of one
     /// editorial fact per column, applied minimally — one line, one column).
     pub article_count: usize,
+    /// Canonical JOURNAL notice-banner text, loaded from
+    /// `factory-release-engineering/tokens/notice-text-journal.yaml`. `None`
+    /// if the file is absent/malformed — `notice_banner()` renders nothing
+    /// in that case rather than fabricating disclosure text (same fallback
+    /// discipline as `legal`, minus a hardcoded default: there is no safe
+    /// default disclosure copy to fall back to).
+    pub notice_text: Arc<Option<notice_text::NoticeText>>,
 }
 
 impl AppState {
@@ -118,6 +126,9 @@ impl AppState {
         // Canonical legal copy — falls back to today's known-correct hardcoded
         // values if the token file is absent/malformed (see legal.rs).
         let legal = legal::load_default(&config.site.brand).unwrap_or_default();
+        // Canonical JOURNAL notice-banner text — None (not a hardcoded
+        // fallback) if absent/malformed, see notice_text.rs.
+        let notice_text = notice_text::load_default();
         let category_counts = index.category_counts();
 
         let citations = config
@@ -165,6 +176,7 @@ impl AppState {
             citations: Arc::new(citations),
             site_description: Arc::new(site_description),
             article_count,
+            notice_text: Arc::new(notice_text),
         }
     }
 }
@@ -680,12 +692,24 @@ async fn research_landing(State(state): State<AppState>, Path(slug): Path<String
         .clone()
         .unwrap_or_default();
     let cite_as = parsed.frontmatter.cite_as.as_deref();
+    let corresponding_author = parsed.frontmatter.corresponding_author_display();
+    let notice = ui::notice_banner(
+        state.notice_text.as_ref().as_ref(),
+        parsed.frontmatter.state.as_deref(),
+        parsed.frontmatter.version.as_deref(),
+        parsed.frontmatter.preprint_posted_date.as_deref(),
+        parsed.frontmatter.license.as_deref(),
+        corresponding_author.as_deref(),
+        cite_as,
+        parsed.frontmatter.doi.as_deref(),
+    );
     let body = ui::research_landing(
         &title,
         &parsed.frontmatter.authors,
         &abstract_html,
         &doc.slug,
         cite_as,
+        notice,
     );
     let trail = vec![
         ("/".to_string(), tenant.home_label().to_string()),
@@ -754,6 +778,17 @@ async fn research_fulltext(State(state): State<AppState>, Path(slug): Path<Strin
         .clone()
         .unwrap_or_default();
     let cite_as = parsed.frontmatter.cite_as.as_deref();
+    let corresponding_author = parsed.frontmatter.corresponding_author_display();
+    let notice = ui::notice_banner(
+        state.notice_text.as_ref().as_ref(),
+        parsed.frontmatter.state.as_deref(),
+        parsed.frontmatter.version.as_deref(),
+        parsed.frontmatter.preprint_posted_date.as_deref(),
+        parsed.frontmatter.license.as_deref(),
+        corresponding_author.as_deref(),
+        cite_as,
+        parsed.frontmatter.doi.as_deref(),
+    );
     let rendered = content::render_journal_doc(&parsed, &state.citations, &state.index, doc.lang);
     let body = ui::research_fulltext(
         &title,
@@ -762,6 +797,7 @@ async fn research_fulltext(State(state): State<AppState>, Path(slug): Path<Strin
         parsed.frontmatter.is_geospatial(),
         &doc.slug,
         cite_as,
+        notice,
     );
     let trail = vec![
         ("/".to_string(), tenant.home_label().to_string()),
