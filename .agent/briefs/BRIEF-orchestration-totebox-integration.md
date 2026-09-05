@@ -530,7 +530,41 @@ Ratified by Command 2026-07-16 (msg-id `command-20260716-ratified-app-orchestrat
   `capability-broker-pd` as a static-topology PD first — do not start with the dynamic
   delegation reading of §4.** Same misplaced-ownership pattern as everything else this
   session: `moonshot-sel4-vmm`/`moonshot-toolkit`/`system-*` all physically live in
-  project-totebox's tree — this needs cross-archive coordination from the start.
+  project-totebox's tree (superseded 2026-09-05, see new entry below) — this needs cross-archive coordination from the start.
+- **`os-orchestration` build path — decided 2026-09-05: adopt libvmm-guest
+  (Microkit + vendor-libvmm), matching os-totebox and the consolidated
+  app-orchestration-command+slm appliance. Answers the 2026-07-28 conflict
+  message (`command-20260728-sel4-architecture-conflict-new-contribut`).**
+  Two independent deep-think reviews (Opus + Fable), both confirming the
+  ground moved decisively since 2026-07-17: project-totebox's own
+  `BRIEF-os-totebox-platform.md` already locked Pattern A (libvmm-guest) as
+  the near-term path with a written pivot trigger back to native PDs;
+  `capability-broker-pd` is "at least 6 months out with no further work
+  started." More decisively — `project-sel4` (a separate, newer archive) has
+  already retired the single hardest technical risk the 2026-07-17 estimate
+  was built on ("no multi-real-Rust-PD image has ever booted"): its Phase 1.5
+  booted a real multi-Rust-PD Microkit image with real cross-PD capability
+  delegation into a durable WORM log (Gates N17, N51-N54) — exactly the
+  static-topology chokepoint pattern this track wanted, already built and
+  regression-tested, by a different team. `project-sel4`'s own roadmap
+  explicitly lists "Phase 6 — apply the same framework to os-orchestration,
+  then os-console," currently marked "do not start yet." Building
+  `capability-broker-pd` here would re-derive that work from a weaker
+  position. Separately (Fable): the operator's own resource-split gives
+  `os-orchestration` GPU/CUDA/`llama-server` inference workloads — further
+  from `no_std`-feasible than `os-totebox`'s `lbug` dependency ever was, so
+  native-PD-first was arguably backwards for this specific product anyway.
+  **Decision: `os-orchestration` becomes the appliance-image crate for the
+  already-live `os-orchestration-1` VM.** First concrete build step: mirror
+  project-totebox's `os-totebox/scripts/{build-guest-rootfs.sh,
+  build-microkit-image.sh,deploy-loader-img.sh,write-guest-config.sh}` +
+  `systemd/` unit as the template (same gate `app-orchestration-command`
+  passed 2026-08-06), turn `os-orchestration/src/lib.rs`'s scaffold stub into
+  a real `std` binary with a `/readyz` endpoint, produce one `loader.img`
+  that QEMU-boots. Use a dedicated `build-os-orchestration/` directory from
+  the start — `virtio.mk`'s shared-`build/`-directory fragility is a known,
+  already-documented footgun across all three products. Not yet started —
+  this closes the decision, not the implementation.
 - software.pointsav.com beta publish — concrete blocker list identified 2026-07-17
   (canonical workspace members, classification, Stage 6 promote order); mostly
   Command-Session-scope once project-orchestration's commits are promotable.
