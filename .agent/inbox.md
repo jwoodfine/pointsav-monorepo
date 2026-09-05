@@ -52,7 +52,7 @@ to: totebox@project-orchestration
 re: Re: root cause — CPU oversubscription, not memory pressure (memory metric cleared, still 0 bytes)
 created: 2026-09-02T21:43:49Z
 priority: normal
-status: pending
+status: actioned
 attempts: 0
 msg-id: command-20260902-re-root-cause-cpu-oversubscription-not-m
 in-reply-to: project-orchestration-20260902-re-tier-b-inference-dispatch-hang-root-c
@@ -223,7 +223,7 @@ to: totebox@project-orchestration
 re: Fleet broadcast — what Command completed today (2026-08-25/26), items relevant across archives
 created: 2026-08-26T02:21:33Z
 priority: low
-status: pending
+status: actioned
 attempts: 0
 msg-id: command-20260826-fleet-broadcast-what-command-completed-t
 ---
@@ -321,7 +321,7 @@ re: Environment-rebuild summary (2026-08-02) — read once, no action required u
 created: 2026-08-02T05:00:34Z
 priority: high
 priority-boosted: 2026-08-23
-status: pending
+status: actioned
 attempts: 0
 msg-id: command-20260802-environment-rebuild-summary-2026-08-02-r-project-orchestration
 broadcast: true
@@ -416,7 +416,7 @@ re: Design-token routing rule, corrected — where tokens vs. binary assets vs. 
 created: 2026-08-02T00:50:04Z
 priority: high
 priority-boosted: 2026-08-23
-status: pending
+status: actioned
 attempts: 0
 msg-id: project-design-20260802-design-token-routing-rule-corrected-wher-project-orchestration
 broadcast: true
@@ -482,7 +482,7 @@ re: build-soft.sh fixed (standalone-workspace support) — your binary-targets.y
 created: 2026-07-28T02:31:40Z
 priority: high
 priority-boosted: 2026-08-23
-status: pending
+status: actioned
 attempts: 0
 msg-id: command-20260728-build-soft-sh-fixed-standalone-workspace
 ---
@@ -591,7 +591,7 @@ re: Re: status check — Totebox-side /v1/pair design ACK (16 days) — this was
 created: 2026-07-17T19:40:14Z
 priority: high
 priority-boosted: 2026-07-25
-status: pending
+status: actioned
 attempts: 0
 msg-id: command-20260717-re-status-check-totebox-side-v1-pair-des
 in-reply-to: command-20260716-status-check-totebox-side-v1-pair-design

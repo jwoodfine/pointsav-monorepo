@@ -26,6 +26,7 @@ software_footprint:
     - app-orchestration-slm/   # KNOWN STALE in pointsav-orchestration-private as of 2026-09-04: project-totebox's own residual copy has real newer work not in the private repo (fleet.rs, license.rs, membership.rs, yoyo_proxy.rs, orchestration-slm-server/{http,main}.rs, plus build-microkit-image.sh/deploy-loader-img.sh/qmp-shutdown.py/systemd/ entirely absent) — physical relocation ratified 2026-07-16 but reconciliation with project-totebox's active development not yet done; see BRIEF-orchestration-totebox-integration.md carry-forward
     - os-interface/
     - os-orchestration/   # also diverged from project-totebox's copy (Cargo.toml, src/lib.rs differ) — same reconciliation gap as app-orchestration-slm above
+    - app-orchestration-graph/   # ownership formalized 2026-09-05 (Command confirmed no objection, msg-id command-20260802-closing-out-3-long-open-coordination-ite); fork with project-totebox's copy confirmed already resolved 2026-09-04 (byte-identical, correct LicenseRef-PointSav-ARR license). Real, tested code (Ed25519 fan-out signing in capability.rs) — DataGraph federation design signed off 2026-09-04, conditional on the pairing-bypass fix (see BRIEF-orchestration-totebox-integration.md Decisions locked)
 
 # Cluster mission:
 # Implement the Totebox Orchestration transition — Phases 1, 2, and 3.
@@ -43,7 +44,7 @@ software_footprint:
 tetrad:
   vendor:
     - source_repo: pointsav-orchestration-private   # corrected 2026-09-04 (was pointsav-monorepo, stale since the 2026-09-01 relocation — see software_footprint.sub_clone above for the actual nested-clone path)
-      project_path: app-orchestration-command/, app-orchestration-slm/, os-interface/, os-orchestration/
+      project_path: app-orchestration-command/, app-orchestration-slm/, os-interface/, os-orchestration/, app-orchestration-graph/
       status: app-orchestration-command v0.0.1 (2026-06-29) + v0.0.2 WORM ledger (schema_version "1"/"2") both confirmed present and current in pointsav-orchestration-private (re-verified 2026-09-04); peer_type implemented same session (commit 6a6f6f7). app-orchestration-graph fork also confirmed resolved — byte-identical to project-totebox's copy, correct license, closed as of 2026-09-04 (see Decisions locked). app-orchestration-slm and os-orchestration confirmed STALE relative to project-totebox's own residual copies (diffed directly 2026-09-04) — real reconciliation work needed before pointsav-orchestration-private can be treated as fully authoritative for those two; not yet scheduled. Stage 6 promotion path for this sub-clone does not exist yet (no staging forks provisioned for the private repo) — flagged to Command, not blocking.
   customer:
     - fleet_deployment_repo: woodfine-fleet-deployment
