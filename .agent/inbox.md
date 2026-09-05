@@ -616,7 +616,7 @@ to: totebox@project-orchestration
 re: DataGraph federation design (your v0.1.0 open decision) + overdue /v1/pair ACK — let's close both together
 created: 2026-07-16T19:48:38Z
 priority: high
-status: pending
+status: actioned
 attempts: 0
 msg-id: command-20260716-datagraph-federation-design-your-v0-1-0-
 ---
