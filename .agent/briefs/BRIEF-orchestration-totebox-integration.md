@@ -374,7 +374,7 @@ Ratified by Command 2026-07-16 (msg-id `command-20260716-ratified-app-orchestrat
 | Question | Status | Owner |
 |---|---|---|
 | DataGraph federation design (v0.1.0 graph decision) | project-totebox recommends DataGraph proxy (read-only, capability-gated fan-out) + two new `capability_gate` checks (scope-vs-target, grant-vs-forward). project-orchestration sign-off requested, high priority. | project-orchestration to respond |
-| `app-orchestration-graph` fork — real, not just misplaced | **New finding, 2026-07-17.** Two genuinely different implementations exist: project-orchestration's branch = 33-line stub, `LicenseRef-PointSav-Proprietary`, port 8021. project-totebox's branch = 308 real lines (concurrent fan-out, entity dedup, confidence-sort), **Apache-2.0 OR MIT**, port 9181 — confirmed genuine by direct audit, not overstated. This is a licensing reconciliation, not just a code merge, before either becomes canonical for the (commercially-priced) app-orchestration family. | Both + operator sign-off on relicensing |
+| `app-orchestration-graph` fork | **Resolved, not previously noticed — checked directly 2026-09-04.** The two copies (project-orchestration's `pointsav-orchestration-private` nested clone vs. project-totebox's residual copy) are now byte-identical: 496 lines, `license = "LicenseRef-PointSav-ARR"` in both `Cargo.toml`s. Reconciled at some point via general canonical-repair activity (commit `11a9715` "reconcile(project-totebox): land 14 preserved commits + vendor-libvmm onto repaired canonical" in the private-repo history) rather than a dedicated fork-reconciliation pass — closing this item, no further action needed. | Closed 2026-09-04 |
 | `app-orchestration-slm` physical relocation | Ownership ratified (see Decisions locked) but files haven't moved; crate still receiving active development in project-totebox. Needs a coordinated cut-over point. | Both, timing TBD |
 | Doctrine claim #40 Tier 0 vs. code-level `SLM_TIER=0` divergence | Real doc gap, neither archive's to fix unilaterally | Command Session (Doctrine amendment) |
 
@@ -463,11 +463,6 @@ Ratified by Command 2026-07-16 (msg-id `command-20260716-ratified-app-orchestrat
   `src/lib.rs`). `app-orchestration-command` confirmed identical between the two
   (safe — `peer_type` implemented against it this session, see Decisions locked).
   Still needs a coordinated cut-over point with project-totebox — not scheduled.
-- `app-orchestration-graph` fork reconciliation — adopt project-totebox's real
-  implementation as the functional base, but resolve the Apache/MIT vs
-  `LicenseRef-PointSav-Proprietary` mismatch before it becomes canonical. Pair this with
-  implementing project-totebox's DataGraph-proxy design recommendation rather than
-  doing the fork-reconciliation and the design implementation as two separate passes.
 - Doctrine claim #40's Tier 0 definition vs. the new code-level `SLM_TIER=0` meaning is
   a real divergence worth a NEXT.md note at the workspace root — Command Session's
   document to amend, not either Totebox archive's.
