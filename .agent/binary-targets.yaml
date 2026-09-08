@@ -5,13 +5,26 @@ targets:
   - product_id: app-mediakit-knowledge
     binary_name: app-mediakit-knowledge
     source_crate: app-mediakit-knowledge
-    license: FSL-1.1-ALv2   # verified 2026-08-10 directly against
-                             # pointsav-monorepo/app-mediakit-knowledge/Cargo.toml
-                             # `[package] license = "FSL-1.1-ALv2"`. Corrects
+    license: Apache-2.0     # UPDATED 2026-09-04: canonical ratified an FSL-1.1-ALv2 ->
+                             # Apache-2.0 conversion 2026-09-01 (commit 9fc0055518, 194
+                             # files, os-mediakit/app-mediakit-* scope) -- confirmed
+                             # directly against origin/main's current Cargo.toml
+                             # (`license = "Apache-2.0"`), not assumed. The 2026-08-10
+                             # note below (FSL-1.1-ALv2) is now stale, kept for history.
+                             # CAVEAT: this archive's own local `cluster/project-knowledge`
+                             # branch still carries the pre-conversion FSL-1.1-ALv2 header
+                             # (that branch is intentionally untouched -- see
+                             # BRIEF-project-knowledge-stage6-reconciliation-2026-08-24.md's
+                             # Resolution section; do not build a distributable artifact
+                             # from that branch's Cargo.toml without re-checking this field
+                             # first, it will misreport the license).
+                             # Prior note (2026-08-10, superseded above): verified directly
+                             # against pointsav-monorepo/app-mediakit-knowledge/Cargo.toml
+                             # `[package] license = "FSL-1.1-ALv2"`. Corrected
                              # BRIEF-binary-distribution.md's 2026-06-30 product-listing
-                             # note ("License: Apache 2.0"), which is stale relative to
-                             # the source of record.
-    license_tier: fsl
+                             # note ("License: Apache 2.0"), which was stale at the time
+                             # relative to the then-current source of record.
+    license_tier: apache    # UPDATED 2026-09-04 to match the license field above (was: fsl)
     class: os-image          # standalone self-contained appliance (Format B: QCOW2 that
                               # does not require os-infrastructure as a prerequisite —
                               # BRIEF-binary-distribution.md "Decisions locked" #4), matching
@@ -23,10 +36,24 @@ targets:
                               # 2026-08-10, not inferred.
     layer: base
     requires: []
-    platforms: [x86_64-unknown-linux-gnu]   # BETA is Linux x86_64 only per
-                                             # BRIEF-binary-distribution.md "Decisions
-                                             # locked" #5 — no macOS/Windows/AArch64 builds
-                                             # until pipelines exist.
+    platforms: [x86_64-unknown-linux-gnu]   # This binary's own build target -- correct
+                                             # as-is (this row is app-mediakit-knowledge
+                                             # the Linux binary, not the os-mediakit
+                                             # appliance guest, which is a separate
+                                             # AArch64 build not tracked as a target here).
+                                             # UPDATED 2026-09-04: the comment previously
+                                             # here ("no ... AArch64 builds until pipelines
+                                             # exist", per BRIEF-binary-distribution.md
+                                             # "Decisions locked" #5) is now factually
+                                             # stale -- a real aarch64-unknown-linux-gnu
+                                             # cross-compile of this same crate was verified
+                                             # 2026-08-25 (BRIEF-os-mediakit-product-family.md
+                                             # ~L666-677), the pipeline now exists. The old
+                                             # x86_64 BETA listing intentionally stays live
+                                             # unchanged until the seL4/AArch64 os-mediakit
+                                             # replacement is fully live (no-gap requirement)
+                                             # -- so this platforms list is still correct
+                                             # today, only the comment's premise was wrong.
     soft_enabled: true
     notes: >
       Two formats, both live on software.pointsav.com since 2026-07-01 (BETA, no charge —

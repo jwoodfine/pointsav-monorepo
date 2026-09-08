@@ -3,10 +3,10 @@ artifact: brief
 schema: foundry-brief-v1
 brief-id: project-knowledge-stage6-reconciliation-2026-08-24
 title: project-knowledge — 3-way Stage 6 reconciliation (archive-root, sub-clone, origin-staging-j all diverged)
-status: active
+status: superseded
 owner: project-knowledge
 created: 2026-08-24
-updated: 2026-08-24
+updated: 2026-09-04 (superseded — see Resolution section; the e5fc54aa62 canonical-reconciliation branch this BRIEF ends on was never applied by Command, and by 2026-09-02 the gap had regrown into a fresh, deeper divergence requiring its own separate scoped-patch cycle)
 related_briefs: [command-fleet-backlog-2026-08-23]
 cites: []
 ---
@@ -210,3 +210,38 @@ something introduced or fixed here.
 **All 4 Decisions-open items resolved 2026-08-24** — see the rewritten Decisions-open
 section above for full detail on each. Nothing further pending from this BRIEF; the
 canonical-reconciliation branch and its application are Command's next step.
+
+## Resolution — 2026-09-04 (superseding this BRIEF)
+
+The `e5fc54aa62` canonical-reconciliation branch above was never applied — by
+2026-09-02 (msg-id `command-20260904-promote-queue-blocked-deeper-than-it-loo`),
+Command found the merge-base gap had regrown into a much deeper 3+-month
+divergence (`cluster/project-knowledge` measured 3,425 commits behind / 23,004
+phantom-ahead of `origin/main`), with a real risk that a full rebase would delete
+`tool-typeset` (a shared crate this branch doesn't actually own).
+
+Resolved via the same technique this file's own Carry-forward already used
+successfully once (scope to the archive's real paths, replay only that onto
+canonical's current tip — not a full rebase of the poisoned branch), borrowed
+this time directly from `project-design`'s 2026-07-17 precedent (`NEXT.md`)
+rather than reusing `e5fc54aa62` itself: `git diff e2c86e505f..558dd7433 --
+app-mediakit-knowledge/ os-mediakit/` (24 files), applied with `git apply -3`
+against a fresh branch off `origin/main`'s tip, 6 real conflicts resolved by
+reading the actual diffs (not take-ours/take-theirs), licensing headers
+verified header-by-header. Commit `d889a0b6ff`, branch
+`canonical-reconcile-2026-09-04`. Command independently re-verified (separate
+build+test run, not this session's reported numbers) and fast-forward pushed —
+`origin/main` is now at `d889a0b6ff` (confirmed directly against the remote,
+not just from Command's report). Both stale promote-queue entries
+(`self-service-promote-project-knowledge-20260902200251` and
+`-20260902213243`) closed as superseded by Command.
+
+**Still open, not resolved by this**: the underlying poisoned
+`cluster/project-knowledge` branch itself was never touched and remains
+exactly as diverged as before (3,425 behind / 23,004 phantom-ahead) — this
+resolution got the real work onto canonical without needing to fix that
+history. Per Command's message, it "still needs its own real reconciliation
+someday if that history ever matters, but nothing forces that now." If this
+branch's history divergence becomes blocking again, do not assume `e5fc54aa62`
+or this cycle's technique is still directly reusable without re-checking the
+merge-base first — this has now recurred once already.
