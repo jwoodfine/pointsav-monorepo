@@ -6,7 +6,7 @@ title: "os-mediakit + app-mediakit-* — product-family architecture and develop
 status: active
 owner: project-knowledge
 created: 2026-08-06
-updated: 2026-08-24 (VM topology ratified at 1 VM — see Work log)
+updated: 2026-09-04 (Decisions-open #3 re-derived and closed — app-mediakit-distributions confirmed owned by project-newsroom; CONFIG_UNIX precedent confirmed landed at shared level; "Hard constraint: AArch64 only" passage's stale "additive/third-option" framing corrected to match the ratified sole-replacement decision; all via cross-model audit — prior 2026-09-01 note below still accurate)
 related_briefs:
   - command-os-product-family
 cites:
@@ -17,6 +17,50 @@ cites:
 ---
 
 # BRIEF — os-mediakit + app-mediakit-* product family
+
+## Current Status (2026-09-01) — read this first
+
+**Ratified direction (Decisions-open #8, #9, #10):** seL4/Microkit becomes the
+sole os-mediakit, replacing both legacy formats (bare binary + old plain-QCOW2)
+entirely — appliance-only, platform shift x86_64→AArch64, accepted knowingly.
+The old software.pointsav.com listing stays live, unchanged, until the new one
+is fully live and verified — no gap. Multi-product (knowledge + marketing +
+eventually distributions sharing one appliance) is a real future direction,
+not near-term. Production VM provisioning (Phase T2A) is deliberately deferred
+by the operator ("we will get the T2A when the time comes") until every
+`app-mediakit-*` product is validated on the local test loop first, so
+`foundry-prod` can be retired in one consolidated cutover instead of piecemeal.
+
+**Build-out gate ladder (G1→G4): ALL DONE.** Bare boot, VirtIO passthrough,
+real guest rootfs, real binary reachable, automated smoke test + SIGTERM
+self-test — all proven, all live-verified, not just implemented. See Build-out
+plan below for each gate's evidence.
+
+**The swap itself is gated on THREE things (item 8) — current state of each:**
+
+| Gate | Status |
+|---|---|
+| **`/data` persistence** | ✅ **DONE**, live-verified 2-boot proof. Real root cause found and fixed along the way (missing seed content for 2 of 3 tenants, not a durability bug as it first appeared — see item 9). |
+| **Phase Deploy packaging** | 🟡 **Scripts written, committed, syntax/systemd-verified.** `deploy-loader-img.sh` + `qmp-shutdown.py` + `os-mediakit-guest.service`, ported from project-totebox's precedent. **Not yet run against a real target** — none exists (blocked on Phase T2A, deliberately deferred). |
+| **G-TLS** | 🟡 **Reverse-proxy scaffolding DONE, live-verified.** nginx routes all 3 real public domains to their backends by `server_name` (3/3 M-SMOKE routing checks pass, 4/4 SIGTERM-TEST). **Real ACME/cert issuance still genuinely blocked** — certbot deliberately not installed (nothing to issue against without a real target), and this whole gate still depends on Decisions-open **item 2** (host-ingress/host-assignment) being resolved, which remains open. |
+
+**What this means concretely:** every piece of engineering work that does
+**not** require a real target VM is now done for all three gates. What
+remains in each case needs either a real GCE instance (Phase Deploy execution,
+G-TLS's real cert issuance) or the host-assignment decision itself (T2A vs.
+something else — asked, partially answered, then explicitly deferred). There
+is currently no further local/dev-loop work available on any of the three
+gates — the next unblock has to come from resolving item 2 or lifting the
+Phase T2A deferral, not from more scripting.
+
+**Real bugs found and fixed this pass, worth knowing before touching this
+area again** (full detail under item 9 and the Build-out plan's G-TLS entry):
+`git2`'s default features broke the aarch64 cross-compile (unused
+openssl/ssh deps, fixed by disabling them); an apparent `/data` durability
+bug that turned out to be missing seed content for 2 of 3 tenants, not a
+flush/timing issue; a kernel panic from adding nginx+certbot that turned out
+to be 86MB of un-pruned apt binary caches, not either package's actual
+footprint (fixed — rootfs is now smaller than before nginx was added).
 
 ## Context
 
@@ -103,10 +147,20 @@ first draft, converging on the same fix in D3 especially. See Work log.**
    project-infrastructure that their Tier B plan is being adopted as the actual Phase 3
    starting point.
 
-2. **Host-ingress ownership — largely moot for the near term, given the 1-VM ruling above.**
-   A single VM behind a plain host port-forward doesn't need SNI-based multi-VM routing;
-   worth reopening only if/when a real split happens later. Investigation before that
-   ruling landed (kept for record): neither `os-infrastructure` nor `os-network-admin` is
+2. **Host-ingress ownership — REOPENED 2026-08-26 (see item 8 above).** Previously marked
+   "largely moot for the near term" on the reasoning that a single VM behind a plain host
+   port-forward doesn't need SNI-based multi-VM routing — that reasoning still holds for
+   the multi-VM-routing question specifically, but it does **not** dispose of the real
+   blocker this item already named below: *where does this VM actually run* (GCP Compute
+   Engine vs. a to-be-determined local/PPN-hosted QEMU-KVM host). G-TLS (item 8's swap-gate
+   #1) needs that answered for real — ACME HTTP-01 needs a real public path on port 80 to
+   whatever host is running the guest, and cert issuance/renewal needs a stable answer to
+   "this host, this IP, this DNS record" that doesn't change out from under it. Not
+   resolved this session — flagging as the concrete next question before G-TLS
+   implementation starts, per item 8's own "not yet done" list.
+
+   Investigation before the 1-VM ruling landed (kept for record): neither `os-infrastructure`
+   nor `os-network-admin` is
    documented anywhere as an actual hypervisor/host layer for other products' guest VMs —
    both are themselves guest-level OS products, same category as `os-mediakit`, not a
    dom0/host layer. There is no host-assignment decision anywhere yet for where these VMs
@@ -130,9 +184,15 @@ first draft, converging on the same fix in D3 especially. See Work log.**
    unlike the PPN case, I found no real substrate underneath these three claims. The naming
    fix (`app-mediakit-distributions`, plural) may still be a real, independently-verifiable
    correction — but needs re-deriving from an actual current source, not resent with these
-   citations. Not re-investigated further this session; if this is still worth pursuing,
-   it needs a fresh pass citing only content actually found by reading the source, the same
-   discipline applied to Decisions-open #1 above.
+   citations.
+
+   **Re-derived 2026-09-04, from a real source this time**:
+   `/srv/foundry/conventions/software-units.yaml:304-321` is authoritative — two reserved
+   ports (9098, 9107) for `app-mediakit-distributions` (plural, confirmed), `binary: null`
+   (no code yet, scaffold only), explicitly owned by **project-newsroom**, not
+   project-knowledge or project-marketing. Registered purely to reserve the ports against
+   collision; replace once that archive actually builds it. This closes the naming/ownership
+   question — no further action needed from this archive.
 
 4. ~~**Sequencing — the original gate ("wait for another app-mediakit-* product to be real")
    had a false premise per D3's correction — marketing is already real. Both reviewers
@@ -176,11 +236,19 @@ first draft, converging on the same fix in D3 especially. See Work log.**
      `.agent/binary-targets.yaml`'s `app-mediakit-knowledge` entry — `soft_enabled: true`
      but Format B is now flagged **unverified**, not confirmed-working, until resolved.
 
-5. **`conventions/os-mediakit-tier.md` does not exist yet — flagged as possibly the highest-
-   value next artifact, ahead of any seL4 design work.** Doctrine §K marks it HIGH priority
-   and §N lists it as a near-term item; it's precisely the document that would formally
-   settle D2's implementation-status gap and the §Q.7 bootability contradiction above. This
-   BRIEF is not that convention document, but should probably feed it once written.
+5. **`conventions/os-mediakit-tier.md` does not exist yet.** ~~Doctrine §K marks it HIGH
+   priority and §N lists it as a near-term item~~ **RETRACTED 2026-09-04 — another
+   instance of this same BRIEF's already-documented fabricated-citation pattern (see
+   Decisions-open #1/#3's corrections and item 3 above), never previously caught.**
+   `DOCTRINE.md` uses Roman-numeral sections (I through XVII), not letter sections — no
+   §K or §N exists anywhere in it (confirmed directly, full grep of `^#` headers). The one
+   genuine `os-mediakit` mention in DOCTRINE.md (§IV.f, `station-*` deployment prefix
+   discussion) is incidental — a list entry among "server tiers," no priority designation,
+   no convention-file mandate. The document may still be independently worth writing —
+   it's precisely what would formally settle D2's implementation-status gap and the
+   ~~§Q.7~~ (also fabricated, see item 3) bootability contradiction above — but not because
+   doctrine requires it. Any future proposal to draft it should say so honestly (operator/
+   archive judgment call, not a doctrine mandate) rather than repeat this citation.
 
 6. **`vendor-libvmm/examples/virtio/build/` shared-directory hazard** — only relevant once/if
    Phase 3 seL4 work actually starts, but locking the rule in now so it's never
@@ -305,6 +373,253 @@ first draft, converging on the same fix in D3 especially. See Work log.**
 
    </details>
 
+8. **RATIFIED 2026-08-26 (operator-directed, two rounds of clarifying questions asked
+   and answered) — product-family scope: seL4/Microkit becomes the sole os-mediakit;
+   both legacy formats are dropped, not kept alongside it.**
+
+   - **Format A (bare binary, live on software.pointsav.com since 2026-07-01) is
+     dropped entirely.** Operator confirmed explicitly: "Yes, appliance-only is
+     intentional." Going forward, os-mediakit ships only as a bootable appliance
+     image — no standalone binary listing.
+   - **The old plain-QCOW2 Format B (x86_64, Ubuntu 24.04, no seL4 — the artifact
+     Phase F's device-timeout/network.target/IMAGE_SIZE fixes above were made
+     against) is also dropped entirely, not kept as a fallback.** The seL4/Microkit
+     build (G1–G4, all DONE above) fully replaces it. Operator confirmed: "Yes —
+     seL4/Microkit is the new and only os-mediakit."
+   - **Real consequence, accepted knowingly, not glossed over: this is a platform
+     shift, x86_64 → AArch64** (`MICROKIT_BOARD=qemu_virt_aarch64`, per
+     `build-microkit-image.sh` above). Any downstream tooling, docs, or automation
+     that assumed Format B's x86_64 QCOW2 shape needs to be re-checked against this
+     before the swap — do not assume it silently still applies.
+   - **The swap is gated on ALL THREE of the following being complete — not a
+     majority, not "good enough," all three:**
+     1. **G-TLS** — real HTTPS in-guest (nginx + certbot, ACME HTTP-01).
+        **PARTIALLY DONE 2026-09-01 — the part that doesn't need a real target
+        is built and live-verified; the part that does (real certs) is still
+        genuinely blocked.** nginx now reverse-proxies all 3 real public
+        domains (documentation.pointsav.com, projects.woodfinegroup.com,
+        corporate.woodfinegroup.com) to their loopback backends by
+        `server_name`, with an ACME HTTP-01 webroot wired and
+        `/etc/letsencrypt` bind-mounted to `/data` for future cert
+        persistence — live-verified via M-SMOKE checks that actually send the
+        right `Host` header and confirm nginx routes to the correct backend
+        (3/3 pass), plus 4/4 SIGTERM-TEST including nginx's own port. Full
+        details, including a real kernel-panic bug found and fixed along the
+        way, in item 9's persistence-wiring area of this BRIEF (search
+        "G-TLS scaffolding"). **certbot itself is deliberately NOT installed**
+        — it can't issue anything without a real target anyway, and
+        installing it caused this build's actual kernel panic (traced to an
+        unrelated apt-cache pruning bug, not certbot's own footprint — see
+        the full finding). Still explicitly depends on Decisions-open
+        **item 2** (host-ingress / bridged-networking ownership) being
+        resolved before real ACME issuance can happen — that part of this
+        gate remains genuinely open.
+     2. **/data live-content persistence** — **DONE 2026-08-26, live-verified
+        2-boot proof (see item 9's persistence-wiring bullet below for the
+        full finding, including a root-cause correction worth reading before
+        touching this area again).**
+     3. **Phase Deploy packaging** — **scripts written and committed
+        2026-08-27** (`os-mediakit/scripts/deploy-loader-img.sh` +
+        `qmp-shutdown.py` + `os-mediakit/systemd/os-mediakit-guest.service`,
+        ported from project-totebox's os-totebox precedent, adapted for 3
+        wiki tenants instead of 1 API port; unit deliberately named
+        `os-mediakit-guest.service`, checked for collisions first — none
+        found). **Not yet actually run against a real target** — no
+        os-mediakit appliance VM exists (Phase T2A, item 10, is still
+        deliberately deferred until multi-product validation). Do not mark
+        this swap-gate fully closed until it's been exercised against a real
+        instance, not just written and syntax-checked
+        (`systemd-analyze verify` + `bash -n` + `py_compile` all clean, but
+        that only proves the files parse, not that the deploy flow works
+        end to end).
+   - **Timing / no-gap requirement:** the old software.pointsav.com binary listing(s)
+     (Format A and old Format B) stay live and unchanged **until** the seL4
+     replacement is fully live and verified — operator confirmed: "Only once the
+     seL4 replacement is live." software.pointsav.com must never show a gap with
+     nothing listed. Do not retire the old listings preemptively, and do not treat
+     G1–G4's completion (build-out proven) as sufficient on its own — the three gates
+     above are additional, all still open as of this writing.
+   - **Not yet done as of this writing:** no code changes, no `binary-targets.yaml`
+     update, and no message to project-software or Command reflecting this decision
+     — this BRIEF entry is the first place it's recorded. Next concrete steps: (a)
+     re-open and resolve Decisions-open item 2 given G-TLS's new hard-gate status,
+     (b) scope G-TLS/persistence/Phase Deploy as tracked work, (c) notify
+     project-software and Command once there's real progress to report, not before.
+   - **Item 8's swap is scoped to os-mediakit / app-mediakit-knowledge only** —
+     operator confirmed explicitly (2026-08-26, answering a direct question): the
+     "take down the old listing" instruction is a restatement of this item, not a
+     wider ask. `app-mediakit-marketing-2`'s and `app-mediakit-distributions`'
+     own software.pointsav.com listings (if/when the latter has one) are untouched
+     by this swap — see item 9 below for why they're a separate, later question.
+
+9. **RATIFIED 2026-08-26 (operator-directed) — multi-product os-mediakit is a real
+   future direction, not near-term, and shapes persistence design starting now.**
+
+   Prompted by the operator asking directly whether the other `app-mediakit-*`
+   products could eventually share this same appliance. Checked real state before
+   answering (not assumed): `software-units.yaml`, `PROJECT-CLONES.md`, and the
+   actual crates in this monorepo clone.
+
+   - **`app-mediakit-marketing-2`** (project-marketing) — real, live on foundry-prod
+     today (`local-marketing-pointsav`, `local-marketing`, port 9101), same
+     `axum 0.8` + `tokio` stack as `app-mediakit-knowledge`. Structurally the same
+     "unmodified binary in a Linux guest" Pattern A approach plausibly applies. One
+     real wrinkle, confirmed by reading its `software-units.yaml` entry directly:
+     it binds to a fixed VPN address (`10.8.0.9:9101`), not loopback like
+     `app-mediakit-knowledge` does (`localhost:9090`) — almost certainly a
+     `SERVICE_MARKETING_*` env var, not a rewrite, but it means "drop the binary in
+     unmodified" needs that config point checked/fixed first, not assumed to just
+     work.
+   - **`app-mediakit-distributions`** (project-newsroom, plural — confirms the
+     naming correction item 3 flagged but didn't verify) — **does not exist as
+     real code.** `Cargo.toml` has zero dependencies; `src/lib.rs` is an empty
+     stub. What's live at its URLs today is a static-only nginx snapshot with no
+     backend (`software-units.yaml`: `binary: null`, `services: []`). Not a
+     near-term candidate for anything — there is nothing to port yet, and this
+     BRIEF makes no further claim about when that changes.
+   - **Retirement scope (operator-confirmed, see item 8's last bullet above):**
+     item 8's swap covers only os-mediakit / app-mediakit-knowledge. Marketing's
+     and distributions' own listings are untouched — this is a separate, later
+     question, not folded into the current swap.
+   - **Persistence design directive, effective immediately:** item 8's swap-gate
+     #2 (`/data` live-content persistence) must be designed **product-agnostic**
+     from the start — not a wiki-specific content layout — so that a later
+     marketing (and eventual distributions, once real) port onto this appliance
+     doesn't require redoing the persistence layer. Operator chose this explicitly
+     over the cheaper "wiki-only now, generalize later" option, accepting the
+     slower near-term pace in exchange for avoiding rework. Concretely: when
+     `/data` wiring work starts, the mount/layout scheme should key by
+     product+instance (e.g. `/data/<product>/<instance>/`), not assume
+     `app-mediakit-knowledge`'s three-tenant shape is the only shape that will
+     ever exist under it.
+   - **Persistence wiring — DONE 2026-08-26, live-verified end to end, not just
+     code-reviewed.** `/init` bind-mounts
+     `/data/app-mediakit-knowledge/<instance>/{content,state}` onto each
+     tenant's `/var/lib/wiki{,-state}/<instance>`, seeding from baked-in sample
+     content on first boot (bind-mount, not a path rewrite in
+     `/etc/wiki/*.toml` — the appliance still works, non-persistently, on a
+     boot with no data disk attached at all). Cross-compiling
+     `app-mediakit-knowledge` for this rebuild surfaced and fixed a real,
+     independent bug: `git2 = "0.20"`'s default features pull in `openssl-sys`,
+     which has no cross pkg-config sysroot on this host; `history.rs` (the
+     only call site) only does local repo/diff reads, never clone/fetch/push,
+     so `default-features = false` on `git2` removes the dependency entirely
+     rather than working around it. Also needed the linker/pkg-config env
+     vars this BRIEF's own Phase 0 section (below) already documented
+     (`CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc`,
+     `PKG_CONFIG_ALLOW_CROSS=1`) — missed on the first two attempts because
+     the recipe wasn't grepped for before building.
+
+     **Long apparent-durability chase, real root cause found, worth recording
+     so it isn't repeated:** an 11-boot investigation initially looked like a
+     write-durability bug — `documentation`'s seed survived every boot,
+     `projects`'/`corporate`'s never did, reproduced identically across
+     several attempts: an explicit `sync` after seeding, QEMU `-drive
+     cache=writethrough` (temporary diagnostic edit to the shared
+     `vendor-libvmm/examples/virtio/virtio.mk`, reverted after), and a 65s
+     sleep between seeding and killing the VM to rule out a writeback-timing
+     race. None of these changed the outcome. Along the way, checked
+     project-totebox's own precedent (`BRIEF-os-totebox-platform.md`, Session
+     24) rather than keep guessing blind, and found their own
+     `os-totebox-guest.service` unit documents the identical QMP-shutdown
+     limitation (no ACPI device in the same shared guest DTS) and their own
+     boot logs show the same unclean-shutdown journal-replay message
+     (`EXT4-fs (vda): recovery complete`) — ruling out "they had a graceful
+     stop and this archive doesn't" as the explanation too. **The real cause,
+     found by adding direct `cp`-exit-code + `df`/`find` instrumentation
+     instead of theorizing further: `projects` and `corporate` never had any
+     baked-in sample content to begin with** — `build-guest-rootfs.sh`'s §4b
+     only ever wrote a `getting-started.md` sample article into
+     `documentation`'s directory; `projects`/`corporate` were created as
+     empty directories (`mkdir -p` only). Every boot's `cp -a
+     /var/lib/wiki/<instance>/. <data-dir>/` for those two instances was
+     copying an empty source, correctly exiting 0, correctly copying zero
+     files — not a flush/sync/timing bug at all. The evidence was visible
+     from the very first boot's own log (`indexed 0 article(s)` ×2,
+     `indexed 1 article(s)` ×1) and went unnoticed until directly
+     instrumented. **Fixed**: §4b now seeds all 3 instances with a
+     brand-appropriate sample article, not just `documentation`. **Live
+     re-verified, 2-boot proof**: boot 1 seeded all 3 with real content
+     (`indexed 1 article(s)` ×3); boot 2 on the same disk shows zero
+     "seeding" messages for any instance and all 3 still `indexed 1
+     article(s)` — genuine persistence confirmed, plus M-SMOKE 3/3 and
+     SIGTERM-TEST 3/3 both still pass. **Swap-gate #2 (`/data` persistence) is
+     now genuinely closed** — first of item 8's three swap-gates to be fully
+     done and proven, not just implemented.
+   - **Ownership model, if/when multi-product happens: project-knowledge stays
+     sole owner of the shared appliance build.** Operator confirmed explicitly
+     over the alternative (each archive forking its own os-mediakit variant).
+     Other archives' binaries would get baked into images this archive builds and
+     ships, rather than project-marketing/project-newsroom each maintaining a
+     parallel os-mediakit fork — the inverse of this archive's own relationship
+     to project-totebox (there, project-knowledge borrows os-totebox's proven
+     scripts as precedent; here, project-knowledge would be the one being
+     borrowed from). Not yet actioned — no cross-archive message sent, no build
+     changes made.
+   - **TIGHTENED 2026-08-26 (operator-directed) — hard gate, not "further along":
+     do not ask project-marketing or project-newsroom to start rebuilding their
+     `app-mediakit-*` packages against os-mediakit until item 8's three swap-gates
+     (G-TLS, `/data` persistence, Phase Deploy) are ALL fully complete and
+     verified on `app-mediakit-knowledge` first.** Operator's own reasoning: keep
+     the BRIEF and the Build-out plan aligned on one stable, finished target
+     before other archives start depending on it — if this host has a VM crash or
+     other disruption mid-build (a real, evidenced risk this session; see the
+     resource-pressure guard's own crash history note in `build-microkit-image.sh`),
+     a half-finished os-mediakit with other archives' in-flight porting work
+     depending on it is worse than the same crash hitting a single-owner,
+     not-yet-shared build. Sequencing is now strictly linear: item 8 complete
+     end-to-end → *then* notify project-marketing/project-newsroom to begin
+     porting → *then* item 10's multi-product validation → *then* Phase T2A. No
+     step starts before the one before it is fully done, not just mostly done.
+   - **Explicitly unresolved, deferred:** "app-orchestration-gis" was mentioned by
+     the operator as a possible exclusion from this consolidation, but no product
+     by that exact name was found in `software-units.yaml` or `PROJECT-CLONES.md`
+     (`app-orchestration-bim` and `app-orchestration-command` exist; no `-gis`
+     variant). Not guessed at — needs the operator to clarify what they meant, or
+     it can be dropped as a mis-typed reference to something already covered
+     above.
+
+10. **RATIFIED 2026-08-26 (operator-directed) — T2A production VM provisioning is
+    sequenced AFTER item 9's multi-product validation, not right after item 8's
+    three swap-gates complete for knowledge alone.**
+
+    Operator's own words: "we'll need to set up the T2A VM after we get all the
+    app-mediakit-* working on the test os-mediakit so we can retire the current VM
+    at the same time." This adds a sequencing layer on top of item 8's swap-gate
+    list, not a replacement for it:
+
+    - **"the test os-mediakit"** = the local/dev build-and-boot loop this archive
+      already has (`build-microkit-image.sh` + friends, TCG-only on this host, no
+      `/dev/kvm` — same environment G1–G4 were proven on). Validate every
+      `app-mediakit-*` product there first, iteratively, before spending money on
+      real GCP infrastructure.
+    - **Only once that validation is done does T2A provisioning happen** — i.e.
+      even after `app-mediakit-knowledge`'s own G-TLS/persistence/Phase Deploy
+      (item 8) are all complete, the *production* cutover does not start until the
+      other real product (`app-mediakit-marketing-2` at minimum) is also proven
+      working on the same test appliance.
+    - **Goal: one consolidated cutover, not piecemeal per-product migrations off
+      `foundry-prod`.** Provision T2A once, migrate everything that's ready onto
+      it at the same time, retire `foundry-prod`'s hosting of all of them
+      together — rather than standing up T2A for knowledge alone now and doing a
+      second disruptive migration later when marketing catches up.
+    - **Flagged, not yet resolved: does "all the app-mediakit-*" include
+      `app-mediakit-distributions`?** Item 9 already established that product has
+      zero real code today (empty `Cargo.toml`, stub `lib.rs`) — if T2A
+      provisioning is strictly gated on *every* `app-mediakit-*` product being
+      validated, this could block the production cutover indefinitely on
+      project-newsroom's own unscoped work, well past the point where knowledge
+      and marketing are both ready. Not assumed either way here — surface this
+      explicitly to the operator before treating distributions as a hard blocker
+      when this phase is actually reached.
+    - **Consequence for item 8's "no-gap" framing:** the old software.pointsav.com
+      os-mediakit/app-mediakit-knowledge listing may now stay live considerably
+      longer than "until knowledge's own three gates close" — it stays live until
+      the *consolidated* T2A cutover happens, which is gated on this item too.
+      Item 8's no-gap requirement itself is unchanged (old listing never comes
+      down before the new one is live); what's changed is how much later "the new
+      one is live" now lands.
+
 ## Build-out plan — bootable seL4/Microkit os-mediakit running app-mediakit-knowledge
 
 **Added 2026-08-10, operator-directed.** Structured the same way project-totebox's
@@ -345,10 +660,17 @@ bundle like os-totebox).
 ### Hard constraint: AArch64 only
 
 Microkit 2.2 targets AArch64, not x86_64 — every precedent product cross-compiles to
-`aarch64-unknown-linux-gnu`. This is additive to, not a replacement for, the existing BETA
+`aarch64-unknown-linux-gnu`. ~~This is additive to, not a replacement for, the existing BETA
 Format A/B (`x86_64-unknown-linux-gnu`, already declared in `.agent/binary-targets.yaml`) —
 matches how `BRIEF-binary-distribution.md` already frames "seL4 AArch64 system image" as a
-future third download option.
+future third download option.~~ **SUPERSEDED — written 2026-08-10, before the later
+ratification.** Per this file's own Current Status section (2026-09-01, Decisions-open
+#8/#9/#10): seL4/AArch64 becomes the **sole** os-mediakit, **replacing** Format A/B entirely,
+not a third option alongside them — this directly contradicted that later, higher-authority
+ratification and was left uncorrected until a cross-model audit flagged it 2026-09-04. The
+no-gap requirement (old software.pointsav.com listing stays live unchanged until the new one
+is fully live and verified) still applies — that part of this passage's intent was correct,
+only the "additive/third-option" framing was wrong.
 
 **Known cross-compile risk, checked directly against `app-mediakit-knowledge/Cargo.toml`**:
 `git2 = "0.20"` (binds `libgit2`, a C library) and `syntect = "5"` (default features may pull
@@ -532,12 +854,22 @@ abandoned H0–H8 native-PD track)
   not started, needs the host-ingress/bridged-networking decision below resolved
   first if/when it's picked up).
 
-- **G-TLS (new, no precedent).** nginx + certbot running inside the guest, reverse-proxying
-  to the app on loopback, ACME HTTP-01 challenge path, cert persistence across guest restarts
-  via `/data`. Needs the host-ingress/bridged-networking decision from Decisions-open #2
-  resolved, not assumed. Not started — deliberately descoped this pass (operator
-  direction, 2026-08-25): no real public reachability in the test environment used
-  for G1-G3 to terminate TLS against.
+- **G-TLS (new, no precedent). PARTIALLY DONE 2026-09-01 — reverse-proxy scaffolding
+  live-verified; real ACME issuance still blocked, correctly.** nginx runs inside the
+  guest, reverse-proxying to each of the 3 apps on loopback by `server_name`
+  (documentation.pointsav.com, projects.woodfinegroup.com, corporate.woodfinegroup.com),
+  ACME HTTP-01 challenge webroot wired, `/etc/letsencrypt` bind-mounted to `/data` for
+  future cert persistence across guest restarts. Live-verified: M-SMOKE sends the
+  correct `Host` header per domain and confirms nginx→backend routing (3/3 pass), nginx
+  included in the SIGTERM-TEST process/port checks (4/4 pass), rootfs persistence
+  unaffected. **certbot is deliberately NOT installed** — real ACME issuance still needs
+  the host-ingress/bridged-networking decision from Decisions-open #2 resolved (real
+  public DNS/reachability), which remains genuinely blocked; installing certbot anyway
+  caused a real kernel panic this pass (traced to an apt-cache pruning bug the fix also
+  closed, not certbot's actual footprint — full finding: item 9's persistence-wiring
+  area, search "G-TLS scaffolding"). Re-add certbot once Phase T2A provides a real
+  target — either a fresh guest-rootfs rebuild at that point, or installed directly on
+  the target instead of baked into every dev-loop rebuild.
 
 - **G4 — Full smoke test. DONE 2026-08-26 — exercised end-to-end for real, both halves
   pass.** `foundry.mode=smoketest` couldn't be passed via QEMU `-append` (this image's
@@ -580,10 +912,38 @@ abandoned H0–H8 native-PD track)
   narrower scope) caused real downstream storefront-naming confusion; don't repeat it for
   os-mediakit.
 
+- **Phase Handoff (new, added 2026-08-26, operator-directed — hard gate, see
+  Decisions-open item 9's tightened bullet).** G-TLS, `/data` persistence, and Phase
+  Deploy above must ALL be fully complete and verified on `app-mediakit-knowledge`
+  before this phase starts — not "mostly done," not "good enough." Only once that's
+  true: notify project-marketing and project-newsroom that os-mediakit is ready and
+  ask them to begin rebuilding/porting their `app-mediakit-*` packages onto it.
+  Reasoning (operator-stated): keeps this BRIEF and this Build-out plan pointing at
+  one stable, finished target before other archives' work depends on it — a VM crash
+  or other disruption mid-build is a real, evidenced risk on this host (see the
+  resource-pressure guard's crash-history note above), and hitting it with only this
+  archive's own in-flight work at stake is a smaller problem than hitting it with
+  two other archives' in-flight porting work also depending on an unfinished
+  appliance. Not started — no message sent to either archive yet.
+
 **Standing carry-forward (not a phase — see Carry-forward section below)**: periodically check
 project-totebox's BRIEFs for how they resolve the MBA/gateway-wiring gap and the shared
 build-dir hazard; adopt their fix once real rather than maintaining a second workaround
 indefinitely.
+
+- **Phase T2A (new, added 2026-08-26, operator-directed — see Decisions-open item 10).**
+  After Phase Handoff above (not just Phase Deploy) — do **not** immediately provision
+  the real GCP Tau T2A production VM for `app-mediakit-knowledge` alone. First validate
+  every other real `app-mediakit-*` product (`app-mediakit-marketing-2` at minimum — real, live,
+  same axum/tokio stack, needs its VPN-bind-address config point checked per item 9)
+  on this same test os-mediakit build/boot loop. Only once that multi-product
+  validation is done: provision `t2a-standard-1` (or larger, if sizing needs revisit
+  at that point) with a reserved static external IP, migrate every validated product
+  onto it in one consolidated cutover, and retire `foundry-prod`'s hosting of all of
+  them together — not a piecemeal per-product migration. `app-mediakit-distributions`'
+  inclusion in "every other product" is explicitly unresolved (item 10) — it has no
+  real code as of this writing, so do not treat it as a hard blocker without
+  re-confirming with the operator when this phase is actually reached.
 
 ## Work log
 
@@ -717,13 +1077,20 @@ indefinitely.
   #1/#2 to the operator; final ruling (1 VM, not 5 or 3) landed same session — see the
   new 2026-08-24 (VM topology ratified) Work log entry and the rewritten Decisions-open
   #1/#2 above. Nothing further pending on this thread.
-- **NEW 2026-08-24 — next concrete step, now that topology is ratified**: the Build-out
+- ~~**NEW 2026-08-24 — next concrete step, now that topology is ratified**: the Build-out
   plan's Phase F/Phase 0 sequencing doesn't change (still binary-per-VM structure, just
   1 VM total instead of 3), but Phase 0's cross-compile/toolchain work and the G-series
   gate ladder should be read once more against a single-VM target before implementation
   starts — e.g. G2.5's guest-rootfs step now installs all of knowledge+marketing+dist
   into one rootfs rather than per-product ones. Not re-derived this session — flagging so
-  the Build-out plan section isn't read as still assuming the superseded 3-VM shape.
+  the Build-out plan section isn't read as still assuming the superseded 3-VM shape.~~
+  **RE-DERIVED 2026-09-04, via cross-model audit.** The gate-ladder/topology language itself
+  (G1-G4, Phase T2A multi-product validation) was already consistent with the single-VM
+  shape — no fix needed there. The real staleness was elsewhere in this same file: the
+  "Hard constraint: AArch64 only" passage above (written 2026-08-10, same day as the
+  original ratification but apparently not updated alongside it) still described seL4 as
+  "additive... a future third download option" instead of the sole replacement — corrected
+  above. No other stale multi-VM assumptions found in the Build-out plan body.
 - ~~**Send Command a consolidated doctrine-correction message**~~ **SENT 2026-08-10**
   (`msg-id: command-20260810-os-mediakit-answer-consolidated-doctrine`, in reply to
   `command-20260806-question-does-os-mediakit-get-the-same-s`). Single message covering:
@@ -773,6 +1140,21 @@ indefinitely.
   `vendor-libvmm/examples/virtio/build/` directory hazard. Adopt their real fix once it lands
   rather than maintaining os-mediakit's own parallel workaround (the Phase 0 `BUILD_DIR`
   isolation) indefinitely.
+
+  **CHECKED 2026-09-04 — CONFIG_UNIX fix now landed at the shared level, real news.**
+  Per `project-totebox/.agent/briefs/BRIEF-os-totebox-platform.md:7202-7214`, the patched
+  guest kernel is now git-committed at
+  `vendor-libvmm/examples/virtio/client_vm/linux-CONFIG_UNIX-v6.13.img` (sha256-verified
+  sidecar), and `virtio.mk`'s `${LINUX}:` rule has a `LINUX_SRC` override defaulting to this
+  committed file — closing a recurring loss where the fix had silently vanished twice before
+  (once on a `BUILD_DIR` split, once on a disk-cleanup pass) because it previously lived only
+  as an untracked file. Confirmed deployed live on `os-totebox-1` via journalctl, not just a
+  health check. **Gotcha worth carrying into os-mediakit's own build notes**: a stale
+  stock-kernel file already sitting at the `${LINUX}` target path can make Make silently
+  ignore the new `LINUX_SRC` override, masking the fix (`BRIEF-os-totebox-platform.md:
+  7215-7226`) — check for this specifically if/when os-mediakit's build first touches this
+  shared directory, don't assume a clean `${LINUX}` target. MBA/gateway-wiring (O9) shipped
+  2026-08-02, predating our last check window — no new developments found since.
 - **NEW 2026-08-10 — next concrete step**: start Build-out plan Phase 0 (preflight) — verify
   the vendored Makefile's `BUILD_DIR` support, resolve the aarch64 cross-compile toolchain
   question, and attempt a bare `cargo build --release --target aarch64-unknown-linux-gnu` for

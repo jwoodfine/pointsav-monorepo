@@ -6,7 +6,7 @@ brief-id: project-knowledge-binary-distribution
 owner: project-knowledge
 destination: project-software
 created: 2026-06-30
-updated: 2026-07-13
+updated: 2026-09-04
 parent: project-knowledge-ng-rewrite
 ---
 
@@ -16,6 +16,18 @@ parent: project-knowledge-ng-rewrite
 > **Site:** software.pointsav.com  
 > **Engine:** `app-privategit-marketplace` (port 9202) — product catalog + license issuance  
 > **Design authority:** project-knowledge (binary producer)
+
+> **STATUS NOTE (2026-09-04) — pending supersession, do not treat "Decisions locked" below
+> as current without cross-checking `BRIEF-os-mediakit-product-family.md`.** That BRIEF's
+> item 8 (Current Status, ratified) has since decided seL4/Microkit becomes the **sole**
+> os-mediakit, replacing both Format A (bare binary) and Format B (plain QCOW2) described
+> below entirely — not a third option alongside them. That BRIEF's own line ~291 already
+> flags this file's Format B "live" claim as unverified/stale evidence, not confirmed
+> end-to-end. Format A and B were genuinely true and shipped 2026-07-01, so nothing below is
+> being retracted — but this is pre-ratification content. **No-gap requirement**: the old
+> software.pointsav.com listing(s) stay live unchanged until the seL4 replacement is fully
+> live and verified — see the other BRIEF for the actual cutover plan and current gate
+> status. Once cutover happens this file should be marked `superseded`, not edited in place.
 
 ---
 

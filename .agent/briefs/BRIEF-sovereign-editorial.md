@@ -6,7 +6,7 @@ brief-id: project-knowledge-sovereign-editorial
 parent: project-knowledge-phase2-redesign
 owner: project-knowledge
 created: 2026-07-09
-updated: 2026-07-09
+updated: 2026-09-04 (carry-forward outbox check re-run — still unresolved, no news)
 ---
 
 # BRIEF — Sovereign Editorial Design Direction (parent tracker)
@@ -60,5 +60,12 @@ different findings, different implementation orders — only the design language
 
 ## Carry-forward
 
-- [ ] Check project-marketing and project-software outboxes for implementation status next
-  time either archive is touched.
+- [x] Check project-marketing and project-software outboxes for implementation status next
+  time either archive is touched. **Checked 2026-09-04 — still genuinely unresolved, no
+  news since 2026-07-09.** `project-software`'s only mentions are the original 2026-06-24
+  handoff (`.agent/inbox-archive.md:1044-1201`); their own reference brief
+  (`project-software/.agent/briefs/BRIEF-sovereign-editorial-software.md:214`) still
+  describes an unstarted chrome-only patch, dated 2026-07-02. `project-marketing` has zero
+  "sovereign editorial" mentions anywhere and no equivalent BRIEF exists in that archive at
+  all — still hasn't acknowledged. Re-check next time either archive is touched, per the
+  standing rule above; not worth a dedicated follow-up otherwise.
