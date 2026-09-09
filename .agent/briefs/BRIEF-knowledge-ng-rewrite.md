@@ -7,8 +7,31 @@ status: active
 owner: project-knowledge
 parent: project-knowledge-wiki-redesign
 created: 2026-07-01
-updated: 2026-09-07 (high-severity Spanish-disclosure bug fixed same-session as Command's report; reconciled to canonical, awaiting merge — Phase 2, the local appliance re-test, is next)
+updated: 2026-09-08 (new carry-forward: wikilinks wrapping across a line break don't render, systemic, ~80 files potentially affected — see STATUS UPDATE below)
 ---
+
+## STATUS UPDATE (2026-09-08) — Real bug, not yet fixed: wikilinks wrapping across a line break don't render (~80 files potentially affected)
+
+Command found this while redeploying: a `[[asset-architecture-standard|asset\narchitecture]]`-
+style wikilink (label wraps across a line break in source markdown) rendered unrendered on
+projects.woodfinegroup.com. Root-caused directly, not assumed: `resolve_wikilinks()` in
+`render.rs` is fine — correctly converts the embedded-newline label into a valid markdown
+link — but `markdown_to_html_with_plugins()` downstream doesn't render a link whose label
+contains a literal `\n`. Grepped all 3 wiki repos for `[[...]]` spans containing a literal
+newline: ~80 files matched (some may be false positives from other bracket-adjacent syntax,
+not individually verified per-file). Command applied an immediate content-side patch for the
+2 originally-reported instances (`media-knowledge-projects/index.md` + `.es.md`, commit
+`26ba72a`) — sidesteps the bug for those 2 only, does not fix the renderer.
+
+**Reported 2026-09-08** (`command-20260908-bug-found-root-caused-wikilinks-that-wra`),
+**acknowledged same session** (`command-20260909-re-wikilinks-wrapping-across-a-line-brea`),
+**not yet fixed** — queued for next session, deliberately not implemented same-session as the
+report (mid-shutdown-sweep). Agreed direction: collapse embedded `\n` to a space in
+`with_links` before the `markdown_to_html_with_plugins()` call in `render.rs` — handles all
+~80 cases at once, not just the 2 already patched. **Next steps**: implement the fix, add a
+regression test (wikilink label containing a literal newline), then grep-sweep the ~80 flagged
+files to confirm real hits vs. false positives before deciding whether any more content-side
+patches are needed in the meantime.
 
 ## STATUS UPDATE (2026-09-07) — High-severity bug: Spanish pages rendered the English disclosure band
 
