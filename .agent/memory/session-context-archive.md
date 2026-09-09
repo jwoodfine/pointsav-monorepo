@@ -4,6 +4,43 @@ Entries pushed from session-context.md when file exceeds 3 entries. Newest on to
 
 ---
 
+## 2026-07-03 (session 28) | Totebox | claude-code (Sonnet 5)
+
+**Done this session (single focused incident fix — corporate wiki 404 bug):**
+- Startup clean: role/branch confirmed, NOTAM not active, 1 pending inbox message (project-bim's
+  corporate-wiki-404 report relayed via Command).
+- Diagnosed the reported bug (`local-knowledge-corporate` 4/5 stylesheets 404) down to a much
+  bigger root cause: 3 stray orphan processes (PIDs 2320353-55, running the pre-rewrite
+  `app-mediakit-knowledge-2` binary directly since 2026-07-02 12:29, leftover from background job
+  `d9940d34`) were squatting all three wiki ports — blocking the real systemd services
+  (`local-knowledge-documentation/-projects/-corporate`) from starting. All three had been
+  crash-looping "Address already in use" for 18h and were sitting in `failed` state, undetected.
+- Auto-mode classifier correctly blocked the first kill attempt (PIDs belonged to another
+  session's job/scratchpad, not confirmed as safe) — stopped, explained the finding, got explicit
+  operator confirmation before killing.
+- Fix: killed the 3 stray PIDs, `systemctl reset-failed` + `start` on all three real units.
+  Verified 200 on HTML + all 5 stylesheets on 9090/9093/9095. Confirmed workspace VM ≠
+  public-facing box for these domains (IP/DNS mismatch) — no live traffic was affected.
+- Closed the loop: mailbox reply to Command with full root-cause writeup, inbox message archived,
+  NEXT.md item marked resolved (with lesson noted), artifact-registry CONFIG/ops row added,
+  `project-state-knowledge-platform.md` memory updated (second occurrence of this exact
+  orphan-process pattern — flagged as a recurring lesson). Committed `0b5369cb3`.
+
+**Pending / carry-forward (unchanged from session 27, none new):**
+- v2→v1 switch-back decision, trademark reconciliation, `pointsav-monorepo` sub-clone branch
+  mismatch — still Command's to resolve.
+- Stage-6 promote for this archive still blocked on project-console's shared
+  `app-console-content/cartridge.rs` conflict.
+- What's actually deployed on foundry-prod for the 3 public domains — still unconfirmed (today's
+  fix only touched workspace-VM local state, not prod).
+
+**Operator preference confirmed this session:** when a destructive action gets blocked by the
+auto-mode classifier for a legitimate but non-obvious reason (e.g. touching another session's
+process), stop and explain rather than retrying or working around it — a one-line confirmation
+from the operator was all that was needed to proceed cleanly.
+
+
+
 ## 2026-07-03 (session 27) | Totebox | claude-code (Sonnet 5)
 
 **Done this session (audit-only: what's blocked on Command vs. actionable now):**
