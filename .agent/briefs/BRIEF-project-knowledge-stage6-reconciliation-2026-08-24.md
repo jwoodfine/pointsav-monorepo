@@ -6,7 +6,7 @@ title: project-knowledge — 3-way Stage 6 reconciliation (archive-root, sub-clo
 status: superseded
 owner: project-knowledge
 created: 2026-08-24
-updated: 2026-09-04 (superseded — see Resolution section; the e5fc54aa62 canonical-reconciliation branch this BRIEF ends on was never applied by Command, and by 2026-09-02 the gap had regrown into a fresh, deeper divergence requiring its own separate scoped-patch cycle)
+updated: 2026-09-08 (fully closed — see the 2026-09-08 Resolution section; the underlying poisoned cluster/project-knowledge history itself is now also resolved, forced by an unrelated orchestration-IP purge incident, not a deliberate reconciliation)
 related_briefs: [command-fleet-backlog-2026-08-23]
 cites: []
 ---
@@ -245,3 +245,37 @@ someday if that history ever matters, but nothing forces that now." If this
 branch's history divergence becomes blocking again, do not assume `e5fc54aa62`
 or this cycle's technique is still directly reusable without re-checking the
 merge-base first — this has now recurred once already.
+
+## Resolution — 2026-09-08 (poisoned branch history finally addressed, forced by an unrelated incident)
+
+The "someday" above arrived, but not via a deliberate reconciliation project —
+Command found 180 files of `app-orchestration-*` license/metering/allocation
+source live on both public forks (`jwoodfine`/`pwoodfine` `pointsav-monorepo`)
+on this exact branch, inherited history missed by the 2026-09-01 sweep
+(`command-20260907-orchestration-ip-found-live-on-cluster-p`). The fix was a
+history purge + force-push to both forks, new tip `2a2f2c2a2f`
+(`command-20260907-cluster-project-knowledge-force-pushed-c`), which as a side
+effect discarded the entire poisoned lineage this BRIEF describes — the new
+tip descends from a real, clean history, not from the 23,004-phantom-ahead
+mess.
+
+Reset both local repos (outer clone + `pointsav-monorepo/` sub-clone) to the
+new tip via `git reset --hard origin-staging-j/cluster/project-knowledge`
+(operator-confirmed, `FOUNDRY_CONFIRM_DESTRUCTIVE=1`, backup branches made
+first in both repos: `pre-purge-reset-backup-20260908`). Verified before
+resetting that no real code was at risk: all of it was independently safe
+either on canonical already or on its own untouched `canonical-reconcile-*`
+branch. One real gap found: `merge-base` against the backup branch came back
+12,214 commits back (dated to February) — cluster/project-knowledge's own
+branch tip hadn't actually been pushed to the forks since 2026-09-02, so this
+session's `.agent/`/BRIEF commits existed only locally. Given the scale,
+did not attempt to replay history — checked out just the 7 differing
+`.agent/` files from the backup branch onto the new tip, committed
+(`b2c0b702b`), fast-forward-pushed clean to both forks.
+
+**This BRIEF is now fully closed** — both the original 3-way divergence
+(resolved 2026-09-04, above) and the underlying poisoned-history root cause
+(resolved 2026-09-08, here) are done. No outstanding item remains. Any
+future `cluster/project-knowledge` divergence is a new problem, not a
+recurrence of this one — the branch's history is clean as of `2a2f2c2a2f`
+forward.

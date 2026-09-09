@@ -2,6 +2,66 @@
 
 Rolling 3-session summary. Newest on top. Keep only 3 entries; push oldest to `session-context-archive.md`.
 
+## 2026-09-08 (session 31) | Totebox | claude-code (Sonnet 5)
+
+**Done this session (continued from a prior compacted session; mailbox/governance triage +
+resolved a real branch-history incident):**
+- Continued a mid-flight task from before compaction: Command's cherry-pick governance-fix
+  request for `woodfine-fleet-deployment` (a byte-identical duplicate doc,
+  `guide-moonshot-toolkit-phase1c-build-setup.md`, sitting in two paths). Primary copy already
+  gone via a clean fast-forward from real `origin/main`; verified the sibling duplicate
+  byte-identical (md5sum) before deleting, committed `07ee551`, pushed to both staging mirrors.
+  Command confirmed merge to canonical the same session.
+- **Real incident: orchestration-layer IP (license/metering/allocation source) found live on
+  both public `pointsav-monorepo` forks on `cluster/project-knowledge`**, inherited history
+  missed by the 2026-09-01 sweep. Command force-pushed a purge to both forks (new tip
+  `2a2f2c2a2f`). Reset both local repos (outer clone + `pointsav-monorepo/` sub-clone) to match
+  — operator-confirmed via the `FOUNDRY_CONFIRM_DESTRUCTIVE=1` gate (I cannot self-authorize
+  this; had the operator run the marker command in their own shell each time), local backup
+  branches made first in both repos.
+- **Found and fixed a real gap while verifying the reset was safe**: `cluster/project-knowledge`
+  itself hadn't been pushed to the staging forks since 2026-09-02 — merge-base against the
+  backup branch came back 12,214 commits, dated to February. All code content was independently
+  safe (already on canonical, or on its own untouched `canonical-reconcile-*` branch), but this
+  session's `.agent/`/BRIEF commits existed only locally. Restored the 7 differing `.agent/`
+  files from the backup branch as one commit (`b2c0b702b`) rather than replaying history at
+  that scale, fast-forward-pushed clean. Full writeup: `BRIEF-project-knowledge-stage6-
+  reconciliation-2026-08-24.md`'s new 2026-09-08 Resolution section (fully closes that BRIEF).
+  New memory: `feedback-branch-divergence-and-purge-2026-09-08.md`.
+- Verified the earlier BRIEF-freshness plan (`indexed-foraging-sphinx.md`, footer-redesign
+  STATUS UPDATE + binary-distribution/os-mediakit-product-family supersession note + README
+  table fixes) was already fully executed before the compaction — confirmed present in the
+  restored `.agent/` state, nothing left to do there.
+- **Mailbox triage, 2 rounds:** first round — Command chased/confirmed the reset; second round
+  — project-editorial's bundled ask (full rebuild+redeploy of all 3 wikis given real stale-
+  deploy evidence, a footer-validation CI-check ownership ask, apex-footer status question, O3
+  status-only) plus Command's re-send of 2 UI items previously only staged-not-sent in a BRIEF
+  (uncapped sidebar panel — kept deferred per prior operator direction, offered a `sibling_scope`
+  frontmatter alternative to a raw threshold; prose column width — already fixed this session
+  via an independent path, confirmed live on canonical, just needed to tell Command). Accepted
+  the CI-check ownership (operator-confirmed) — new `BRIEF-footer-ci-check.md`, not yet scoped.
+  Relayed the rebuild request to Command (operator-confirmed) rather than acting on it directly
+  — deployment/VM-sysadmin is Command-Session-only territory.
+
+**Pending / carry-forward:**
+- Spanish-disclosure fix (`canonical-reconcile-2026-09-07b`, `4c5e1966c8`) still not merged to
+  canonical as of session end — reconfirmed directly against `origin/main`, still missing.
+- Phase 2 of the "path to live" plan (rebuild + re-verify the local `os-mediakit` appliance
+  against current code) — Phase 1 is done, Phase 2 not yet started, no explicit go-ahead this
+  session.
+- `BRIEF-footer-ci-check.md` — accepted, not yet scoped; queued behind Phase 2.
+- Asked Command whether `.agent/` durability pushes (this branch → staging forks) should become
+  a routine cadence rather than only during Stage 6 promote runs — not yet answered.
+- project-editorial's full-rebuild request — relayed, Command owns scheduling from here.
+
+**Operator preference confirmed this session:** when a destructive git operation (reset --hard)
+is required, do not attempt any self-authorization workaround (e.g. setting the confirm env var
+in the same Bash call) even when instructed to proceed — state scope/rollback/ratification
+clearly, then have the operator run the marker command themselves in their own shell. This was
+the gate's designed behavior, not a failure to work around.
+
+---
+
 ---
 
 ## 2026-07-09 (session 30) | Totebox | claude-code (Sonnet 5)
@@ -127,41 +187,4 @@ only") was a full pivot, not a tweak.
 during startup (not what the operator asked for), stop and present findings + options before acting,
 even when the fix is well-precedented — a one-line "fix now" was all that was needed once framed
 clearly with the finding, evidence, and proposed action.
-
----
-
-## 2026-07-03 (session 28) | Totebox | claude-code (Sonnet 5)
-
-**Done this session (single focused incident fix — corporate wiki 404 bug):**
-- Startup clean: role/branch confirmed, NOTAM not active, 1 pending inbox message (project-bim's
-  corporate-wiki-404 report relayed via Command).
-- Diagnosed the reported bug (`local-knowledge-corporate` 4/5 stylesheets 404) down to a much
-  bigger root cause: 3 stray orphan processes (PIDs 2320353-55, running the pre-rewrite
-  `app-mediakit-knowledge-2` binary directly since 2026-07-02 12:29, leftover from background job
-  `d9940d34`) were squatting all three wiki ports — blocking the real systemd services
-  (`local-knowledge-documentation/-projects/-corporate`) from starting. All three had been
-  crash-looping "Address already in use" for 18h and were sitting in `failed` state, undetected.
-- Auto-mode classifier correctly blocked the first kill attempt (PIDs belonged to another
-  session's job/scratchpad, not confirmed as safe) — stopped, explained the finding, got explicit
-  operator confirmation before killing.
-- Fix: killed the 3 stray PIDs, `systemctl reset-failed` + `start` on all three real units.
-  Verified 200 on HTML + all 5 stylesheets on 9090/9093/9095. Confirmed workspace VM ≠
-  public-facing box for these domains (IP/DNS mismatch) — no live traffic was affected.
-- Closed the loop: mailbox reply to Command with full root-cause writeup, inbox message archived,
-  NEXT.md item marked resolved (with lesson noted), artifact-registry CONFIG/ops row added,
-  `project-state-knowledge-platform.md` memory updated (second occurrence of this exact
-  orphan-process pattern — flagged as a recurring lesson). Committed `0b5369cb3`.
-
-**Pending / carry-forward (unchanged from session 27, none new):**
-- v2→v1 switch-back decision, trademark reconciliation, `pointsav-monorepo` sub-clone branch
-  mismatch — still Command's to resolve.
-- Stage-6 promote for this archive still blocked on project-console's shared
-  `app-console-content/cartridge.rs` conflict.
-- What's actually deployed on foundry-prod for the 3 public domains — still unconfirmed (today's
-  fix only touched workspace-VM local state, not prod).
-
-**Operator preference confirmed this session:** when a destructive action gets blocked by the
-auto-mode classifier for a legitimate but non-obvious reason (e.g. touching another session's
-process), stop and explain rather than retrying or working around it — a one-line confirmation
-from the operator was all that was needed to proceed cleanly.
 
